@@ -14,9 +14,9 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             min-height: 100vh;
-            color: #333;
+            color: #2d3748;
         }
 
         .container {
@@ -27,7 +27,7 @@
 
         .header {
             text-align: center;
-            color: white;
+            color: #2d3748;
             margin-bottom: 30px;
         }
 
@@ -58,7 +58,7 @@
         }
 
         .nav {
-            background: #4a5568;
+            background: #2d3748;
             color: white;
             padding: 20px;
             display: flex;
@@ -77,7 +77,7 @@
         }
 
         .btn {
-            background: #3182ce;
+            background: #4299e1;
             color: white;
             border: none;
             padding: 12px 24px;
@@ -85,11 +85,13 @@
             cursor: pointer;
             font-size: 16px;
             transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .btn:hover {
-            background: #2c5aa0;
-            transform: translateY(-2px);
+            background: #3182ce;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         .btn-secondary {
@@ -188,11 +190,12 @@
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
             color: white;
             padding: 25px;
             border-radius: 12px;
             text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         .stat-card h3 {
@@ -414,7 +417,21 @@
         <!-- Auth Container -->
         <div id="authContainer" class="auth-container">
             <div id="loginForm">
-                <h2 style="text-align: center; margin-bottom: 30px; color: #4a5568;">Login</h2>
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2d3748;">Login to IDCR System</h2>
+                
+                <!-- Demo Users Section -->
+                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h4 style="margin: 0 0 10px 0; color: #4a5568;">Demo Users - Click to Login:</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.manager@company.com', 'password123')">HR Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.employee@company.com', 'password123')">HR Employee</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('finance.manager@company.com', 'password123')">Finance Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('legal.manager@company.com', 'password123')">Legal Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('general.employee@company.com', 'password123')">General Employee</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('admin@company.com', 'admin123')">System Admin</button>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>Email:</label>
                     <input type="email" id="loginEmail" placeholder="Enter your email" required>
@@ -426,7 +443,7 @@
                 <button class="btn" style="width: 100%; margin-bottom: 15px;" onclick="loginUser()">Login</button>
                 <p style="text-align: center;">
                     Don't have an account? 
-                    <a href="#" onclick="showRegisterForm()" style="color: #3182ce;">Register here</a>
+                    <a href="#" onclick="showRegisterForm()" style="color: #4299e1;">Register here</a>
                 </p>
             </div>
 
@@ -482,9 +499,10 @@
             </div>
 
             <div class="tabs">
-                <button class="tab active" onclick="showTab('upload')">Upload Documents</button>
-                <button class="tab" onclick="showTab('documents')">My Documents</button>
-                <button class="tab" onclick="showTab('review')" id="reviewTab" style="display: none;">Review Documents</button>
+                <button class="tab active" onclick="showTab('upload')" id="uploadTab">Upload Documents</button>
+                <button class="tab" onclick="showTab('documents')" id="documentsTab">My Documents</button>
+                <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
+                <button class="tab" onclick="showTab('notifications')" id="notificationsTab" style="display: none;">Email Notifications</button>
                 <button class="tab" onclick="showTab('stats')">Statistics</button>
             </div>
 
@@ -568,6 +586,29 @@
                 </table>
 
                 <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div id="notificationsTab" class="tab-content hidden">
+                <h3>📧 Email Notifications</h3>
+                <p>See what email notifications would be sent to your department</p>
+                
+                <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                    <h4 style="color: #2d3748; margin-bottom: 15px;">📬 Your Department Email: <span id="deptEmail" style="color: #4299e1;"></span></h4>
+                    <p style="color: #718096; margin-bottom: 10px;">You would receive email notifications when:</p>
+                    <ul style="color: #718096; margin-left: 20px;">
+                        <li>New documents are uploaded and classified to your department</li>
+                        <li>Documents require review and approval</li>
+                        <li>High priority documents need immediate attention</li>
+                    </ul>
+                </div>
+
+                <div id="emailSimulation" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+                    <h4 style="color: #2d3748; margin-bottom: 15px;">📩 Recent Email Notifications (Demo)</h4>
+                    <div id="emailList">
+                        <p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Review Tab -->
@@ -748,24 +789,51 @@
             showLoginForm();
         }
 
+        async function quickLogin(email, password) {
+            document.getElementById('loginEmail').value = email;
+            document.getElementById('loginPassword').value = password;
+            await loginUser();
+        }
+
         function showMainContent() {
             document.getElementById('authContainer').classList.add('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
             
             // Update user info
-            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name}`;
+            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
             const deptBadge = document.getElementById('userDept');
             deptBadge.textContent = currentUser.department.toUpperCase();
             deptBadge.className = `department-badge dept-${currentUser.department}`;
 
-            // Show review tab for managers/admins
+            // Show tabs based on role
             if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-                document.getElementById('reviewTab').style.display = 'block';
+                document.getElementById('reviewTabBtn').style.display = 'block';
+                document.getElementById('notificationsTab').style.display = 'block';
+                
+                // Set department email for notifications
+                const deptEmails = {
+                    'hr': 'hr@company.com',
+                    'finance': 'finance@company.com', 
+                    'legal': 'legal@company.com',
+                    'sales': 'sales@company.com',
+                    'marketing': 'marketing@company.com',
+                    'it': 'it@company.com',
+                    'operations': 'operations@company.com',
+                    'support': 'support@company.com',
+                    'procurement': 'procurement@company.com',
+                    'product': 'product@company.com',
+                    'administration': 'administration@company.com',
+                    'executive': 'executive@company.com'
+                };
+                document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
             }
 
             // Load initial data
             loadStatistics();
             loadDocuments();
+            if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+                loadEmailNotifications();
+            }
         }
 
         function showTab(tabName) {
@@ -784,6 +852,8 @@
                 loadReviewDocuments();
             } else if (tabName === 'stats') {
                 loadStatistics();
+            } else if (tabName === 'notifications') {
+                loadEmailNotifications();
             }
         }
 
@@ -871,6 +941,13 @@
                     document.getElementById('fileList').innerHTML = '';
                     document.getElementById('uploadBtn').disabled = true;
                     loadStatistics();
+                    
+                    // Refresh notifications if user is manager/admin
+                    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+                        setTimeout(() => {
+                            loadEmailNotifications();
+                        }, 2000); // Wait for processing
+                    }
                 } else {
                     showToast(data.detail || 'Upload failed', 'error');
                 }
@@ -1113,9 +1190,10 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(`Document ${status} successfully!`, 'success');
+                    showToast(`Document ${status} successfully! User will receive email notification.`, 'success');
                     closeModal();
                     loadReviewDocuments();
+                    loadEmailNotifications();
                 } else {
                     showToast(data.detail || 'Review submission failed', 'error');
                 }
@@ -1195,6 +1273,46 @@
         function changePage(page) {
             currentPage = page;
             loadDocuments();
+        }
+
+        async function loadEmailNotifications() {
+            // Simulate email notifications for demo
+            const emailList = document.getElementById('emailList');
+            
+            try {
+                const response = await fetch('/api/documents/review?page=1&page_size=5', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.documents && data.documents.length > 0) {
+                    let emailHTML = '';
+                    data.documents.forEach(doc => {
+                        const time = new Date(doc.uploaded_at).toLocaleString();
+                        emailHTML += `
+                            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 10px; background: #f9fafb;">
+                                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                                    <strong style="color: #2d3748;">📧 New Document for Review</strong>
+                                    <small style="color: #718096;">${time}</small>
+                                </div>
+                                <p style="margin: 5px 0; color: #4a5568;"><strong>From:</strong> ${doc.uploaded_by || 'Unknown User'}</p>
+                                <p style="margin: 5px 0; color: #4a5568;"><strong>Document:</strong> ${doc.original_name}</p>
+                                <p style="margin: 5px 0; color: #4a5568;"><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
+                                <p style="margin: 5px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
+                                <p style="margin: 5px 0; color: #718096; font-size: 14px;">Please log into the IDCR system to review this document.</p>
+                            </div>
+                        `;
+                    });
+                    emailList.innerHTML = emailHTML;
+                } else {
+                    emailList.innerHTML = '<p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>';
+                }
+            } catch (error) {
+                emailList.innerHTML = '<p style="color: #e53e3e; text-align: center; padding: 20px;">Error loading notifications</p>';
+            }
         }
 
         function showToast(message, type = 'info') {

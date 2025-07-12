@@ -123,6 +123,28 @@ def init_database():
             VALUES (?, ?, ?, ?)
         ''', dept)
 
+    # Create default demo users for each department
+    demo_users = [
+        ('hr.manager@company.com', 'HR Manager', 'hr', 'manager', 'password123'),
+        ('hr.employee@company.com', 'HR Employee', 'hr', 'employee', 'password123'),
+        ('finance.manager@company.com', 'Finance Manager', 'finance', 'manager', 'password123'),
+        ('finance.employee@company.com', 'Finance Employee', 'finance', 'employee', 'password123'),
+        ('legal.manager@company.com', 'Legal Manager', 'legal', 'manager', 'password123'),
+        ('it.manager@company.com', 'IT Manager', 'it', 'manager', 'password123'),
+        ('sales.manager@company.com', 'Sales Manager', 'sales', 'manager', 'password123'),
+        ('general.employee@company.com', 'General Employee', 'general', 'employee', 'password123'),
+        ('admin@company.com', 'System Admin', 'administration', 'admin', 'admin123')
+    ]
+
+    for email, name, dept, role, password in demo_users:
+        user_id = str(uuid.uuid4())
+        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        cursor.execute(
+            '''
+            INSERT OR IGNORE INTO users (user_id, email, password_hash, full_name, department, role, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, email, password_hash, name, dept, role, datetime.datetime.utcnow().isoformat()))
+
     # Create documents table (updated with user info)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS documents (
@@ -1065,12 +1087,12 @@ async def get_review_documents(page: int = 1,
     where_clauses = []
     params = []
 
-    # Show documents from user's department or documents they uploaded
+    # Show documents based on user role and department
     if current_user['role'] == 'admin':
         # Admin can see all documents
         pass
     elif current_user['role'] == 'manager':
-        # Managers can see documents in their department
+        # Managers can see documents routed to their department (not just uploaded by them)
         where_clauses.append("department = ?")
         params.append(current_user['department'])
     else:
