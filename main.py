@@ -31,9 +31,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 import httpx
-import uvicorn
-import uuid
-import jwt
 from datetime import timedelta
 
 app = FastAPI(title="IDCR Enhanced Demo Server")
@@ -1071,4 +1068,4 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
 # Main startup
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)

@@ -1,7 +1,4 @@
-The code is updated to include better upload notifications and feedback, a notification system in HTML, notification styles and functions, notification JavaScript functions, and better review feedback.
-```
-
-```html
+html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1053,15 +1050,15 @@ The code is updated to include better upload notifications and feedback, a notif
         function showAlert(message, type) {
             const alertContainer = document.getElementById('alertContainer');
             const alertId = 'alert-' + Date.now();
-            
+
             const alertHtml = `
                 <div id="${alertId}" class="alert alert-${type}">
                     ${message}
                 </div>
             `;
-            
+
             alertContainer.innerHTML = alertHtml;
-            
+
             setTimeout(() => {
                 const alertElement = document.getElementById(alertId);
                 if (alertElement) {
@@ -1084,7 +1081,7 @@ The code is updated to include better upload notifications and feedback, a notif
         function handleFileDrop(e) {
             e.preventDefault();
             e.currentTarget.classList.remove('dragover');
-            
+
             const files = Array.from(e.dataTransfer.files);
             addFiles(files);
         }
@@ -1100,7 +1097,7 @@ The code is updated to include better upload notifications and feedback, a notif
                     selectedFiles.push(file);
                 }
             });
-            
+
             updateFileList();
             updateUploadButton();
         }
@@ -1113,7 +1110,7 @@ The code is updated to include better upload notifications and feedback, a notif
 
         function updateFileList() {
             const fileList = document.getElementById('fileList');
-            
+
             if (selectedFiles.length === 0) {
                 fileList.innerHTML = '';
                 return;
@@ -1140,7 +1137,7 @@ The code is updated to include better upload notifications and feedback, a notif
         function updateUploadButton() {
             const uploadBtn = document.getElementById('uploadBtn');
             const batchName = document.getElementById('batchNameInput').value.trim();
-            
+
             uploadBtn.disabled = selectedFiles.length === 0 || !batchName;
         }
 
@@ -1151,7 +1148,7 @@ The code is updated to include better upload notifications and feedback, a notif
 
         async function uploadFiles() {
             const batchName = document.getElementById('batchNameInput').value.trim();
-            
+
             if (!batchName) {
                 showAlert('Please enter a batch name', 'error');
                 return;
@@ -1169,7 +1166,7 @@ The code is updated to include better upload notifications and feedback, a notif
             try {
                 const formData = new FormData();
                 formData.append('batch_name', batchName);
-                
+
                 selectedFiles.forEach(file => {
                     formData.append('files', file);
                 });
@@ -1222,7 +1219,7 @@ The code is updated to include better upload notifications and feedback, a notif
 
         function displayStatistics(stats) {
             const statsGrid = document.getElementById('statsGrid');
-            
+
             const statsHtml = `
                 <div class="stat-card">
                     <div class="stat-icon">📊</div>
@@ -1245,7 +1242,7 @@ The code is updated to include better upload notifications and feedback, a notif
                     <div class="stat-label">Errors</div>
                 </div>
             `;
-            
+
             statsGrid.innerHTML = statsHtml;
         }
 
@@ -1253,7 +1250,7 @@ The code is updated to include better upload notifications and feedback, a notif
             try {
                 const filters = getFilters();
                 const queryParams = new URLSearchParams(filters);
-                
+
                 const response = await fetch(`/api/documents?${queryParams}`, {
                     headers: {
                         'Authorization': `Bearer ${authToken}`
@@ -1285,7 +1282,7 @@ The code is updated to include better upload notifications and feedback, a notif
 
         function displayDocuments(documents) {
             const documentsList = document.getElementById('documentsList');
-            
+
             if (documents.length === 0) {
                 documentsList.innerHTML = '<div class="loading">No documents found</div>';
                 return;
@@ -1312,7 +1309,7 @@ The code is updated to include better upload notifications and feedback, a notif
         function displayPagination(result) {
             const pagination = document.getElementById('pagination');
             const totalPages = Math.ceil(result.total_count / result.page_size);
-            
+
             if (totalPages <= 1) {
                 pagination.innerHTML = '';
                 return;
@@ -1348,3 +1345,6 @@ The code is updated to include better upload notifications and feedback, a notif
                 timeout = setTimeout(later, wait);
             };
         }
+    </script>
+</body>
+</html>
