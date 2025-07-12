@@ -251,14 +251,14 @@ class DocumentInfo(BaseModel):
     file_type: str
     uploaded_at: str
     processing_status: str
-    document_type: str = None
-    department: str = None
-    priority: str = None
-    classification_confidence: float = None
-    page_count: int = None
-    tags: List[str] = None
-    review_status: str = None
-    reviewed_by: str = None
+    document_type: Optional[str] = None
+    department: Optional[str] = None
+    priority: Optional[str] = None
+    classification_confidence: Optional[float] = None
+    page_count: Optional[int] = None
+    tags: Optional[List[str]] = None
+    review_status: Optional[str] = None
+    reviewed_by: Optional[str] = None
 
 
 class DocumentReview(BaseModel):
@@ -876,14 +876,14 @@ async def get_documents(page: int = 1,
                            file_type=row[3],
                            uploaded_at=row[4],
                            processing_status=row[5],
-                           document_type=row[6],
-                           department=row[7],
-                           priority=row[8],
-                           classification_confidence=row[9],
-                           page_count=row[10],
+                           document_type=row[6] or "",
+                           department=row[7] or "",
+                           priority=row[8] or "",
+                           classification_confidence=row[9] or 0.0,
+                           page_count=row[10] or 0,
                            tags=tags,
-                           review_status=row[12],
-                           reviewed_by=row[13])
+                           review_status=row[12] or "",
+                           reviewed_by=row[13] or "")
         documents.append(doc)
 
     return DocumentListResponse(documents=documents,
@@ -949,7 +949,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     total_docs = cursor.fetchone()[0]
 
     cursor.execute(
-        f'SELECT COUNT(*) FROM documents {basewhere} AND processing_status = "completed"',
+        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
         params)
     processed_docs = cursor.fetchone()[0]
 

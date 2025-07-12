@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import sys
 import os
+import uvicorn
 
 # Add the project root to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
@@ -36,3 +37,6 @@ async def send_notification(request: NotificationRequest):
 @app.get("/ping")
 async def ping():
     return {"message": "pong from Workflow Integration Service"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8004)

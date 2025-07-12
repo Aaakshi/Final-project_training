@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import sys
 import os
+import uvicorn
 
 # Add the project root to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
@@ -43,3 +44,6 @@ async def route_document(request: RoutingRequest):
 @app.get("/ping")
 async def ping():
     return {"message": "pong from Routing Engine Service"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8002)
