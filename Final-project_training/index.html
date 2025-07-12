@@ -809,11 +809,11 @@
         const pageSize = 20;
 
         // Check for existing auth token on page load
-        window.onload = async function() {
+        window.onload = function() {
             const token = localStorage.getItem('authToken');
             if (token) {
                 authToken = token;
-                await checkAuth();
+                checkAuth();
             }
         };
 
@@ -996,18 +996,20 @@
 
         // File upload functionality
         document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                const uploadArea = document.getElementById('uploadArea');
-                const fileInput = document.getElementById('fileInput');
-
-                if (uploadArea && fileInput) {
-                    uploadArea.addEventListener('click', () => fileInput.click());
-                    uploadArea.addEventListener('dragover', handleDragOver);
-                    uploadArea.addEventListener('drop', handleDrop);
-                    fileInput.addEventListener('change', handleFileSelect);
-                }
-            }, 100);
+            initializeFileUpload();
         });
+
+        function initializeFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            if (uploadArea && fileInput) {
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', handleDragOver);
+                uploadArea.addEventListener('drop', handleDrop);
+                fileInput.addEventListener('change', handleFileSelect);
+            }
+        }
 
         function handleDragOver(e) {
             e.preventDefault();

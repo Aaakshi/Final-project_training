@@ -414,11 +414,15 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
         return True  # Return True so the process continues
 
 
-# Mount static files
+# Mount static files for the project
 app.mount("/static",
-          StaticFiles(directory="."),
+          StaticFiles(directory="Final-project_training"),
           name="static")
 
+# Mount uploads directory
+app.mount("/uploads",
+          StaticFiles(directory="uploads"),
+          name="uploads")
 
 @app.get("/")
 async def serve_frontend():
@@ -428,6 +432,11 @@ async def serve_frontend():
 @app.get("/index.html")
 async def serve_index():
     """Alternative path to serve frontend"""
+    return FileResponse("Final-project_training/index.html")
+
+@app.get("/app")
+async def serve_app():
+    """Another path to serve frontend"""
     return FileResponse("Final-project_training/index.html")
 
 
