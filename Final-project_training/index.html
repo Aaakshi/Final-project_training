@@ -1365,15 +1365,21 @@
                     displayStatistics(stats);
                     renderCharts(stats);
                 } else {
-                    console.error('Failed to load statistics');
+                    console.error('Failed to load statistics:', stats);
+                    document.getElementById('statsGrid').innerHTML = '<p>Error loading statistics. Please try again.</p>';
                 }
             } catch (error) {
                 console.error('Failed to load statistics:', error);
+                document.getElementById('statsGrid').innerHTML = '<p>Error loading statistics. Please check your connection.</p>';
             }
         }
 
         function displayStatistics(stats) {
             const statsGrid = document.getElementById('statsGrid');
+            if (!statsGrid) {
+                console.error('Stats grid element not found');
+                return;
+            }
             statsGrid.innerHTML = `
                 <div class="stat-card">
                     <h3>${stats.total_documents || 0}</h3>

@@ -1392,73 +1392,123 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         # Build base query based on user role
         base_where = ""
         params = []
+        additional_where = ""
 
         if current_user['role'] == 'employee':
             base_where = "WHERE user_id = ?"
             params.append(current_user['user_id'])
+            additional_where = "AND"
         elif current_user['role'] != 'admin':
             base_where = "WHERE (user_id = ? OR department = ?)"
             params.extend([current_user['user_id'], current_user['department']])
+            additional_where = "AND"
 
         # Overall stats
         cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
         total_docs = cursor.fetchone()[0]
 
-        cursor.execute(
-            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
-            params)
-        processed_docs = cursor.fetchone()[0]
+        # For queries with additional conditions, handle WHERE clause properly
+        if base_where:
+            cursor.execute(
+                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
+                params + ["completed"])
+            processed_docs = cursor.fetchone()[0]
 
-        cursor.execute(
-            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "processing"',
-            params)
-        pending_docs = cursor.fetchone()[0]
+            cursor.execute(
+                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
+                params + ["processing"])
+            pending_docs = cursor.fetchone()[0]
 
-        cursor.execute(
-            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "failed"',
-            params)
-        error_docs = cursor.fetchone()[0]
+            cursor.execute(
+                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
+                params + ["failed"])
+            error_docs = cursor.fetchone()[0]
+        else:
+            cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["completed"])
+            processed_docs = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["processing"])
+            pending_docs = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["failed"])
+            error_docs = cursor.fetchone()[0]
 
         # Document type breakdown
-        cursor.execute(
-            f'''
-            SELECT document_type, COUNT(*) 
-            FROM documents 
-            {base_where} AND document_type IS NOT NULL 
-            GROUP BY document_type
-        ''', params)
+        if base_where:
+            cursor.execute(
+                f'''
+                SELECT document_type, COUNT(*) 
+                FROM documents 
+                {base_where} AND document_type IS NOT NULL 
+                GROUP BY document_type
+            ''', params)
+        else:
+            cursor.execute(
+                '''
+                SELECT document_type, COUNT(*) 
+                FROM documents 
+                WHERE document_type IS NOT NULL 
+                GROUP BY document_type
+            ''')
         doc_types = dict(cursor.fetchall())
 
         # Department breakdown
-        cursor.execute(
-            f'''
-            SELECT department, COUNT(*) 
-            FROM documents 
-            {base_where} AND department IS NOT NULL 
-            GROUP BY department
-        ''', params)
+        if base_where:
+            cursor.execute(
+                f'''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                {base_where} AND department IS NOT NULL 
+                GROUP BY department
+            ''', params)
+        else:
+            cursor.execute(
+                '''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                WHERE department IS NOT NULL 
+                GROUP BY department
+            ''')
         departments = dict(cursor.fetchall())
 
         # Priority breakdown
-        cursor.execute(
-            f'''
-            SELECT priority, COUNT(*) 
-            FROM documents 
-            {base_where} AND priority IS NOT NULL 
-            GROUP BY priority
-        ''', params)
+        if base_where:
+            cursor.execute(
+                f'''
+                SELECT priority, COUNT(*) 
+                FROM documents 
+                {base_where} AND priority IS NOT NULL 
+                GROUP BY priority
+            ''', params)
+        else:
+            cursor.execute(
+                '''
+                SELECT priority, COUNT(*) 
+                FROM documents 
+                WHERE priority IS NOT NULL 
+                GROUP BY priority
+            ''')
         priorities = dict(cursor.fetchall())
 
         # Monthly upload trends (last 6 months)
-        cursor.execute(
-            f'''
-            SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
-            FROM documents 
-            {base_where}
-            WHERE uploaded_at >= date('now', '-6 months')
-            GROUP BY DATE(uploaded_at)
-            ORDER BY upload_date
-        ''', params)
+        if base_where:
+            cursor.execute(
+                f'''
+                SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
+                FROM documents 
+                {base_where} AND uploaded_at >= date('now', '-6 months')
+                GROUP BY DATE(uploaded_at)
+                ORDER BY upload_date
+            ''', params)
+        else:
+            cursor.execute(
+                '''
+                SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
+                FROM documents 
+                WHERE uploaded_at >= date('now', '-6 months')
+                GROUP BY DATE(uploaded_at)
+                ORDER BY upload_date
+            ''')
         daily_uploads = cursor.fetchall()
 
         return {
