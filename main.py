@@ -8,10 +8,20 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import uvicorn
 
 app = FastAPI(title="IDCR Demo Server")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global variable to track backend processes
 backend_processes = []
@@ -167,14 +177,14 @@ def start_backend():
             ], 
             cwd=service_path, 
             env=env,
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL, 
+            stderr=subprocess.DEVNULL,
             preexec_fn=os.setsid  # Create new process group
             )
             
             backend_processes.append(process)
             print(f"✓ Started {service_path.split('/')[-1]} service on port {port}")
-            time.sleep(1.5)  # Give each service time to start
+            time.sleep(2.5)  # Give each service time to start
             
         except Exception as e:
             print(f"✗ Failed to start service {service_path}: {e}")

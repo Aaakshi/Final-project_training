@@ -1,5 +1,5 @@
+
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 import sys
 import os
 
@@ -16,18 +16,10 @@ except ImportError:
 
 app = FastAPI(title="API Gateway")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.get("/ping")
 async def ping():
     return {"message": "pong from API Gateway"}
 
-@app.on_startup
-async def startup_event():
-    logger.info("API Gateway started")
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "service": "api_gateway"}

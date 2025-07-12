@@ -22,39 +22,23 @@ class RoutingRequest(BaseModel):
 
 class RoutingResponse(BaseModel):
     assignee: str
-    priority: int
+    priority: str
 
 @app.post("/route")
 async def route_document(request: RoutingRequest):
-    # Mock routing logic
-    assignee = "finance_team" if request.doc_type == "invoice" else "legal_team"
-    priority = 1
-    logger.info(f"Routed document {request.doc_id} to {assignee}")
-    return RoutingResponse(assignee=assignee, priority=priority)
-
-@app.get("/ping")
-async def ping():
-    return {"message": "pong from Routing Engine Service"}
-
-class RoutingResponse(BaseModel):
-    assignee: str
-    department: str
-
-@app.post("/route")
-async def route_document(request: RoutingRequest):
-    # Mock routing logic based on document type
+    # Simple routing logic based on document type
     if request.doc_type == "invoice":
         assignee = "finance_team"
-        department = "Finance"
+        priority = "high"
     elif request.doc_type == "contract":
         assignee = "legal_team"
-        department = "Legal"
+        priority = "medium"
     else:
         assignee = "general_team"
-        department = "General"
-    
+        priority = "low"
+
     logger.info(f"Routed document {request.doc_id} to {assignee}")
-    return RoutingResponse(assignee=assignee, department=department)
+    return RoutingResponse(assignee=assignee, priority=priority)
 
 @app.get("/ping")
 async def ping():
