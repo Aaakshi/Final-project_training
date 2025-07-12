@@ -29,3 +29,23 @@ args = "python main.py"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8001
+externalPort = 3000
+
+[[ports]]
+localPort = 8002
+externalPort = 3001
+
+[[ports]]
+localPort = 8003
+externalPort = 3002
+
+[[ports]]
+localPort = 8004
+externalPort = 3003
