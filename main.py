@@ -491,6 +491,13 @@ async def health_check():
     return {"services": status}
 
 
+# Microservice URLs - using existing microservices
+CLASSIFICATION_SERVICE_URL = "http://localhost:8001"
+ROUTING_ENGINE_URL = "http://localhost:8002"
+CONTENT_ANALYSIS_URL = "http://localhost:8003"
+WORKFLOW_INTEGRATION_URL = "http://localhost:8004"
+
+
 @app.post("/api/bulk-upload", response_model=BulkUploadResponse)
 async def bulk_upload_documents(
         files: List[UploadFile] = File(...),
@@ -622,7 +629,7 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                         "file": (doc_row[2], f, doc_row[6])
                     }  # original_name, content, mime_type
                     response = await client.post(
-                        "http://0.0.0.0:8001/classify", files=files_payload)
+                        CLASSIFICATION_SERVICE_URL + "/classify", files=files_payload)
 
                     if response.status_code == 200:
                         result = response.json()
@@ -942,7 +949,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     total_docs = cursor.fetchone()[0]
 
     cursor.execute(
-        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
+        f'SELECT COUNT(*) FROM documents {basewhere} AND processing_status = "completed"',
         params)
     processed_docs = cursor.fetchone()[0]
 
