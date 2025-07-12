@@ -7,6 +7,8 @@ import asyncio
 import subprocess
 import os
 import uvicorn
+import time
+import sys
 
 app = FastAPI(title="IDCR Demo Server")
 
@@ -21,11 +23,11 @@ async def serve_frontend():
 async def health_check():
     """Check if backend services are running"""
     services = {
-        "api_gateway": "http://localhost:8000",
-        "classification": "http://localhost:8001", 
-        "routing_engine": "http://localhost:8002",
-        "content_analysis": "http://localhost:8003",
-        "workflow_integration": "http://localhost:8004"
+        "api_gateway": "http://0.0.0.0:8000",
+        "classification": "http://0.0.0.0:8001", 
+        "routing_engine": "http://0.0.0.0:8002",
+        "content_analysis": "http://0.0.0.0:8003",
+        "workflow_integration": "http://0.0.0.0:8004"
     }
     
     status = {}
@@ -106,36 +108,49 @@ def start_backend():
     """Start all microservices"""
     print("Starting backend microservices...")
     
-    # Change to the project directory
-    os.chdir("Final-project_training")
-    
-    # Start individual Python services directly
+    # Services with their paths and ports
     services = [
-        ("microservices/api_gateway/app", 8000),
-        ("microservices/classification/app", 8001),
-        ("microservices/routing_engine/app", 8002),
-        ("microservices/content_analysis/app", 8003),
-        ("microservices/workflow_integration/app", 8004)
+        ("Final-project_training/microservices/api_gateway/app", 8000),
+        ("Final-project_training/microservices/classification/app", 8001),
+        ("Final-project_training/microservices/routing_engine/app", 8002),
+        ("Final-project_training/microservices/content_analysis/app", 8003),
+        ("Final-project_training/microservices/workflow_integration/app", 8004)
     ]
     
+    processes = []
     for service_path, port in services:
         try:
-            subprocess.Popen([
-                "python", "-m", "uvicorn", "main:app", 
+            # Add the service path to Python path
+            env = os.environ.copy()
+            env['PYTHONPATH'] = f"{service_path}:{env.get('PYTHONPATH', '')}"
+            
+            process = subprocess.Popen([
+                sys.executable, "-m", "uvicorn", "main:app", 
                 "--host", "0.0.0.0", "--port", str(port)
-            ], cwd=service_path)
+            ], cwd=service_path, env=env)
+            
+            processes.append(process)
             print(f"Started service at {service_path} on port {port}")
+            time.sleep(1)  # Small delay between service starts
+            
         except Exception as e:
             print(f"Failed to start service {service_path}: {e}")
+    
+    return processes
 
 if __name__ == "__main__":
     # Start backend services
-    start_backend()
+    backend_processes = start_backend()
     
-    # Wait a moment for services to start
+    # Wait for services to initialize
     print("Waiting for services to initialize...")
-    asyncio.run(asyncio.sleep(5))
+    time.sleep(8)
     
-    # Start the demo frontend server
-    print("Starting demo frontend server on http://0.0.0.0:5000")
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    try:
+        # Start the demo frontend server
+        print("Starting demo frontend server on http://0.0.0.0:5000")
+        uvicorn.run(app, host="0.0.0.0", port=5000)
+    except KeyboardInterrupt:
+        print("Shutting down services...")
+        for process in backend_processes:
+            process.terminate()
