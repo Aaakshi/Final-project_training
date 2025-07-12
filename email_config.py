@@ -19,13 +19,21 @@ EMAIL_CONFIG = {
     # Email templates
     "FROM_NAME": "IDCR System",
     
-    # Department email addresses (customize these for your organization)
+    # Department email addresses - DUMMY EMAILS FOR TESTING
     "DEPARTMENT_EMAILS": {
-        "finance": "finance@your-company.com",
-        "legal": "legal@your-company.com", 
-        "hr": "hr@your-company.com",
-        "it": "it@your-company.com",
-        "general": "general@your-company.com"
+        "hr": "hr.manager@democompany.com",
+        "finance": "finance.manager@democompany.com",
+        "legal": "legal.manager@democompany.com",
+        "sales": "sales.manager@democompany.com",
+        "marketing": "marketing.manager@democompany.com",
+        "it": "it.manager@democompany.com",
+        "operations": "operations.manager@democompany.com",
+        "support": "support.manager@democompany.com",
+        "procurement": "procurement.manager@democompany.com",
+        "product": "product.manager@democompany.com",
+        "administration": "admin.manager@democompany.com",
+        "executive": "executive.manager@democompany.com",
+        "general": "general.manager@democompany.com"
     }
 }
 

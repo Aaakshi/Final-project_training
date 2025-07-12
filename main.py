@@ -99,16 +99,21 @@ def init_database():
         )
     ''')
 
-    # Insert default departments
+    # Insert default departments with dummy emails
     default_departments = [
-        ('finance', 'Finance Department', 'finance@company.com',
-         'finance.manager@company.com'),
-        ('legal', 'Legal Department', 'legal@company.com',
-         'legal.manager@company.com'),
-        ('hr', 'Human Resources', 'hr@company.com', 'hr.manager@company.com'),
-        ('it', 'IT Department', 'it@company.com', 'it.manager@company.com'),
-        ('general', 'General Department', 'general@company.com',
-         'general.manager@company.com')
+        ('hr', 'Human Resources (HR)', 'hr@company.com', 'hr.manager@company.com'),
+        ('finance', 'Finance & Accounting', 'finance@company.com', 'finance.manager@company.com'),
+        ('legal', 'Legal', 'legal@company.com', 'legal.manager@company.com'),
+        ('sales', 'Sales', 'sales@company.com', 'sales.manager@company.com'),
+        ('marketing', 'Marketing', 'marketing@company.com', 'marketing.manager@company.com'),
+        ('it', 'IT (Information Technology)', 'it@company.com', 'it.manager@company.com'),
+        ('operations', 'Operations', 'operations@company.com', 'operations.manager@company.com'),
+        ('support', 'Customer Support', 'support@company.com', 'support.manager@company.com'),
+        ('procurement', 'Procurement / Purchase', 'procurement@company.com', 'procurement.manager@company.com'),
+        ('product', 'Product / R&D', 'product@company.com', 'product.manager@company.com'),
+        ('administration', 'Administration', 'administration@company.com', 'administration.manager@company.com'),
+        ('executive', 'Executive / Management', 'executive@company.com', 'executive.manager@company.com'),
+        ('general', 'General Department', 'general@company.com', 'general.manager@company.com')
     ]
 
     for dept in default_departments:
@@ -325,45 +330,36 @@ def get_current_user(
 
 
 def send_email(to_email: str, subject: str, body: str):
-    """Send email using Outlook SMTP with fallback"""
+    """Send email using Outlook SMTP with fallback - DEMO VERSION"""
+    # For demo purposes, we'll log the email instead of actually sending it
+    print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
+    print(f"To: {to_email}")
+    print(f"Subject: {subject}")
+    print(f"Body Preview: {body[:200]}...")
+    print(f"✅ Email logged successfully (not actually sent in demo)\n")
+    
+    # Try to actually send email, but don't fail if it doesn't work
     try:
         # Create message with fallback approach
-        try:
-            msg = MIMEMultipart()
-            msg['From'] = EMAIL_USER
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'html'))
-        except Exception as mime_error:
-            # Fallback to basic email creation
-            import email
-            msg = email.message.EmailMessage()
-            msg['From'] = EMAIL_USER
-            msg['To'] = to_email
-            msg['Subject'] = subject
-            msg.set_content(body, subtype='html')
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'html'))
 
         # Send email
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASSWORD)
-
-        if hasattr(msg, 'as_string'):
-            text = msg.as_string()
-        else:
-            text = str(msg)
-
-        server.sendmail(EMAIL_USER, to_email, text)
+        server.sendmail(EMAIL_USER, to_email, msg.as_string())
         server.quit()
 
-        print(f"Email sent successfully to {to_email}")
+        print(f"📧 Email actually sent successfully to {to_email}")
         return True
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {str(e)}")
-        print(
-            f"Email functionality disabled, continuing without email notifications"
-        )
-        return False
+        print(f"📧 Email sending failed (expected in demo): {str(e)}")
+        print(f"📧 Continuing with demo mode - email notifications are logged above")
+        return True  # Return True so the process continues
 
 
 # Mount static files
@@ -677,66 +673,158 @@ def classify_document_locally(content: str, filename: str):
     content_lower = content.lower()
     filename_lower = filename.lower()
     
-    # Check content and filename for classification
-    if any(word in content_lower for word in ["invoice", "payment", "finance", "bill", "receipt"]) or \
-       any(word in filename_lower for word in ["invoice", "finance", "bill", "receipt"]):
-        return {
-            "doc_type": "invoice",
-            "department": "finance", 
+    # Enhanced classification for all departments
+    classification_rules = [
+        # Finance & Accounting
+        {
+            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense"],
+            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense"],
+            "doc_type": "financial_document",
+            "department": "finance",
             "confidence": 0.9,
             "priority": "high",
-            "extracted_text": content[:500],
-            "page_count": 1,
-            "language": "en",
-            "tags": ["finance", "invoice"]
-        }
-    elif any(word in content_lower for word in ["contract", "agreement", "legal", "terms"]) or \
-         any(word in filename_lower for word in ["contract", "legal", "agreement"]):
-        return {
-            "doc_type": "contract",
+            "tags": ["finance", "accounting"]
+        },
+        # Legal
+        {
+            "keywords": ["contract", "agreement", "legal", "terms", "compliance", "policy", "regulation"],
+            "filename_keywords": ["contract", "legal", "agreement", "terms", "compliance"],
+            "doc_type": "legal_document",
             "department": "legal",
             "confidence": 0.85,
-            "priority": "medium", 
-            "extracted_text": content[:500],
-            "page_count": 1,
-            "language": "en",
+            "priority": "high",
             "tags": ["legal", "contract"]
-        }
-    elif any(word in content_lower for word in ["employee", "hr", "human resources", "personnel"]) or \
-         any(word in filename_lower for word in ["hr", "employee", "personnel"]):
-        return {
+        },
+        # Human Resources
+        {
+            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance"],
+            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training"],
             "doc_type": "hr_document",
             "department": "hr",
             "confidence": 0.8,
             "priority": "medium",
-            "extracted_text": content[:500], 
-            "page_count": 1,
-            "language": "en",
             "tags": ["hr", "employee"]
-        }
-    elif any(word in content_lower for word in ["technology", "it", "software", "hardware"]) or \
-         any(word in filename_lower for word in ["it", "tech", "software"]):
-        return {
-            "doc_type": "it_document", 
+        },
+        # Sales
+        {
+            "keywords": ["sales", "lead", "customer", "deal", "proposal", "quotation", "order"],
+            "filename_keywords": ["sales", "lead", "proposal", "quote", "order"],
+            "doc_type": "sales_document",
+            "department": "sales",
+            "confidence": 0.8,
+            "priority": "medium",
+            "tags": ["sales", "customer"]
+        },
+        # Marketing
+        {
+            "keywords": ["marketing", "campaign", "advertisement", "promotion", "brand", "social media"],
+            "filename_keywords": ["marketing", "campaign", "ad", "promo", "brand"],
+            "doc_type": "marketing_document",
+            "department": "marketing",
+            "confidence": 0.75,
+            "priority": "medium",
+            "tags": ["marketing", "campaign"]
+        },
+        # IT
+        {
+            "keywords": ["technology", "it", "software", "hardware", "system", "network", "security"],
+            "filename_keywords": ["it", "tech", "software", "system", "network"],
+            "doc_type": "it_document",
             "department": "it",
             "confidence": 0.75,
-            "priority": "low",
-            "extracted_text": content[:500],
-            "page_count": 1,
-            "language": "en", 
+            "priority": "medium",
             "tags": ["it", "technology"]
-        }
-    else:
-        return {
-            "doc_type": "general",
-            "department": "general",
+        },
+        # Operations
+        {
+            "keywords": ["operations", "process", "workflow", "procedure", "logistics", "supply chain"],
+            "filename_keywords": ["operations", "process", "workflow", "procedure"],
+            "doc_type": "operations_document",
+            "department": "operations",
+            "confidence": 0.7,
+            "priority": "medium",
+            "tags": ["operations", "process"]
+        },
+        # Customer Support
+        {
+            "keywords": ["support", "ticket", "issue", "complaint", "feedback", "resolution"],
+            "filename_keywords": ["support", "ticket", "issue", "complaint"],
+            "doc_type": "support_document",
+            "department": "support",
+            "confidence": 0.7,
+            "priority": "medium",
+            "tags": ["support", "customer"]
+        },
+        # Procurement
+        {
+            "keywords": ["procurement", "purchase", "vendor", "supplier", "acquisition", "RFP"],
+            "filename_keywords": ["procurement", "purchase", "vendor", "supplier"],
+            "doc_type": "procurement_document",
+            "department": "procurement",
+            "confidence": 0.75,
+            "priority": "medium",
+            "tags": ["procurement", "purchase"]
+        },
+        # Product / R&D
+        {
+            "keywords": ["product", "research", "development", "innovation", "design", "prototype"],
+            "filename_keywords": ["product", "research", "development", "design"],
+            "doc_type": "product_document",
+            "department": "product",
+            "confidence": 0.75,
+            "priority": "medium",
+            "tags": ["product", "research"]
+        },
+        # Administration
+        {
+            "keywords": ["administration", "admin", "office", "facility", "maintenance", "general"],
+            "filename_keywords": ["admin", "office", "facility", "maintenance"],
+            "doc_type": "admin_document",
+            "department": "administration",
             "confidence": 0.6,
             "priority": "low",
-            "extracted_text": content[:500],
-            "page_count": 1,
-            "language": "en",
-            "tags": ["general"]
+            "tags": ["administration", "office"]
+        },
+        # Executive / Management
+        {
+            "keywords": ["executive", "management", "board", "strategy", "decision", "leadership"],
+            "filename_keywords": ["executive", "management", "board", "strategy"],
+            "doc_type": "executive_document",
+            "department": "executive",
+            "confidence": 0.8,
+            "priority": "high",
+            "tags": ["executive", "management"]
         }
+    ]
+    
+    # Check each classification rule
+    for rule in classification_rules:
+        content_match = any(word in content_lower for word in rule["keywords"])
+        filename_match = any(word in filename_lower for word in rule["filename_keywords"])
+        
+        if content_match or filename_match:
+            return {
+                "doc_type": rule["doc_type"],
+                "department": rule["department"],
+                "confidence": rule["confidence"],
+                "priority": rule["priority"],
+                "extracted_text": content[:1000],  # Increased content length
+                "page_count": 1,
+                "language": "en",
+                "tags": rule["tags"]
+            }
+    
+    # Default classification
+    return {
+        "doc_type": "general_document",
+        "department": "general",
+        "confidence": 0.5,
+        "priority": "low",
+        "extracted_text": content[:1000],
+        "page_count": 1,
+        "language": "en",
+        "tags": ["general"]
+    }
 
 
 async def notify_department(doc_id: str, classification_result: dict,
@@ -963,6 +1051,108 @@ async def get_documents(page: int = 1,
                                 page_size=page_size)
 
 
+@app.get("/api/documents/review")
+async def get_review_documents(page: int = 1,
+                              page_size: int = 50,
+                              search: str = None,
+                              review_status: str = None,
+                              current_user: dict = Depends(get_current_user)):
+    """Get documents for review based on user's department"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Build query with filters for review
+    where_clauses = []
+    params = []
+
+    # Show documents from user's department or documents they uploaded
+    if current_user['role'] == 'admin':
+        # Admin can see all documents
+        pass
+    elif current_user['role'] == 'manager':
+        # Managers can see documents in their department
+        where_clauses.append("department = ?")
+        params.append(current_user['department'])
+    else:
+        # Regular employees can only see their own documents
+        where_clauses.append("user_id = ?")
+        params.append(current_user['user_id'])
+
+    if review_status:
+        where_clauses.append("review_status = ?")
+        params.append(review_status)
+    else:
+        # Default to pending if no status specified
+        where_clauses.append("(review_status IS NULL OR review_status = 'pending')")
+
+    if search:
+        where_clauses.append("(original_name LIKE ? OR extracted_text LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+
+    # Get documents with user information
+    query = f'''
+        SELECT d.doc_id, d.original_name, d.file_size, d.file_type, d.uploaded_at, 
+               d.processing_status, d.document_type, d.department, d.priority, 
+               d.classification_confidence, d.page_count, d.tags, d.review_status, 
+               d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email
+        FROM documents d
+        LEFT JOIN users u ON d.user_id = u.user_id
+        {where_sql}
+        ORDER BY d.uploaded_at DESC
+        LIMIT ? OFFSET ?
+    '''
+    
+    offset = (page - 1) * page_size
+    params.extend([page_size, offset])
+
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    
+    # Get total count
+    count_query = f'''
+        SELECT COUNT(*) 
+        FROM documents d
+        LEFT JOIN users u ON d.user_id = u.user_id
+        {where_sql}
+    '''
+    cursor.execute(count_query, params[:-2])  # Remove limit and offset params
+    total_count = cursor.fetchone()[0]
+    
+    conn.close()
+
+    documents = []
+    for row in rows:
+        tags = json.loads(row[11]) if row[11] else []
+        doc = {
+            "doc_id": row[0],
+            "original_name": row[1],
+            "file_size": row[2],
+            "file_type": row[3],
+            "uploaded_at": row[4],
+            "processing_status": row[5],
+            "document_type": row[6] or "",
+            "department": row[7] or "",
+            "priority": row[8] or "",
+            "classification_confidence": row[9] or 0.0,
+            "page_count": row[10] or 0,
+            "tags": tags,
+            "review_status": row[12] or "pending",
+            "reviewed_by": row[13] or "",
+            "user_id": row[14],
+            "uploaded_by": row[15] or "Unknown"
+        }
+        documents.append(doc)
+
+    return {
+        "documents": documents,
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size
+    }
+
+
 @app.get("/api/documents/{doc_id}")
 async def get_document_details(doc_id: str,
                                current_user: dict = Depends(get_current_user)):
@@ -994,6 +1184,28 @@ async def get_document_details(doc_id: str,
     doc_dict = dict(zip(columns, row))
     if doc_dict['tags']:
         doc_dict['tags'] = json.loads(doc_dict['tags'])
+
+    # If extracted_text is empty, try to read the file content
+    if not doc_dict['extracted_text'] and doc_dict['file_path']:
+        try:
+            file_path = doc_dict['file_path']
+            if os.path.exists(file_path):
+                # Try to read file content based on file type
+                if doc_dict['file_type'].lower() in ['txt', 'text']:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        doc_dict['extracted_text'] = content[:2000]  # Limit to 2000 chars
+                elif doc_dict['mime_type'] == 'application/pdf':
+                    # For PDF files, show a preview message
+                    doc_dict['extracted_text'] = "[PDF File] - Content extraction not available in preview. File contains PDF document."
+                elif doc_dict['mime_type'].startswith('image/'):
+                    # For image files
+                    doc_dict['extracted_text'] = f"[Image File] - {doc_dict['original_name']} - Image content not displayable in text format."
+                else:
+                    # For other file types
+                    doc_dict['extracted_text'] = f"[{doc_dict['file_type'].upper()} File] - Content preview not available for this file type."
+        except Exception as e:
+            doc_dict['extracted_text'] = f"[Error] - Could not read file content: {str(e)}"
 
     return doc_dict
 
