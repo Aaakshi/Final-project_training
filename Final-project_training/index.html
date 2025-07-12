@@ -636,7 +636,7 @@
         };
 
         // API Base URL (adjust as needed)
-        const API_BASE = 'http://localhost:8000';
+        const API_BASE = 'http://0.0.0.0:5000';
 
         // DOM Elements
         const loginForm = document.getElementById('loginForm');
@@ -656,6 +656,7 @@
 
             setupEventListeners();
             loadMockData();
+            checkBackendHealth();
         });
 
         function setupEventListeners() {
@@ -843,20 +844,51 @@
             updateStats();
             renderDocuments();
 
-            // Simulate processing
-            setTimeout(() => {
-                processDocument(docId);
-            }, 2000);
+            // Process document through backend pipeline
+            try {
+                const response = await fetch(`${API_BASE}/api/classify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    processDocument(docId, result.results);
+                } else {
+                    markDocumentError(docId, result.error);
+                }
+            } catch (error) {
+                markDocumentError(docId, 'Backend services unavailable');
+            }
         }
 
-        function processDocument(docId) {
+        function processDocument(docId, results) {
             const doc = documents.find(d => d.id === docId);
             if (doc) {
                 doc.status = 'processed';
-                doc.assignee = getAssignee(doc.type);
+                doc.assignee = results.routing?.assignee || getAssignee(doc.type);
+                doc.classification = results.classification;
+                doc.analysis = results.analysis;
 
                 stats.pending--;
                 stats.processed++;
+
+                updateStats();
+                renderDocuments();
+            }
+        }
+
+        function markDocumentError(docId, error) {
+            const doc = documents.find(d => d.id === docId);
+            if (doc) {
+                doc.status = 'error';
+                doc.error = error;
+
+                stats.pending--;
+                stats.error++;
 
                 updateStats();
                 renderDocuments();
@@ -927,6 +959,16 @@
 
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString();
+        }
+
+        async function checkBackendHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                console.log('Backend services status:', data.services);
+            } catch (error) {
+                console.log('Backend health check failed:', error);
+            }
         }
 
         function loadMockData() {

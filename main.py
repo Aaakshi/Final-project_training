@@ -15,10 +15,6 @@ app.mount("/static", StaticFiles(directory="Final-project_training"), name="stat
 
 @app.get("/")
 async def serve_frontend():
-    return FileResponse("Final-project_training/demo.html")
-
-@app.get("/index")
-async def serve_original():
     return FileResponse("Final-project_training/index.html")
 
 @app.get("/health")
@@ -43,58 +39,59 @@ async def health_check():
     
     return {"services": status}
 
-@app.post("/demo/classify")
-async def demo_classify():
-    """Demo endpoint that simulates document classification flow"""
+@app.post("/api/classify")
+async def classify_document():
+    """Classify document through the processing pipeline"""
     try:
         # Simulate the full pipeline
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             # 1. Classify document
             classify_response = await client.post(
-                "http://localhost:8001/classify",
-                files={"file": ("demo.txt", b"This is an invoice for $1000", "text/plain")}
+                "http://0.0.0.0:8001/classify",
+                files={"file": ("document.txt", b"This is an invoice for $1000", "text/plain")}
             )
             
             if classify_response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Classification failed")
+                return {"error": "Classification service unavailable"}
             
             classification = classify_response.json()
             
             # 2. Route document
             route_response = await client.post(
-                "http://localhost:8002/route",
-                json={"doc_id": "demo-123", "doc_type": classification["doc_type"]}
+                "http://0.0.0.0:8002/route",
+                json={"doc_id": "doc-123", "doc_type": classification["doc_type"]}
             )
             
             if route_response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Routing failed")
+                return {"error": "Routing service unavailable"}
             
             routing = route_response.json()
             
             # 3. Analyze content
             analysis_response = await client.post(
-                "http://localhost:8003/analyze",
-                json={"doc_id": "demo-123", "content": "This is an invoice for $1000"}
+                "http://0.0.0.0:8003/analyze",
+                json={"doc_id": "doc-123", "content": "This is an invoice for $1000"}
             )
             
             if analysis_response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Analysis failed")
+                return {"error": "Analysis service unavailable"}
             
             analysis = analysis_response.json()
             
             # 4. Send notification
             notify_response = await client.post(
-                "http://localhost:8004/notify",
-                json={"doc_id": "demo-123", "assignee": routing["assignee"]}
+                "http://0.0.0.0:8004/notify",
+                json={"doc_id": "doc-123", "assignee": routing["assignee"]}
             )
             
             if notify_response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Notification failed")
+                return {"error": "Notification service unavailable"}
             
             notification = notify_response.json()
             
             return {
-                "demo_results": {
+                "success": True,
+                "results": {
                     "classification": classification,
                     "routing": routing,
                     "analysis": analysis,
@@ -103,7 +100,7 @@ async def demo_classify():
             }
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Demo failed: {str(e)}")
+        return {"error": f"Pipeline failed: {str(e)}"}
 
 def start_backend():
     """Start all microservices"""
@@ -112,30 +109,24 @@ def start_backend():
     # Change to the project directory
     os.chdir("Final-project_training")
     
-    # Start services using docker-compose
-    try:
-        subprocess.run(["docker-compose", "up", "-d"], check=True)
-        print("Backend services started successfully!")
-    except subprocess.CalledProcessError:
-        print("Failed to start with docker-compose, trying individual services...")
-        # Fallback: start individual Python services
-        services = [
-            ("microservices/api_gateway/app", 8000),
-            ("microservices/classification/app", 8001),
-            ("microservices/routing_engine/app", 8002),
-            ("microservices/content_analysis/app", 8003),
-            ("microservices/workflow_integration/app", 8004)
-        ]
-        
-        for service_path, port in services:
-            try:
-                subprocess.Popen([
-                    "python", "-m", "uvicorn", "main:app", 
-                    "--host", "0.0.0.0", "--port", str(port)
-                ], cwd=service_path)
-                print(f"Started service at {service_path} on port {port}")
-            except Exception as e:
-                print(f"Failed to start service {service_path}: {e}")
+    # Start individual Python services directly
+    services = [
+        ("microservices/api_gateway/app", 8000),
+        ("microservices/classification/app", 8001),
+        ("microservices/routing_engine/app", 8002),
+        ("microservices/content_analysis/app", 8003),
+        ("microservices/workflow_integration/app", 8004)
+    ]
+    
+    for service_path, port in services:
+        try:
+            subprocess.Popen([
+                "python", "-m", "uvicorn", "main:app", 
+                "--host", "0.0.0.0", "--port", str(port)
+            ], cwd=service_path)
+            print(f"Started service at {service_path} on port {port}")
+        except Exception as e:
+            print(f"Failed to start service {service_path}: {e}")
 
 if __name__ == "__main__":
     # Start backend services
