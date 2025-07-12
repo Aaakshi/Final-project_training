@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -962,4 +963,17 @@
 
             stats = {
                 total: documents.length,
-                processed: documents.filter(
+                processed: documents.filter(d => d.status === 'processed').length,
+                pending: documents.filter(d => d.status === 'pending').length,
+                error: documents.filter(d => d.status === 'error').length
+            };
+
+            // Only update UI if user is logged in
+            if (currentUser) {
+                updateStats();
+                renderDocuments();
+            }
+        }
+    </script>
+</body>
+</html>
