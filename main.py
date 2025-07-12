@@ -1,4 +1,3 @@
-
 import asyncio
 import subprocess
 import sys
@@ -13,14 +12,14 @@ import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional
 try:
-    from email.mime.text import MimeText
-    from email.mime.multipart import MimeMultipart
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
 except ImportError:
     # Fallback for email imports
     import email.mime.text as mime_text
     import email.mime.multipart as mime_multipart
-    MimeText = mime_text.MimeText
-    MimeMultipart = mime_multipart.MimeMultipart
+    MIMEText = mime_text.MIMEText
+    MIMEMultipart = mime_multipart.MIMEMultipart
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -59,8 +58,8 @@ except ImportError:
     # Fallback to default values
     SMTP_SERVER = "smtp-mail.outlook.com"
     SMTP_PORT = 587
-    EMAIL_USER = "your-email@outlook.com"  # Replace with your Outlook email
-    EMAIL_PASSWORD = "your-app-password"  # Replace with your app password
+    EMAIL_USER = "akshipersonal003@gmail.com"  # Replace with your Outlook email
+    EMAIL_PASSWORD = "Akshi@2003"  # Replace with your app password
 
 # Global variable to track backend processes
 backend_processes = []
@@ -288,11 +287,11 @@ def send_email(to_email: str, subject: str, body: str):
     try:
         # Create message with fallback approach
         try:
-            msg = MimeMultipart()
+            msg = MIMEMultipart()
             msg['From'] = EMAIL_USER
             msg['To'] = to_email
             msg['Subject'] = subject
-            msg.attach(MimeText(body, 'html'))
+            msg.attach(MIMEText(body, 'html'))
         except Exception as mime_error:
             # Fallback to basic email creation
             import email
