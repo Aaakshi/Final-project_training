@@ -288,7 +288,7 @@ def verify_password(password: str, hashed: str) -> bool:
 def create_access_token(data: dict):
     """Create JWT access token"""
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(hours=24)
+    expire = datetime.datetime.utcnow() + timedelta(hours=24)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -371,7 +371,7 @@ def send_email(to_email: str, subject: str, body: str):
 
 # Mount static files
 app.mount("/static",
-          StaticFiles(directory="Final-project_training"),
+          StaticFiles(directory="."),
           name="static")
 
 
@@ -409,7 +409,7 @@ async def register_user(user_data: UserRegistration):
         INSERT INTO users (user_id, email, password_hash, full_name, department, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (user_id, user_data.email, password_hash, user_data.full_name,
-          user_data.department or 'general', datetime.utcnow().isoformat()))
+          user_data.department or 'general', datetime.datetime.utcnow().isoformat()))
 
     conn.commit()
     conn.close()
@@ -543,7 +543,7 @@ async def bulk_upload_documents(
         INSERT INTO upload_batches (batch_id, user_id, batch_name, total_files, created_at)
         VALUES (?, ?, ?, ?, ?)
     ''', (batch_id, current_user['user_id'], batch_name, len(files),
-          datetime.utcnow().isoformat()))
+          datetime.datetime.utcnow().isoformat()))
 
     saved_files = []
 
@@ -568,7 +568,7 @@ async def bulk_upload_documents(
             ''',
                 (doc_id, current_user['user_id'], file.filename, file_path,
                  len(content), file.filename.split('.')[-1].lower(),
-                 file.content_type, datetime.utcnow().isoformat(), 'uploaded'))
+                 file.content_type, datetime.datetime.utcnow().isoformat(), 'uploaded'))
 
             saved_files.append({
                 'doc_id': doc_id,
@@ -655,7 +655,7 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
         UPDATE upload_batches 
         SET processed_files = ?, failed_files = ?, completed_at = ?, status = ?
         WHERE batch_id = ?
-    ''', (processed, failed, datetime.utcnow().isoformat(), 'completed',
+    ''', (processed, failed, datetime.datetime.utcnow().isoformat(), 'completed',
           batch_id))
     conn.commit()
     conn.close()
@@ -759,7 +759,7 @@ async def review_document(doc_id: str,
         SET review_status = ?, reviewed_by = ?, review_comments = ?, reviewed_at = ?
         WHERE doc_id = ?
     ''', (review.status, current_user['email'], review.comments,
-          datetime.utcnow().isoformat(), doc_id))
+          datetime.datetime.utcnow().isoformat(), doc_id))
 
     # Get user email who uploaded the document
     cursor.execute('SELECT email, full_name FROM users WHERE user_id = ?',
