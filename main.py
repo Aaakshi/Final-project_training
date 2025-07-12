@@ -669,11 +669,56 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
 
             # Read file content for classification
             try:
-                with open(doc_row[3], 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-            except:
-                # If can't read as text, treat as binary and skip classification
+                file_path = doc_row[3]
                 content = ""
+                
+                if doc_row[6] == 'application/pdf':
+                    # Handle PDF files
+                    try:
+                        import PyPDF2
+                        with open(file_path, 'rb') as pdf_file:
+                            pdf_reader = PyPDF2.PdfReader(pdf_file)
+                            text_content = []
+                            for page in pdf_reader.pages[:5]:  # Limit to first 5 pages
+                                text_content.append(page.extract_text())
+                            content = '\n'.join(text_content)
+                    except Exception as pdf_error:
+                        print(f"PDF reading error: {pdf_error}")
+                        content = f"PDF document with {len(open(file_path, 'rb').read())} bytes"
+                        
+                elif doc_row[6] == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                    # Handle DOCX files
+                    try:
+                        import docx
+                        doc = docx.Document(file_path)
+                        paragraphs = []
+                        for para in doc.paragraphs[:50]:  # Limit to first 50 paragraphs
+                            paragraphs.append(para.text)
+                        content = '\n'.join(paragraphs)
+                    except Exception as docx_error:
+                        print(f"DOCX reading error: {docx_error}")
+                        content = f"DOCX document: {doc_row[2]}"
+                        
+                elif doc_row[6].startswith('text/'):
+                    # Handle text files
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()[:10000]  # Limit to 10KB
+                        
+                elif doc_row[6].startswith('image/'):
+                    # Handle image files
+                    content = f"Image file: {doc_row[2]} - Image content requires OCR processing"
+                    
+                else:
+                    # Other file types
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()[:5000]  # Limit to 5KB
+                    except:
+                        content = f"Binary file: {doc_row[2]}"
+                        
+            except Exception as e:
+                print(f"File reading error: {e}")
+                content = f"Error reading file: {doc_row[2]}"
 
             # Simple local classification (fallback if microservice not available)
             classification_result = classify_document_locally(content, doc_row[2])
@@ -722,7 +767,9 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
 
 def classify_document_locally(content: str, filename: str):
     """Local classification as fallback when microservice is unavailable"""
-    content_lower = content.lower()
+    # Handle large documents by limiting content length for processing
+    content_to_analyze = content[:5000] if len(content) > 5000 else content
+    content_lower = content_to_analyze.lower()
     filename_lower = filename.lower()
     
     # Enhanced classification for all departments with improved keywords

@@ -1344,7 +1344,7 @@
             document.getElementById('documentModal').style.display = 'none';
         }
 
-        function loadStatistics() {
+        async function loadStatistics() {
             try {
                 const response = await fetch('/api/stats', {
                     headers: {
@@ -1356,6 +1356,7 @@
 
                 if (response.ok) {
                     displayStatistics(stats);
+                    renderCharts(stats);
                 } else {
                     console.error('Failed to load statistics');
                 }
@@ -1383,7 +1384,111 @@
                     <h3>${stats.error_documents || 0}</h3>
                     <p>Errors</p>
                 </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);">
+                    <h3>${stats.processing_rate || 0}%</h3>
+                    <p>Processing Rate</p>
+                </div>
             `;
+        }
+
+        function renderCharts(stats) {
+            // Document Types Chart
+            if (stats.document_types && Object.keys(stats.document_types).length > 0) {
+                const docTypesCtx = document.getElementById('docTypesChart');
+                if (docTypesCtx) {
+                    new Chart(docTypesCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(stats.document_types),
+                            datasets: [{
+                                data: Object.values(stats.document_types),
+                                backgroundColor: ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#38b2ac', '#f56565']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            }
+
+            // Departments Chart
+            if (stats.departments && Object.keys(stats.departments).length > 0) {
+                const deptCtx = document.getElementById('departmentsChart');
+                if (deptCtx) {
+                    new Chart(deptCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(stats.departments),
+                            datasets: [{
+                                label: 'Documents',
+                                data: Object.values(stats.departments),
+                                backgroundColor: '#4299e1'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Priority Chart
+            if (stats.priorities && Object.keys(stats.priorities).length > 0) {
+                const priorityCtx = document.getElementById('priorityChart');
+                if (priorityCtx) {
+                    new Chart(priorityCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: Object.keys(stats.priorities),
+                            datasets: [{
+                                data: Object.values(stats.priorities),
+                                backgroundColor: ['#e53e3e', '#dd6b20', '#38a169']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            }
+
+            // Upload Trends Chart
+            if (stats.upload_trends && stats.upload_trends.length > 0) {
+                const trendsCtx = document.getElementById('trendsChart');
+                if (trendsCtx) {
+                    new Chart(trendsCtx, {
+                        type: 'line',
+                        data: {
+                            labels: stats.upload_trends.map(item => item.date),
+                            datasets: [{
+                                label: 'Documents Uploaded',
+                                data: stats.upload_trends.map(item => item.count),
+                                borderColor: '#4299e1',
+                                backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }
         }
 
         function updatePagination(totalCount, currentPageNum, pageSizeNum) {
