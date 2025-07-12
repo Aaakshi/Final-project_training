@@ -34,6 +34,7 @@ import httpx
 import uvicorn
 import uuid
 import jwt
+from datetime import timedelta
 
 app = FastAPI(title="IDCR Enhanced Demo Server")
 
@@ -966,7 +967,27 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     doc_types = dict(cursor.fetchall())
 
     # Department breakdown
-    cursor.execute(f'''
-        SELECT * FROM your_table
-        WHERE condition = value
-    ''')  # Ensure this closing quote is present
+    cursor.execute(
+        f'''
+        SELECT department, COUNT(*) 
+        FROM documents 
+        {base_where} AND department IS NOT NULL 
+        GROUP BY department
+    ''', params)
+    departments = dict(cursor.fetchall())
+
+    conn.close()
+
+    return {
+        "total_documents": total_docs,
+        "processed_documents": processed_docs,
+        "pending_documents": pending_docs,
+        "error_documents": error_docs,
+        "document_types": doc_types,
+        "departments": departments
+    }
+
+
+# Main startup
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
