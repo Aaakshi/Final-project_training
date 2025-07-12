@@ -1388,93 +1388,94 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Build base query based on user role
-    base_where = ""
-    params = []
+    try:
+        # Build base query based on user role
+        base_where = ""
+        params = []
 
-    if current_user['role'] == 'employee':
-        base_where = "WHERE user_id = ?"
-        params.append(current_user['user_id'])
-    elif current_user['role'] != 'admin':
-        base_where = "WHERE (user_id = ? OR department = ?)"
-        params.extend([current_user['user_id'], current_user['department']])
+        if current_user['role'] == 'employee':
+            base_where = "WHERE user_id = ?"
+            params.append(current_user['user_id'])
+        elif current_user['role'] != 'admin':
+            base_where = "WHERE (user_id = ? OR department = ?)"
+            params.extend([current_user['user_id'], current_user['department']])
 
-    # Overall stats
-    cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
-    total_docs = cursor.fetchone()[0]
+        # Overall stats
+        cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
+        total_docs = cursor.fetchone()[0]
 
-    cursor.execute(
-        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
-        params)
-    processed_docs = cursor.fetchone()[0]
+        cursor.execute(
+            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
+            params)
+        processed_docs = cursor.fetchone()[0]
 
-    cursor.execute(
-        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "processing"',
-        params)
-    pending_docs = cursor.fetchone()[0]
+        cursor.execute(
+            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "processing"',
+            params)
+        pending_docs = cursor.fetchone()[0]
 
-    cursor.execute(
-        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "failed"',
-        params)
-    error_docs = cursor.fetchone()[0]
+        cursor.execute(
+            f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "failed"',
+            params)
+        error_docs = cursor.fetchone()[0]
 
-    # Document type breakdown
-    cursor.execute(
-        f'''
-        SELECT document_type, COUNT(*) 
-        FROM documents 
-        {base_where} AND document_type IS NOT NULL 
-        GROUP BY document_type
-    ''', params)
-    doc_types = dict(cursor.fetchall())
+        # Document type breakdown
+        cursor.execute(
+            f'''
+            SELECT document_type, COUNT(*) 
+            FROM documents 
+            {base_where} AND document_type IS NOT NULL 
+            GROUP BY document_type
+        ''', params)
+        doc_types = dict(cursor.fetchall())
 
-    # Department breakdown
-    cursor.execute(
-        f'''
-        SELECT department, COUNT(*) 
-        FROM documents 
-        {base_where} AND department IS NOT NULL 
-        GROUP BY department
-    ''', params)
-    departments = dict(cursor.fetchall())
+        # Department breakdown
+        cursor.execute(
+            f'''
+            SELECT department, COUNT(*) 
+            FROM documents 
+            {base_where} AND department IS NOT NULL 
+            GROUP BY department
+        ''', params)
+        departments = dict(cursor.fetchall())
 
-    conn.close()
+        # Priority breakdown
+        cursor.execute(
+            f'''
+            SELECT priority, COUNT(*) 
+            FROM documents 
+            {base_where} AND priority IS NOT NULL 
+            GROUP BY priority
+        ''', params)
+        priorities = dict(cursor.fetchall())
 
-    # Priority breakdown
-    cursor.execute(
-        f'''
-        SELECT priority, COUNT(*) 
-        FROM documents 
-        {base_where} AND priority IS NOT NULL 
-        GROUP BY priority
-    ''', params)
-    priorities = dict(cursor.fetchall())
+        # Monthly upload trends (last 6 months)
+        cursor.execute(
+            f'''
+            SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
+            FROM documents 
+            {base_where}
+            WHERE uploaded_at >= date('now', '-6 months')
+            GROUP BY DATE(uploaded_at)
+            ORDER BY upload_date
+        ''', params)
+        daily_uploads = cursor.fetchall()
 
-    # Monthly upload trends (last 6 months)
-    cursor.execute(
-        f'''
-        SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
-        FROM documents 
-        {base_where}
-        WHERE uploaded_at >= date('now', '-6 months')
-        GROUP BY DATE(uploaded_at)
-        ORDER BY upload_date
-    ''', params)
-    daily_uploads = cursor.fetchall()
-
-    conn.close()
-
-    return {
-        "total_documents": total_docs,
-        "processed_documents": processed_docs,
-        "pending_documents": pending_docs,
-        "error_documents": error_docs,
-        "document_types": doc_types,
-        "departments": departments,
-        "priorities": priorities,
-        "upload_trends": [{"date": row[0], "count": row[1]} for row in daily_uploads],
-        "processing_rate": round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 2)
-    }
+        return {
+            "total_documents": total_docs,
+            "processed_documents": processed_docs,
+            "pending_documents": pending_docs,
+            "error_documents": error_docs,
+            "document_types": doc_types,
+            "departments": departments,
+            "priorities": priorities,
+            "upload_trends": [{"date": row[0], "count": row[1]} for row in daily_uploads],
+            "processing_rate": round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 2)
+        }
+        
+    finally:
+        # Ensure connection is always closed
+        conn.close()
 
 
 # Main startup
