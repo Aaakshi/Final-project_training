@@ -17,6 +17,10 @@ except ImportError:
 
 app = FastAPI(title="Routing Engine Service")
 
+@app.get("/")
+async def root():
+    return {"message": "Routing Engine Service is running", "service": "routing_engine"}
+
 class RoutingRequest(BaseModel):
     doc_id: str
     doc_type: str

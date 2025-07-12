@@ -18,6 +18,10 @@ except ImportError:
 
 app = FastAPI(title="Content Analysis Service")
 
+@app.get("/")
+async def root():
+    return {"message": "Content Analysis Service is running", "service": "content_analysis"}
+
 class AnalysisRequest(BaseModel):
     doc_id: str
     content: str

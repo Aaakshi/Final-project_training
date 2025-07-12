@@ -17,6 +17,10 @@ except ImportError:
 
 app = FastAPI(title="Workflow Integration Service")
 
+@app.get("/")
+async def root():
+    return {"message": "Workflow Integration Service is running", "service": "workflow_integration"}
+
 class NotificationRequest(BaseModel):
     doc_id: str
     assignee: str

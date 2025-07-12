@@ -17,6 +17,10 @@ except ImportError:
 
 app = FastAPI(title="Classification Service")
 
+@app.get("/")
+async def root():
+    return {"message": "Classification Service is running", "service": "classification"}
+
 class ClassificationResponse(BaseModel):
     doc_type: str
     department: str
