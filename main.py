@@ -16,8 +16,8 @@ import shutil
 import threading
 from pathlib import Path
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from jinja2 import Template
 import PyPDF2
 import docx
@@ -71,6 +71,7 @@ backend_processes = []
 # Database setup
 DB_PATH = "idcr_documents.db"
 
+
 def init_database():
     """Initialize SQLite database for document storage and user management"""
     conn = sqlite3.connect(DB_PATH)
@@ -102,15 +103,19 @@ def init_database():
 
     # Insert default departments
     default_departments = [
-        ('finance', 'Finance Department', 'finance@company.com', 'finance.manager@company.com'),
-        ('legal', 'Legal Department', 'legal@company.com', 'legal.manager@company.com'),
+        ('finance', 'Finance Department', 'finance@company.com',
+         'finance.manager@company.com'),
+        ('legal', 'Legal Department', 'legal@company.com',
+         'legal.manager@company.com'),
         ('hr', 'Human Resources', 'hr@company.com', 'hr.manager@company.com'),
         ('it', 'IT Department', 'it@company.com', 'it.manager@company.com'),
-        ('general', 'General Department', 'general@company.com', 'general.manager@company.com')
+        ('general', 'General Department', 'general@company.com',
+         'general.manager@company.com')
     ]
 
     for dept in default_departments:
-        cursor.execute('''
+        cursor.execute(
+            '''
             INSERT OR IGNORE INTO departments (dept_id, dept_name, dept_email, manager_email)
             VALUES (?, ?, ?, ?)
         ''', dept)
@@ -180,20 +185,25 @@ def init_database():
     cursor.execute("PRAGMA table_info(documents)")
     columns = [row[1] for row in cursor.fetchall()]
     if 'user_id' not in columns:
-        cursor.execute('ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT "system"')
+        cursor.execute(
+            'ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT "system"')
 
     # Check if user_id column exists in upload_batches table, add if missing
     cursor.execute("PRAGMA table_info(upload_batches)")
     columns = [row[1] for row in cursor.fetchall()]
     if 'user_id' not in columns:
-        cursor.execute('ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"')
+        cursor.execute(
+            'ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"'
+        )
 
     conn.commit()
     conn.close()
     print("✓ Database initialized")
 
+
 # Initialize database on startup
 init_database()
+
 
 # Pydantic models
 class UserRegistration(BaseModel):
@@ -202,9 +212,11 @@ class UserRegistration(BaseModel):
     full_name: str
     department: Optional[str] = None
 
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
 
 class UserResponse(BaseModel):
     user_id: str
@@ -213,19 +225,23 @@ class UserResponse(BaseModel):
     department: str
     role: str
 
+
 class DocumentUpload(BaseModel):
     filename: str
     file_size: int
     file_type: str
 
+
 class BulkUploadRequest(BaseModel):
     batch_name: str
     files: List[DocumentUpload]
+
 
 class BulkUploadResponse(BaseModel):
     batch_id: str
     message: str
     total_files: int
+
 
 class DocumentInfo(BaseModel):
     doc_id: str
@@ -243,10 +259,12 @@ class DocumentInfo(BaseModel):
     review_status: str = None
     reviewed_by: str = None
 
+
 class DocumentReview(BaseModel):
     doc_id: str
     status: str  # approved, rejected
     comments: Optional[str] = None
+
 
 class DocumentListResponse(BaseModel):
     documents: List[DocumentInfo]
@@ -254,14 +272,17 @@ class DocumentListResponse(BaseModel):
     page: int
     page_size: int
 
+
 # Utility functions
 def hash_password(password: str) -> str:
     """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
+
 def verify_password(password: str, hashed: str) -> bool:
     """Verify password against hash"""
     return hash_password(password) == hashed
+
 
 def create_access_token(data: dict):
     """Create JWT access token"""
@@ -271,17 +292,23 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+
+def get_current_user(
+        credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Get current user from JWT token"""
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(credentials.credentials,
+                             SECRET_KEY,
+                             algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM users WHERE user_id = ? AND is_active = 1', (user_id,))
+        cursor.execute(
+            'SELECT * FROM users WHERE user_id = ? AND is_active = 1',
+            (user_id, ))
         user = cursor.fetchone()
         conn.close()
 
@@ -297,6 +324,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         }
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
 
 def send_email(to_email: str, subject: str, body: str):
     """Send email using Outlook SMTP with fallback"""
@@ -334,20 +362,28 @@ def send_email(to_email: str, subject: str, body: str):
         return True
     except Exception as e:
         print(f"Failed to send email to {to_email}: {str(e)}")
-        print(f"Email functionality disabled, continuing without email notifications")
+        print(
+            f"Email functionality disabled, continuing without email notifications"
+        )
         return False
 
+
 # Mount static files
-app.mount("/static", StaticFiles(directory="Final-project_training"), name="static")
+app.mount("/static",
+          StaticFiles(directory="Final-project_training"),
+          name="static")
+
 
 @app.get("/")
 async def serve_frontend():
     """Serve the main frontend application"""
     return FileResponse("Final-project_training/index.html")
 
+
 @app.get("/favicon.ico")
 async def favicon():
     return {"message": "No favicon"}
+
 
 # Authentication endpoints
 @app.post("/api/register")
@@ -357,7 +393,8 @@ async def register_user(user_data: UserRegistration):
     cursor = conn.cursor()
 
     # Check if user already exists
-    cursor.execute('SELECT user_id FROM users WHERE email = ?', (user_data.email,))
+    cursor.execute('SELECT user_id FROM users WHERE email = ?',
+                   (user_data.email, ))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -366,10 +403,11 @@ async def register_user(user_data: UserRegistration):
     user_id = str(uuid.uuid4())
     password_hash = hash_password(user_data.password)
 
-    cursor.execute('''
+    cursor.execute(
+        '''
         INSERT INTO users (user_id, email, password_hash, full_name, department, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, user_data.email, password_hash, user_data.full_name, 
+    ''', (user_id, user_data.email, password_hash, user_data.full_name,
           user_data.department or 'general', datetime.utcnow().isoformat()))
 
     conn.commit()
@@ -390,18 +428,21 @@ async def register_user(user_data: UserRegistration):
 
     return {"message": "User registered successfully", "user_id": user_id}
 
+
 @app.post("/api/login")
 async def login_user(user_data: UserLogin):
     """Login user"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute('SELECT * FROM users WHERE email = ? AND is_active = 1', (user_data.email,))
+    cursor.execute('SELECT * FROM users WHERE email = ? AND is_active = 1',
+                   (user_data.email, ))
     user = cursor.fetchone()
     conn.close()
 
     if not user or not verify_password(user_data.password, user[2]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401,
+                            detail="Invalid email or password")
 
     access_token = create_access_token(data={"sub": user[0]})
 
@@ -417,17 +458,20 @@ async def login_user(user_data: UserLogin):
         }
     }
 
+
 @app.get("/api/me")
-async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+async def get_current_user_info(
+        current_user: dict = Depends(get_current_user)):
     """Get current user information"""
     return current_user
+
 
 @app.get("/health")
 async def health_check():
     """Check if backend services are running"""
     services = {
         "api_gateway": "http://0.0.0.0:8000",
-        "classification": "http://0.0.0.0:8001", 
+        "classification": "http://0.0.0.0:8001",
         "routing_engine": "http://0.0.0.0:8002",
         "content_analysis": "http://0.0.0.0:8003",
         "workflow_integration": "http://0.0.0.0:8004"
@@ -438,22 +482,25 @@ async def health_check():
         for service, url in services.items():
             try:
                 response = await client.get(f"{url}/ping")
-                status[service] = "healthy" if response.status_code == 200 else "unhealthy"
+                status[
+                    service] = "healthy" if response.status_code == 200 else "unhealthy"
             except Exception as e:
                 status[service] = f"offline: {str(e)}"
 
     return {"services": status}
 
+
 @app.post("/api/bulk-upload", response_model=BulkUploadResponse)
 async def bulk_upload_documents(
-    files: List[UploadFile] = File(...), 
-    batch_name: str = Form(...),
-    current_user: dict = Depends(get_current_user)
-):
+        files: List[UploadFile] = File(...),
+        batch_name: str = Form(...),
+        current_user: dict = Depends(get_current_user)):
     """Handle bulk document upload (up to 20+ files)"""
 
     if len(files) > 50:
-        raise HTTPException(status_code=400, detail="Too many files. Maximum 50 files per batch.")
+        raise HTTPException(
+            status_code=400,
+            detail="Too many files. Maximum 50 files per batch.")
 
     # Validate file types
     allowed_types = {
@@ -468,8 +515,9 @@ async def bulk_upload_documents(
     for file in files:
         if file.content_type not in allowed_types:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Unsupported file type: {file.content_type} for file {file.filename}"
+                status_code=400,
+                detail=
+                f"Unsupported file type: {file.content_type} for file {file.filename}"
             )
 
         # Check file size (10MB limit per file)
@@ -477,8 +525,7 @@ async def bulk_upload_documents(
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(
                 status_code=400,
-                detail=f"File too large: {file.filename} (Max 10MB per file)"
-            )
+                detail=f"File too large: {file.filename} (Max 10MB per file)")
         # Reset file pointer
         await file.seek(0)
 
@@ -490,10 +537,12 @@ async def bulk_upload_documents(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute('''
+    cursor.execute(
+        '''
         INSERT INTO upload_batches (batch_id, user_id, batch_name, total_files, created_at)
         VALUES (?, ?, ?, ?, ?)
-    ''', (batch_id, current_user['user_id'], batch_name, len(files), datetime.utcnow().isoformat()))
+    ''', (batch_id, current_user['user_id'], batch_name, len(files),
+          datetime.utcnow().isoformat()))
 
     saved_files = []
 
@@ -509,16 +558,16 @@ async def bulk_upload_documents(
                 f.write(content)
 
             # Create document record
-            cursor.execute('''
+            cursor.execute(
+                '''
                 INSERT INTO documents (
                     doc_id, user_id, original_name, file_path, file_size, file_type, 
                     mime_type, uploaded_at, processing_status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                doc_id, current_user['user_id'], file.filename, file_path, len(content),
-                file.filename.split('.')[-1].lower(), file.content_type,
-                datetime.utcnow().isoformat(), 'uploaded'
-            ))
+            ''',
+                (doc_id, current_user['user_id'], file.filename, file_path,
+                 len(content), file.filename.split('.')[-1].lower(),
+                 file.content_type, datetime.utcnow().isoformat(), 'uploaded'))
 
             saved_files.append({
                 'doc_id': doc_id,
@@ -534,13 +583,14 @@ async def bulk_upload_documents(
     conn.close()
 
     # Start background processing
-    asyncio.create_task(process_batch_async(batch_id, saved_files, current_user))
+    asyncio.create_task(
+        process_batch_async(batch_id, saved_files, current_user))
 
     return BulkUploadResponse(
         batch_id=batch_id,
         message=f"Successfully uploaded {len(saved_files)} files",
-        total_files=len(saved_files)
-    )
+        total_files=len(saved_files))
+
 
 async def process_batch_async(batch_id: str, files: List[dict], user: dict):
     """Process uploaded files asynchronously"""
@@ -553,7 +603,8 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
 
-            cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (file_info['doc_id'],))
+            cursor.execute('SELECT * FROM documents WHERE doc_id = ?',
+                           (file_info['doc_id'], ))
             doc_row = cursor.fetchone()
             conn.close()
 
@@ -566,21 +617,24 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
             # Send to classification service
             with open(doc_row[3], 'rb') as f:  # file_path is index 3
                 async with httpx.AsyncClient(timeout=30.0) as client:
-                    files_payload = {"file": (doc_row[2], f, doc_row[6])}  # original_name, content, mime_type
+                    files_payload = {
+                        "file": (doc_row[2], f, doc_row[6])
+                    }  # original_name, content, mime_type
                     response = await client.post(
-                        "http://0.0.0.0:8001/classify",
-                        files=files_payload
-                    )
+                        "http://0.0.0.0:8001/classify", files=files_payload)
 
                     if response.status_code == 200:
                         result = response.json()
 
                         # Update document with classification results
-                        update_document_classification(file_info['doc_id'], result)
-                        update_document_status(file_info['doc_id'], 'classified')
+                        update_document_classification(file_info['doc_id'],
+                                                       result)
+                        update_document_status(file_info['doc_id'],
+                                               'classified')
 
                         # Send notification to department
-                        await notify_department(file_info['doc_id'], result, user)
+                        await notify_department(file_info['doc_id'], result,
+                                                user)
 
                         processed += 1
                     else:
@@ -595,22 +649,27 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
     # Update batch status
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('''
+    cursor.execute(
+        '''
         UPDATE upload_batches 
         SET processed_files = ?, failed_files = ?, completed_at = ?, status = ?
         WHERE batch_id = ?
-    ''', (processed, failed, datetime.utcnow().isoformat(), 'completed', batch_id))
+    ''', (processed, failed, datetime.utcnow().isoformat(), 'completed',
+          batch_id))
     conn.commit()
     conn.close()
 
-async def notify_department(doc_id: str, classification_result: dict, user: dict):
+
+async def notify_department(doc_id: str, classification_result: dict,
+                            user: dict):
     """Send notification to department about new document"""
     department = classification_result.get('department', 'general')
 
     # Get department email
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?', (department,))
+    cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
+                   (department, ))
     dept_result = cursor.fetchone()
     conn.close()
 
@@ -636,13 +695,17 @@ async def notify_department(doc_id: str, classification_result: dict, user: dict
 
         send_email(dept_email, subject, body)
 
+
 def update_document_status(doc_id: str, status: str):
     """Update document processing status"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('UPDATE documents SET processing_status = ? WHERE doc_id = ?', (status, doc_id))
+    cursor.execute(
+        'UPDATE documents SET processing_status = ? WHERE doc_id = ?',
+        (status, doc_id))
     conn.commit()
     conn.close()
+
 
 def update_document_classification(doc_id: str, classification_result: dict):
     """Update document with classification results"""
@@ -651,39 +714,37 @@ def update_document_classification(doc_id: str, classification_result: dict):
 
     tags_json = json.dumps(classification_result.get('tags', []))
 
-    cursor.execute('''
+    cursor.execute(
+        '''
         UPDATE documents SET 
             extracted_text = ?, document_type = ?, department = ?, 
             priority = ?, classification_confidence = ?, page_count = ?,
             language = ?, tags = ?
         WHERE doc_id = ?
-    ''', (
-        classification_result.get('extracted_text', ''),
-        classification_result.get('doc_type', ''),
-        classification_result.get('department', ''),
-        classification_result.get('priority', ''),
-        classification_result.get('confidence', 0.0),
-        classification_result.get('page_count', 1),
-        classification_result.get('language', 'en'),
-        tags_json,
-        doc_id
-    ))
+    ''', (classification_result.get(
+            'extracted_text', ''), classification_result.get(
+                'doc_type', ''), classification_result.get('department', ''),
+          classification_result.get(
+              'priority', ''), classification_result.get('confidence', 0.0),
+          classification_result.get('page_count', 1),
+          classification_result.get('language', 'en'), tags_json, doc_id))
 
     conn.commit()
     conn.close()
 
+
 @app.post("/api/documents/{doc_id}/review")
-async def review_document(
-    doc_id: str, 
-    review: DocumentReview,
-    current_user: dict = Depends(get_current_user)
-):
+async def review_document(doc_id: str,
+                          review: DocumentReview,
+                          current_user: dict = Depends(get_current_user)):
     """Review a document (approve/reject)"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     # Get document info
-    cursor.execute('SELECT user_id, original_name FROM documents WHERE doc_id = ?', (doc_id,))
+    cursor.execute(
+        'SELECT user_id, original_name FROM documents WHERE doc_id = ?',
+        (doc_id, ))
     doc_result = cursor.fetchone()
 
     if not doc_result:
@@ -691,14 +752,17 @@ async def review_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Update document review status
-    cursor.execute('''
+    cursor.execute(
+        '''
         UPDATE documents 
         SET review_status = ?, reviewed_by = ?, review_comments = ?, reviewed_at = ?
         WHERE doc_id = ?
-    ''', (review.status, current_user['email'], review.comments, datetime.utcnow().isoformat(), doc_id))
+    ''', (review.status, current_user['email'], review.comments,
+          datetime.utcnow().isoformat(), doc_id))
 
     # Get user email who uploaded the document
-    cursor.execute('SELECT email, full_name FROM users WHERE user_id = ?', (doc_result[0],))
+    cursor.execute('SELECT email, full_name FROM users WHERE user_id = ?',
+                   (doc_result[0], ))
     user_result = cursor.fetchone()
 
     conn.commit()
@@ -729,16 +793,15 @@ async def review_document(
 
     return {"message": f"Document {review.status} successfully"}
 
+
 @app.get("/api/documents", response_model=DocumentListResponse)
-async def get_documents(
-    page: int = 1, 
-    page_size: int = 20, 
-    status: str = None, 
-    doc_type: str = None, 
-    department: str = None,
-    search: str = None,
-    current_user: dict = Depends(get_current_user)
-):
+async def get_documents(page: int = 1,
+                        page_size: int = 20,
+                        status: str = None,
+                        doc_type: str = None,
+                        department: str = None,
+                        search: str = None,
+                        current_user: dict = Depends(get_current_user)):
     """Get paginated list of documents with filtering"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -754,7 +817,8 @@ async def get_documents(
             params.append(current_user['user_id'])
         else:  # department manager
             where_clauses.append("(user_id = ? OR department = ?)")
-            params.extend([current_user['user_id'], current_user['department']])
+            params.extend(
+                [current_user['user_id'], current_user['department']])
 
     if status:
         where_clauses.append("processing_status = ?")
@@ -798,38 +862,36 @@ async def get_documents(
     documents = []
     for row in rows:
         tags = json.loads(row[11]) if row[11] else []
-        doc = DocumentInfo(
-            doc_id=row[0],
-            original_name=row[1],
-            file_size=row[2],
-            file_type=row[3],
-            uploaded_at=row[4],
-            processing_status=row[5],
-            document_type=row[6],
-            department=row[7],
-            priority=row[8],
-            classification_confidence=row[9],
-            page_count=row[10],
-            tags=tags,
-            review_status=row[12],
-            reviewed_by=row[13]
-        )
+        doc = DocumentInfo(doc_id=row[0],
+                           original_name=row[1],
+                           file_size=row[2],
+                           file_type=row[3],
+                           uploaded_at=row[4],
+                           processing_status=row[5],
+                           document_type=row[6],
+                           department=row[7],
+                           priority=row[8],
+                           classification_confidence=row[9],
+                           page_count=row[10],
+                           tags=tags,
+                           review_status=row[12],
+                           reviewed_by=row[13])
         documents.append(doc)
 
-    return DocumentListResponse(
-        documents=documents,
-        total_count=total_count,
-        page=page,
-        page_size=page_size
-    )
+    return DocumentListResponse(documents=documents,
+                                total_count=total_count,
+                                page=page,
+                                page_size=page_size)
+
 
 @app.get("/api/documents/{doc_id}")
-async def get_document_details(doc_id: str, current_user: dict = Depends(get_current_user)):
+async def get_document_details(doc_id: str,
+                               current_user: dict = Depends(get_current_user)):
     """Get detailed information about a specific document"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
+    cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id, ))
     row = cursor.fetchone()
     conn.close()
 
@@ -842,11 +904,12 @@ async def get_document_details(doc_id: str, current_user: dict = Depends(get_cur
 
     # Convert row to dictionary
     columns = [
-        'doc_id', 'user_id', 'original_name', 'file_path', 'file_size', 'file_type', 'mime_type',
-        'uploaded_at', 'processing_status', 'extracted_text', 'ocr_confidence',
-        'document_type', 'department', 'priority', 'classification_confidence', 
-        'page_count', 'language', 'tags', 'assigned_to', 'reviewed_by', 
-        'review_status', 'review_comments', 'reviewed_at'
+        'doc_id', 'user_id', 'original_name', 'file_path', 'file_size',
+        'file_type', 'mime_type', 'uploaded_at', 'processing_status',
+        'extracted_text', 'ocr_confidence', 'document_type', 'department',
+        'priority', 'classification_confidence', 'page_count', 'language',
+        'tags', 'assigned_to', 'reviewed_by', 'review_status',
+        'review_comments', 'reviewed_at'
     ]
 
     doc_dict = dict(zip(columns, row))
@@ -854,6 +917,7 @@ async def get_document_details(doc_id: str, current_user: dict = Depends(get_cur
         doc_dict['tags'] = json.loads(doc_dict['tags'])
 
     return doc_dict
+
 
 @app.get("/api/stats")
 async def get_statistics(current_user: dict = Depends(get_current_user)):
@@ -876,17 +940,24 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
     total_docs = cursor.fetchone()[0]
 
-    cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"', params)
+    cursor.execute(
+        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "completed"',
+        params)
     processed_docs = cursor.fetchone()[0]
 
-    cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "processing"', params)
+    cursor.execute(
+        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "processing"',
+        params)
     pending_docs = cursor.fetchone()[0]
 
-    cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "failed"', params)
+    cursor.execute(
+        f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = "failed"',
+        params)
     error_docs = cursor.fetchone()[0]
 
     # Document type breakdown
-    cursor.execute(f'''
+    cursor.execute(
+        f'''
         SELECT document_type, COUNT(*) 
         FROM documents 
         {base_where} AND document_type IS NOT NULL 
@@ -896,5 +967,6 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
     # Department breakdown
     cursor.execute(f'''
-        SELECT department, COUNT(*) 
-        FROM documents
+        SELECT * FROM your_table
+        WHERE condition = value
+    ''')  # Ensure this closing quote is present
