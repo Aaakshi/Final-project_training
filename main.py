@@ -206,6 +206,23 @@ def init_database():
         )
     ''')
 
+    # Create email_notifications table for tracking emails
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS email_notifications (
+            email_id TEXT PRIMARY KEY,
+            sent_by TEXT NOT NULL,
+            received_by TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            body TEXT,
+            doc_id TEXT,
+            file_name TEXT,
+            status TEXT DEFAULT 'sent',
+            sent_at TEXT NOT NULL,
+            read_at TEXT,
+            FOREIGN KEY (doc_id) REFERENCES documents (doc_id)
+        )
+    ''')
+
     # Check if user_id column exists in documents table, add if missing
     cursor.execute("PRAGMA table_info(documents)")
     columns = [row[1] for row in cursor.fetchall()]
@@ -351,7 +368,7 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def send_email(to_email: str, subject: str, body: str):
+def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_name: str = None):
     """Send email using Outlook SMTP with fallback - DEMO VERSION"""
     # For demo purposes, we'll log the email instead of actually sending it
     print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
@@ -359,6 +376,19 @@ def send_email(to_email: str, subject: str, body: str):
     print(f"Subject: {subject}")
     print(f"Body Preview: {body[:200]}...")
     print(f"✅ Email logged successfully (not actually sent in demo)\n")
+    
+    # Track email in database
+    email_id = str(uuid.uuid4())
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (email_id, EMAIL_USER, to_email, subject, body, doc_id, file_name, 'sent', datetime.datetime.utcnow().isoformat()))
+    
+    conn.commit()
+    conn.close()
     
     # Try to actually send email, but don't fail if it doesn't work
     try:
@@ -440,7 +470,7 @@ async def register_user(user_data: UserRegistration):
         </body>
     </html>
     """
-    send_email(user_data.email, "Welcome to IDCR System", welcome_body)
+    send_email(user_data.email, "Welcome to IDCR System", welcome_body, None, None)
 
     return {"message": "User registered successfully", "user_id": user_id}
 
@@ -695,67 +725,67 @@ def classify_document_locally(content: str, filename: str):
     content_lower = content.lower()
     filename_lower = filename.lower()
     
-    # Enhanced classification for all departments
+    # Enhanced classification for all departments with improved keywords
     classification_rules = [
-        # Finance & Accounting
+        # Finance & Accounting - High Priority
         {
-            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense"],
-            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense"],
+            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense", "revenue", "profit", "loss", "tax", "audit", "financial statement", "balance sheet", "cash flow", "accounts payable", "accounts receivable", "payroll", "salary", "wage", "reimbursement", "cost", "expenditure", "vendor payment", "purchase order"],
+            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense", "budget", "financial", "tax", "audit", "payroll", "cost", "po", "purchase"],
             "doc_type": "financial_document",
             "department": "finance",
-            "confidence": 0.9,
+            "confidence": 0.95,
             "priority": "high",
-            "tags": ["finance", "accounting"]
+            "tags": ["finance", "accounting", "financial"]
         },
-        # Legal
+        # Legal - High Priority
         {
-            "keywords": ["contract", "agreement", "legal", "terms", "compliance", "policy", "regulation"],
-            "filename_keywords": ["contract", "legal", "agreement", "terms", "compliance"],
+            "keywords": ["contract", "agreement", "legal", "terms", "compliance", "policy", "regulation", "lawsuit", "litigation", "intellectual property", "copyright", "trademark", "patent", "non-disclosure", "nda", "privacy policy", "terms of service", "liability", "warranty", "indemnification", "arbitration", "clause", "amendment", "addendum", "legal notice", "cease and desist"],
+            "filename_keywords": ["contract", "legal", "agreement", "terms", "compliance", "policy", "nda", "lawsuit", "patent", "copyright", "trademark", "liability", "amendment"],
             "doc_type": "legal_document",
             "department": "legal",
-            "confidence": 0.85,
+            "confidence": 0.92,
             "priority": "high",
-            "tags": ["legal", "contract"]
+            "tags": ["legal", "contract", "compliance"]
         },
-        # Human Resources
+        # Human Resources - Medium Priority
         {
-            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance"],
-            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training"],
+            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance", "recruitment", "onboarding", "benefits", "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", "termination", "resignation", "promotion", "performance review", "appraisal", "job description", "organizational chart", "employee handbook", "workplace policy", "harassment", "diversity", "inclusion"],
+            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training", "benefits", "leave", "performance", "recruitment", "onboarding", "handbook", "policy"],
             "doc_type": "hr_document",
             "department": "hr",
-            "confidence": 0.8,
+            "confidence": 0.88,
             "priority": "medium",
-            "tags": ["hr", "employee"]
+            "tags": ["hr", "employee", "personnel"]
         },
-        # Sales
+        # Sales - High Priority
         {
-            "keywords": ["sales", "lead", "customer", "deal", "proposal", "quotation", "order"],
-            "filename_keywords": ["sales", "lead", "proposal", "quote", "order"],
+            "keywords": ["sales", "lead", "customer", "deal", "proposal", "quotation", "order", "client", "prospect", "opportunity", "pipeline", "crm", "revenue", "commission", "target", "forecast", "sales report", "customer acquisition", "retention", "upsell", "cross-sell", "conversion", "roi", "kpi", "territory", "account management"],
+            "filename_keywords": ["sales", "lead", "proposal", "quote", "order", "client", "customer", "deal", "opportunity", "pipeline", "forecast", "commission"],
             "doc_type": "sales_document",
             "department": "sales",
-            "confidence": 0.8,
-            "priority": "medium",
-            "tags": ["sales", "customer"]
+            "confidence": 0.90,
+            "priority": "high",
+            "tags": ["sales", "customer", "revenue"]
         },
-        # Marketing
+        # Marketing - Medium Priority  
         {
-            "keywords": ["marketing", "campaign", "advertisement", "promotion", "brand", "social media"],
-            "filename_keywords": ["marketing", "campaign", "ad", "promo", "brand"],
+            "keywords": ["marketing", "campaign", "advertisement", "promotion", "brand", "social media", "digital marketing", "content marketing", "seo", "sem", "ppc", "email marketing", "influencer", "analytics", "metrics", "engagement", "reach", "impression", "conversion rate", "market research", "competitor analysis", "target audience", "demographic", "segmentation"],
+            "filename_keywords": ["marketing", "campaign", "ad", "promo", "brand", "social", "seo", "analytics", "content", "digital", "email"],
             "doc_type": "marketing_document",
             "department": "marketing",
-            "confidence": 0.75,
+            "confidence": 0.85,
             "priority": "medium",
-            "tags": ["marketing", "campaign"]
+            "tags": ["marketing", "campaign", "brand"]
         },
-        # IT
+        # IT - High Priority
         {
-            "keywords": ["technology", "it", "software", "hardware", "system", "network", "security"],
-            "filename_keywords": ["it", "tech", "software", "system", "network"],
+            "keywords": ["technology", "it", "software", "hardware", "system", "network", "security", "server", "database", "infrastructure", "cybersecurity", "firewall", "backup", "cloud", "api", "integration", "deployment", "maintenance", "troubleshooting", "bug report", "feature request", "technical documentation", "user manual", "system requirements"],
+            "filename_keywords": ["it", "tech", "software", "system", "network", "security", "server", "database", "cloud", "api", "bug", "technical"],
             "doc_type": "it_document",
             "department": "it",
-            "confidence": 0.75,
-            "priority": "medium",
-            "tags": ["it", "technology"]
+            "confidence": 0.88,
+            "priority": "high",
+            "tags": ["it", "technology", "technical"]
         },
         # Operations
         {
@@ -882,7 +912,15 @@ async def notify_department(doc_id: str, classification_result: dict,
         </html>
         """
 
-        send_email(dept_email, subject, body)
+        # Get document name
+        conn2 = sqlite3.connect(DB_PATH)
+        cursor2 = conn2.cursor()
+        cursor2.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
+        doc_result = cursor2.fetchone()
+        file_name = doc_result[0] if doc_result else "Unknown"
+        conn2.close()
+        
+        send_email(dept_email, subject, body, doc_id, file_name)
 
 
 def update_document_status(doc_id: str, status: str):
@@ -978,7 +1016,7 @@ async def review_document(doc_id: str,
         </html>
         """
 
-        send_email(user_email, subject, body)
+        send_email(user_email, subject, body, doc_id, doc_result[1])
 
     return {"message": f"Document {review.status} successfully"}
 
@@ -1093,22 +1131,22 @@ async def get_review_documents(page: int = 1,
         pass
     elif current_user['role'] == 'manager':
         # Managers can see documents routed to their department (not just uploaded by them)
-        where_clauses.append("department = ?")
+        where_clauses.append("d.department = ?")
         params.append(current_user['department'])
     else:
         # Regular employees can only see their own documents
-        where_clauses.append("user_id = ?")
+        where_clauses.append("d.user_id = ?")
         params.append(current_user['user_id'])
 
     if review_status:
-        where_clauses.append("review_status = ?")
+        where_clauses.append("d.review_status = ?")
         params.append(review_status)
     else:
         # Default to pending if no status specified
-        where_clauses.append("(review_status IS NULL OR review_status = 'pending')")
+        where_clauses.append("(d.review_status IS NULL OR d.review_status = 'pending')")
 
     if search:
-        where_clauses.append("(original_name LIKE ? OR extracted_text LIKE ?)")
+        where_clauses.append("(d.original_name LIKE ? OR d.extracted_text LIKE ?)")
         params.extend([f"%{search}%", f"%{search}%"])
 
     where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
@@ -1232,6 +1270,57 @@ async def get_document_details(doc_id: str,
     return doc_dict
 
 
+@app.get("/api/email-notifications")
+async def get_email_notifications(page: int = 1, 
+                                  page_size: int = 20,
+                                  current_user: dict = Depends(get_current_user)):
+    """Get email notifications for the current user"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get emails sent to or from the user
+    offset = (page - 1) * page_size
+    query = '''
+        SELECT email_id, sent_by, received_by, subject, doc_id, file_name, status, sent_at, read_at
+        FROM email_notifications 
+        WHERE sent_by = ? OR received_by = ?
+        ORDER BY sent_at DESC
+        LIMIT ? OFFSET ?
+    '''
+    
+    cursor.execute(query, [current_user['email'], current_user['email'], page_size, offset])
+    emails = cursor.fetchall()
+    
+    # Get total count
+    cursor.execute('''
+        SELECT COUNT(*) FROM email_notifications 
+        WHERE sent_by = ? OR received_by = ?
+    ''', [current_user['email'], current_user['email']])
+    total_count = cursor.fetchone()[0]
+    
+    conn.close()
+    
+    email_list = []
+    for email in emails:
+        email_list.append({
+            "email_id": email[0],
+            "sent_by": email[1],
+            "received_by": email[2],
+            "subject": email[3],
+            "doc_id": email[4],
+            "file_name": email[5] or "N/A",
+            "status": email[6],
+            "sent_at": email[7],
+            "read_at": email[8]
+        })
+    
+    return {
+        "emails": email_list,
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size
+    }
+
 @app.get("/api/stats")
 async def get_statistics(current_user: dict = Depends(get_current_user)):
     """Get document processing statistics"""
@@ -1290,13 +1379,40 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
     conn.close()
 
+    # Priority breakdown
+    cursor.execute(
+        f'''
+        SELECT priority, COUNT(*) 
+        FROM documents 
+        {base_where} AND priority IS NOT NULL 
+        GROUP BY priority
+    ''', params)
+    priorities = dict(cursor.fetchall())
+
+    # Monthly upload trends (last 6 months)
+    cursor.execute(
+        f'''
+        SELECT DATE(uploaded_at) as upload_date, COUNT(*) 
+        FROM documents 
+        {base_where}
+        WHERE uploaded_at >= date('now', '-6 months')
+        GROUP BY DATE(uploaded_at)
+        ORDER BY upload_date
+    ''', params)
+    daily_uploads = cursor.fetchall()
+
+    conn.close()
+
     return {
         "total_documents": total_docs,
         "processed_documents": processed_docs,
         "pending_documents": pending_docs,
         "error_documents": error_docs,
         "document_types": doc_types,
-        "departments": departments
+        "departments": departments,
+        "priorities": priorities,
+        "upload_trends": [{"date": row[0], "count": row[1]} for row in daily_uploads],
+        "processing_rate": round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 2)
     }
 
 
