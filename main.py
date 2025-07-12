@@ -12,8 +12,15 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+try:
+    from email.mime.text import MimeText
+    from email.mime.multipart import MimeMultipart
+except ImportError:
+    # Fallback for email imports
+    import email.mime.text as mime_text
+    import email.mime.multipart as mime_multipart
+    MimeText = mime_text.MimeText
+    MimeMultipart = mime_multipart.MimeMultipart
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -277,19 +284,34 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def send_email(to_email: str, subject: str, body: str):
-    """Send email using Outlook SMTP"""
+    """Send email using Outlook SMTP with fallback"""
     try:
-        msg = MimeMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = to_email
-        msg['Subject'] = subject
+        # Create message with fallback approach
+        try:
+            msg = MimeMultipart()
+            msg['From'] = EMAIL_USER
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MimeText(body, 'html'))
+        except Exception as mime_error:
+            # Fallback to basic email creation
+            import email
+            msg = email.message.EmailMessage()
+            msg['From'] = EMAIL_USER
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.set_content(body, subtype='html')
         
-        msg.attach(MimeText(body, 'html'))
-        
+        # Send email
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASSWORD)
-        text = msg.as_string()
+        
+        if hasattr(msg, 'as_string'):
+            text = msg.as_string()
+        else:
+            text = str(msg)
+            
         server.sendmail(EMAIL_USER, to_email, text)
         server.quit()
         
@@ -297,6 +319,7 @@ def send_email(to_email: str, subject: str, body: str):
         return True
     except Exception as e:
         print(f"Failed to send email to {to_email}: {str(e)}")
+        print(f"Email functionality disabled, continuing without email notifications")
         return False
 
 # Mount static files
