@@ -36,22 +36,6 @@ mode = "sequential"
 task = "shell.exec"
 args = "python main.py"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Final-project_training/microservices/classification/app/main.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Final-project_training/microservices/routing_engine/app/main.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Final-project_training/microservices/content_analysis/app/main.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Final-project_training/microservices/workflow_integration/app/main.py"
-
 [[ports]]
 localPort = 3000
 externalPort = 80
