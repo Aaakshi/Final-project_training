@@ -1022,5 +1022,329 @@ The code is updated to include better upload notifications and feedback, a notif
             if (currentUser) {
                 document.getElementById('userName').textContent = currentUser.full_name;
                 document.getElementById('userEmail').textContent = currentUser.email;
-The code is updated to include better upload notifications and feedback, a notification system in HTML, notification styles and functions, notification JavaScript functions, and better review feedback.
-`
+                document.getElementById('userAvatar').textContent = currentUser.full_name.charAt(0).toUpperCase();
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            authToken = null;
+            currentUser = null;
+            showAuthContainer();
+        }
+
+        function loadDashboard() {
+            loadStatistics();
+            loadDocuments();
+        }
+
+        // Notification Functions
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.remove('hidden');
+
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertId = 'alert-' + Date.now();
+            
+            const alertHtml = `
+                <div id="${alertId}" class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            alertContainer.innerHTML = alertHtml;
+            
+            setTimeout(() => {
+                const alertElement = document.getElementById(alertId);
+                if (alertElement) {
+                    alertElement.remove();
+                }
+            }, 5000);
+        }
+
+        // File handling functions
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+        }
+
+        function addFiles(files) {
+            files.forEach(file => {
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+            
+            updateFileList();
+            updateUploadButton();
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFileList();
+            updateUploadButton();
+        }
+
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+
+            const filesHtml = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <span class="file-icon">📄</span>
+                        <div>
+                            <div style="font-weight: 600;">${file.name}</div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                                ${(file.size / 1024 / 1024).toFixed(2)} MB
+                            </div>
+                        </div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile(${index})">Remove</button>
+                </div>
+            `).join('');
+
+            fileList.innerHTML = filesHtml;
+        }
+
+        function updateUploadButton() {
+            const uploadBtn = document.getElementById('uploadBtn');
+            const batchName = document.getElementById('batchNameInput').value.trim();
+            
+            uploadBtn.disabled = selectedFiles.length === 0 || !batchName;
+        }
+
+        // Add event listener for batch name input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('batchNameInput').addEventListener('input', updateUploadButton);
+        });
+
+        async function uploadFiles() {
+            const batchName = document.getElementById('batchNameInput').value.trim();
+            
+            if (!batchName) {
+                showAlert('Please enter a batch name', 'error');
+                return;
+            }
+
+            if (selectedFiles.length === 0) {
+                showAlert('Please select files to upload', 'error');
+                return;
+            }
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            try {
+                const formData = new FormData();
+                formData.append('batch_name', batchName);
+                
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch('/api/bulk-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification(`Successfully uploaded ${result.total_files} files!`, 'success');
+                    selectedFiles = [];
+                    updateFileList();
+                    document.getElementById('batchNameInput').value = '';
+                    loadDashboard(); // Refresh data
+                } else {
+                    showAlert(result.detail || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error during upload', 'error');
+            }
+
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload Documents';
+        }
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayStatistics(stats);
+                } else {
+                    console.error('Failed to load statistics');
+                }
+            } catch (error) {
+                console.error('Failed to load statistics');
+            }
+        }
+
+        function displayStatistics(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-number">${stats.total_documents}</div>
+                    <div class="stat-label">Total Documents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-number">${stats.processed_documents}</div>
+                    <div class="stat-label">Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-number">${stats.pending_documents}</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">❌</div>
+                    <div class="stat-number">${stats.error_documents}</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            `;
+            
+            statsGrid.innerHTML = statsHtml;
+        }
+
+        async function loadDocuments() {
+            try {
+                const filters = getFilters();
+                const queryParams = new URLSearchParams(filters);
+                
+                const response = await fetch(`/api/documents?${queryParams}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    displayDocuments(result.documents);
+                    displayPagination(result);
+                } else {
+                    console.error('Failed to load documents');
+                }
+            } catch (error) {
+                console.error('Failed to load documents');
+            }
+        }
+
+        function getFilters() {
+            return {
+                page: currentPage,
+                page_size: pageSize,
+                status: document.getElementById('statusFilter').value,
+                doc_type: document.getElementById('docTypeFilter').value,
+                department: document.getElementById('departmentFilter').value,
+                search: document.getElementById('searchInput').value
+            };
+        }
+
+        function displayDocuments(documents) {
+            const documentsList = document.getElementById('documentsList');
+            
+            if (documents.length === 0) {
+                documentsList.innerHTML = '<div class="loading">No documents found</div>';
+                return;
+            }
+
+            const documentsHtml = documents.map(doc => `
+                <div class="document-item" onclick="viewDocument('${doc.doc_id}')">
+                    <div class="document-header">
+                        <div class="document-name">${doc.original_name}</div>
+                        <span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span>
+                    </div>
+                    <div class="document-meta">
+                        <span class="meta-item">📄 ${doc.file_type}</span>
+                        <span class="meta-item">📅 ${new Date(doc.uploaded_at).toLocaleDateString()}</span>
+                        <span class="meta-item">📁 ${doc.department || 'Unassigned'}</span>
+                        <span class="meta-item">🏷️ ${doc.document_type || 'Unclassified'}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            documentsList.innerHTML = documentsHtml;
+        }
+
+        function displayPagination(result) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(result.total_count / result.page_size);
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            const paginationHtml = `
+                <button onclick="changePage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>Previous</button>
+                <span>Page ${currentPage} of ${totalPages}</span>
+                <button onclick="changePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            `;
+
+            pagination.innerHTML = paginationHtml;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadDocuments();
+        }
+
+        function viewDocument(docId) {
+            // For now, just show an alert. You can implement a modal or detailed view
+            alert(`Document ID: ${docId}\nClick OK to continue`);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
