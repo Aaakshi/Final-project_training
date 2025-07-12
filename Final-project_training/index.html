@@ -995,10 +995,6 @@
         }
 
         // File upload functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeFileUpload();
-        });
-
         function initializeFileUpload() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
@@ -1010,6 +1006,11 @@
                 fileInput.addEventListener('change', handleFileSelect);
             }
         }
+
+        // Initialize file upload when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFileUpload();
+        });
 
         function handleDragOver(e) {
             e.preventDefault();
@@ -1542,7 +1543,7 @@
                         const time = new Date(doc.uploaded_at).toLocaleString();
                         emailHTML += `
                             <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 10px; background: #f9fafb;">
-                                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <strong style="color: #2d3748;">📧 New Document for Review</strong>
                                     <small style="color: #718096;">${time}</small>
                                 </div>
