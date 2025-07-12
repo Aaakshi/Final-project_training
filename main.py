@@ -492,10 +492,10 @@ async def health_check():
 
 
 # Microservice URLs - using existing microservices
-CLASSIFICATION_SERVICE_URL = "http://localhost:8001"
-ROUTING_ENGINE_URL = "http://localhost:8002"
-CONTENT_ANALYSIS_URL = "http://localhost:8003"
-WORKFLOW_INTEGRATION_URL = "http://localhost:8004"
+CLASSIFICATION_SERVICE_URL = "http://0.0.0.0:8001"
+ROUTING_ENGINE_URL = "http://0.0.0.0:8002"
+CONTENT_ANALYSIS_URL = "http://0.0.0.0:8003"
+WORKFLOW_INTEGRATION_URL = "http://0.0.0.0:8004"
 
 
 @app.post("/api/bulk-upload", response_model=BulkUploadResponse)

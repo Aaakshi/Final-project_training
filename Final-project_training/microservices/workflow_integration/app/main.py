@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from pydantic import BaseModel
 import sys
@@ -30,7 +29,7 @@ class NotificationResponse(BaseModel):
 async def send_notification(request: NotificationRequest):
     # Simulate sending notification
     message = f"Document {request.doc_id} has been assigned to {request.assignee}"
-    
+
     logger.info(f"Sent notification for document {request.doc_id}")
     return NotificationResponse(status="sent", message=message)
 
