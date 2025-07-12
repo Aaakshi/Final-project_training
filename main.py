@@ -172,6 +172,18 @@ def init_database():
         )
     ''')
     
+    # Check if user_id column exists in documents table, add if missing
+    cursor.execute("PRAGMA table_info(documents)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'user_id' not in columns:
+        cursor.execute('ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT "system"')
+    
+    # Check if user_id column exists in upload_batches table, add if missing
+    cursor.execute("PRAGMA table_info(upload_batches)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'user_id' not in columns:
+        cursor.execute('ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"')
+    
     conn.commit()
     conn.close()
     print("✓ Database initialized")
@@ -1107,9 +1119,11 @@ async def wait_for_services():
     print("⚠ Some services may not be ready, but continuing...")
     return False
 
-@app.on_event("shutdown")
-def shutdown_event():
+@app.get("/api/shutdown")
+async def shutdown_api():
+    """Shutdown endpoint for cleanup"""
     cleanup_processes()
+    return {"message": "Shutting down..."}
 
 if __name__ == "__main__":
     def signal_handler(sig, frame):
