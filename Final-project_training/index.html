@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDCR - Intelligent Document Processing</title>
+    <title>IDCR - Enhanced Document Processing System</title>
     <style>
         * {
             margin: 0;
@@ -12,15 +13,15 @@
         }
 
         body {
-            font-family: 'Arial', sans-serif;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
-            color: #343a40;
+            color: #2c3e50;
             line-height: 1.6;
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
         }
@@ -28,54 +29,95 @@
         /* Header */
         .header {
             background: white;
-            border-radius: 10px;
-            padding: 20px 30px;
+            border-radius: 15px;
+            padding: 25px 30px;
             margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            backdrop-filter: blur(10px);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-size: 24px;
+            gap: 15px;
+            font-size: 28px;
             font-weight: bold;
-            color: #495057;
+            color: #2c3e50;
         }
 
         .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(45deg, #28a745, #20c997);
-            border-radius: 8px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 20px;
+            font-size: 24px;
         }
 
         .status-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            border-radius: 20px;
+            gap: 10px;
+            padding: 10px 20px;
+            border-radius: 25px;
             font-size: 14px;
             font-weight: 600;
         }
 
         .status-online {
-            background: #d4edda;
-            color: #155724;
+            background: #d5f4e6;
+            color: #27ae60;
         }
 
         .status-offline {
             background: #f8d7da;
-            color: #721c24;
+            color: #e74c3c;
+        }
+
+        /* Statistics Dashboard */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .stat-number.total { color: #3498db; }
+        .stat-number.processed { color: #27ae60; }
+        .stat-number.pending { color: #f39c12; }
+        .stat-number.error { color: #e74c3c; }
+
+        .stat-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         /* Main Grid */
@@ -88,9 +130,9 @@
 
         .card {
             background: white;
-            border-radius: 10px;
-            padding: 25px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             transition: transform 0.3s ease;
         }
 
@@ -99,62 +141,106 @@
         }
 
         .card-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: bold;
-            margin-bottom: 20px;
-            color: #495057;
+            margin-bottom: 25px;
+            color: #2c3e50;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
         }
 
-        /* Upload Area */
+        /* Enhanced Upload Zone */
         .upload-zone {
-            border: 2px dashed #28a745;
-            border-radius: 8px;
-            padding: 40px 20px;
+            border: 3px dashed #3498db;
+            border-radius: 15px;
+            padding: 50px 30px;
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: #f8fff9;
+            background: linear-gradient(135deg, #ebf8ff 0%, #f0f9ff 100%);
+            position: relative;
+            overflow: hidden;
         }
 
         .upload-zone:hover {
-            background: #e8f7ea;
-            border-color: #20c997;
-        }
-
-        .upload-zone.dragover {
-            background: #e8f7ea;
-            border-color: #20c997;
+            background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+            border-color: #2980b9;
             transform: scale(1.02);
         }
 
+        .upload-zone.dragover {
+            background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+            border-color: #2980b9;
+            transform: scale(1.05);
+        }
+
         .upload-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-            color: #28a745;
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #3498db;
         }
 
         .upload-text {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 600;
-            color: #495057;
-            margin-bottom: 8px;
+            color: #2c3e50;
+            margin-bottom: 10px;
         }
 
         .upload-subtext {
             font-size: 14px;
-            color: #6c757d;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+        }
+
+        .file-types {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .file-type-badge {
+            background: #3498db;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        /* Bulk Upload Controls */
+        .bulk-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .batch-name-input {
+            padding: 12px 16px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 14px;
+            min-width: 200px;
+            transition: border-color 0.3s ease;
+        }
+
+        .batch-name-input:focus {
+            border-color: #3498db;
+            outline: none;
         }
 
         /* Buttons */
         .btn {
-            background: linear-gradient(45deg, #28a745, #20c997);
+            background: linear-gradient(45deg, #3498db, #2980b9);
             color: white;
             border: none;
             padding: 12px 24px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s ease;
@@ -166,149 +252,203 @@
         }
 
         .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
         }
 
-        .btn-secondary {
-            background: linear-gradient(45deg, #007bff, #0056b3);
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .btn-secondary:hover {
-            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        .btn-success {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
         }
 
         /* Document List */
-        .document-list {
-            max-height: 400px;
+        .document-section {
+            grid-column: 1 / -1;
+        }
+
+        .document-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            min-width: 150px;
+        }
+
+        .filter-select:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .search-input {
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 14px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .document-grid {
+            display: grid;
+            gap: 15px;
+            max-height: 600px;
             overflow-y: auto;
         }
 
         .document-item {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 20px;
             align-items: center;
-            padding: 16px;
-            margin-bottom: 12px;
+            padding: 20px;
             background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #28a745;
+            border-radius: 12px;
+            border-left: 5px solid #3498db;
             transition: all 0.3s ease;
         }
 
         .document-item:hover {
-            background: #e9ecef;
+            background: #ecf0f1;
+            transform: translateX(5px);
         }
 
         .document-info h4 {
             font-size: 16px;
-            color: #495057;
-            margin-bottom: 4px;
+            color: #2c3e50;
+            margin-bottom: 8px;
         }
 
         .document-meta {
-            font-size: 12px;
-            color: #6c757d;
+            font-size: 13px;
+            color: #7f8c8d;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
 
         .status-badge {
-            padding: 6px 12px;
-            border-radius: 12px;
+            padding: 8px 16px;
+            border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
+            text-transform: uppercase;
         }
 
-        .status-processed {
-            background: #d4edda;
-            color: #155724;
+        .status-completed {
+            background: #d5f4e6;
+            color: #27ae60;
         }
 
-        .status-pending {
+        .status-processing {
             background: #fff3cd;
             color: #856404;
         }
 
-        .status-error {
+        .status-pending {
+            background: #cce5ff;
+            color: #0066cc;
+        }
+
+        .status-failed {
             background: #f8d7da;
             color: #721c24;
         }
 
-        /* Statistics */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #28a745;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: #6c757d;
+        .type-badge {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
         }
 
-        /* Pipeline Visualization */
-        .pipeline-flow {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 20px;
-        }
+        .type-invoice { background: #e8f5e8; color: #2e7d32; }
+        .type-contract { background: #fff3e0; color: #f57c00; }
+        .type-report { background: #e3f2fd; color: #1976d2; }
+        .type-document { background: #fce4ec; color: #c2185b; }
 
-        .pipeline-step {
-            text-align: center;
-            flex: 1;
-        }
-
-        .pipeline-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 12px;
-            font-size: 24px;
-            color: white;
-            font-weight: bold;
-        }
-
-        .step-1 .pipeline-icon { background: linear-gradient(45deg, #007bff, #0056b3); }
-        .step-2 .pipeline-icon { background: linear-gradient(45deg, #28a745, #20c997); }
-        .step-3 .pipeline-icon { background: linear-gradient(45deg, #ffc107, #e0a800); }
-        .step-4 .pipeline-icon { background: linear-gradient(45deg, #17a2b8, #138496); }
-
-        .pipeline-label {
+        .priority-badge {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 11px;
             font-weight: 600;
-            color: #495057;
-            font-size: 14px;
+            text-transform: uppercase;
         }
 
-        .pipeline-arrow {
-            font-size: 20px;
-            color: #dee2e6;
-            margin: 0 10px;
+        .priority-high { background: #ffebee; color: #d32f2f; }
+        .priority-medium { background: #fff8e1; color: #f57c00; }
+        .priority-low { background: #e8f5e8; color: #388e3c; }
+
+        /* Progress Bar */
+        .progress-container {
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
         }
 
         /* Loading Spinner */
         .spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #28a745;
+            border-top: 3px solid #3498db;
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -321,36 +461,19 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Progress Bar */
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #e9ecef;
-            border-radius: 3px;
-            overflow: hidden;
-            margin: 16px 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(45deg, #28a745, #20c997);
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 3px;
-        }
-
         /* Notifications */
         .notification {
             position: fixed;
             top: 20px;
             right: 20px;
-            padding: 16px 20px;
-            border-radius: 8px;
+            padding: 20px 25px;
+            border-radius: 10px;
             color: white;
             font-weight: 600;
             z-index: 1000;
             transform: translateX(400px);
             transition: transform 0.3s ease;
+            max-width: 400px;
         }
 
         .notification.show {
@@ -358,11 +481,67 @@
         }
 
         .notification.success {
-            background: #28a745;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
         }
 
         .notification.error {
-            background: #dc3545;
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+
+        .notification.info {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+
+        /* File Preview */
+        .file-preview {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+
+        .file-list {
+            display: grid;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .file-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+
+        .remove-file {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
         }
 
         /* Hidden */
@@ -371,80 +550,67 @@
         }
 
         /* Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
             .main-grid {
                 grid-template-columns: 1fr;
-                gap: 20px;
             }
-
+            
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+        }
 
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
             .header {
                 flex-direction: column;
-                gap: 15px;
+                gap: 20px;
                 text-align: center;
             }
-
-            .pipeline-flow {
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .document-item {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .document-controls {
                 flex-direction: column;
-                gap: 20px;
+                align-items: stretch;
             }
-
-            .pipeline-arrow {
-                transform: rotate(90deg);
+            
+            .bulk-controls {
+                flex-direction: column;
             }
         }
 
-        /* Scrollbar */
-        .document-list::-webkit-scrollbar {
-            width: 6px;
+        /* Custom Scrollbar */
+        .document-grid::-webkit-scrollbar,
+        .file-list::-webkit-scrollbar {
+            width: 8px;
         }
 
-        .document-list::-webkit-scrollbar-track {
+        .document-grid::-webkit-scrollbar-track,
+        .file-list::-webkit-scrollbar-track {
             background: #f1f1f1;
-            border-radius: 3px;
+            border-radius: 4px;
         }
 
-        .document-list::-webkit-scrollbar-thumb {
-            background: #28a745;
-            border-radius: 3px;
+        .document-grid::-webkit-scrollbar-thumb,
+        .file-list::-webkit-scrollbar-thumb {
+            background: #3498db;
+            border-radius: 4px;
         }
 
-        .document-list::-webkit-scrollbar-thumb:hover {
-            background: #20c997;
-        }
-
-        /* Health Status */
-        .health-status {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #28a745;
-        }
-
-        .health-status h4 {
-            margin-bottom: 10px;
-            color: #495057;
-        }
-
-        .service-status {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-
-        .service-healthy {
-            color: #28a745;
-            font-weight: 600;
-        }
-
-        .service-unhealthy {
-            color: #dc3545;
-            font-weight: 600;
+        .document-grid::-webkit-scrollbar-thumb:hover,
+        .file-list::-webkit-scrollbar-thumb:hover {
+            background: #2980b9;
         }
     </style>
 </head>
@@ -453,8 +619,8 @@
         <!-- Header -->
         <header class="header">
             <div class="logo">
-                <div class="logo-icon">📄</div>
-                <span>IDCR System</span>
+                <div class="logo-icon">📊</div>
+                <span>IDCR Enhanced System</span>
             </div>
             <div class="status-indicator" id="systemStatus">
                 <div class="spinner"></div>
@@ -462,92 +628,129 @@
             </div>
         </header>
 
-        <!-- Statistics -->
+        <!-- Enhanced Statistics -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-number" id="totalDocs">0</div>
+                <div class="stat-number total" id="totalDocs">0</div>
                 <div class="stat-label">Total Documents</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="processedDocs">0</div>
+                <div class="stat-number processed" id="processedDocs">0</div>
                 <div class="stat-label">Processed</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="pendingDocs">0</div>
+                <div class="stat-number pending" id="pendingDocs">0</div>
                 <div class="stat-label">Pending</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="errorDocs">0</div>
+                <div class="stat-number error" id="errorDocs">0</div>
                 <div class="stat-label">Errors</div>
             </div>
         </div>
 
         <!-- Main Content -->
         <div class="main-grid">
-            <!-- Upload Section -->
+            <!-- Enhanced Upload Section -->
             <div class="card">
                 <h3 class="card-title">
-                    📤 Document Upload
+                    📤 Bulk Document Upload
                 </h3>
                 <div class="upload-zone" id="uploadZone">
                     <div class="upload-icon">📎</div>
-                    <div class="upload-text">Drop files here or click to browse</div>
-                    <div class="upload-subtext">Supports PDF, DOC, DOCX, TXT files (Max 10MB)</div>
+                    <div class="upload-text">Drop up to 50 files here or click to browse</div>
+                    <div class="upload-subtext">Advanced OCR processing with intelligent classification</div>
+                    <div class="file-types">
+                        <span class="file-type-badge">PDF</span>
+                        <span class="file-type-badge">DOCX</span>
+                        <span class="file-type-badge">TXT</span>
+                        <span class="file-type-badge">XLSX</span>
+                        <span class="file-type-badge">JPG</span>
+                        <span class="file-type-badge">PNG</span>
+                    </div>
                 </div>
-                <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
-                <div class="progress-bar hidden" id="uploadProgress">
-                    <div class="progress-fill" id="progressFill"></div>
+                
+                <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.jpg,.jpeg,.png,.tiff" style="display: none;">
+                
+                <!-- File Preview -->
+                <div class="file-preview hidden" id="filePreview">
+                    <h4>Selected Files:</h4>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+                
+                <!-- Bulk Upload Controls -->
+                <div class="bulk-controls">
+                    <input type="text" class="batch-name-input" id="batchName" placeholder="Enter batch name..." value="Batch">
+                    <button class="btn btn-success" id="uploadBtn" disabled>
+                        🚀 Upload & Process
+                    </button>
+                    <button class="btn btn-danger" id="clearBtn">
+                        🗑️ Clear All
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="progress-container" id="progressContainer">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Uploading files...</div>
                 </div>
             </div>
 
-            <!-- Recent Documents -->
+            <!-- Quick Stats -->
             <div class="card">
                 <h3 class="card-title">
-                    📋 Recent Documents
+                    📈 Processing Insights
                 </h3>
-                <div class="document-list" id="documentList">
-                    <div style="text-align: center; color: #6c757d; padding: 40px 20px;">
-                        No documents uploaded yet
+                <div id="quickStats">
+                    <div style="text-align: center; color: #7f8c8d; padding: 40px 20px;">
+                        Upload documents to see processing insights
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Processing Pipeline -->
-        <div class="card">
+        <!-- Document Management Section -->
+        <div class="card document-section">
             <h3 class="card-title">
-                ⚙️ Document Processing Pipeline
+                📋 Document Management
             </h3>
-            <div class="pipeline-flow">
-                <div class="pipeline-step step-1">
-                    <div class="pipeline-icon">1</div>
-                    <div class="pipeline-label">Upload & Validate</div>
-                </div>
-                <div class="pipeline-arrow">→</div>
-                <div class="pipeline-step step-2">
-                    <div class="pipeline-icon">2</div>
-                    <div class="pipeline-label">Classify Document</div>
-                </div>
-                <div class="pipeline-arrow">→</div>
-                <div class="pipeline-step step-3">
-                    <div class="pipeline-icon">3</div>
-                    <div class="pipeline-label">Route & Assign</div>
-                </div>
-                <div class="pipeline-arrow">→</div>
-                <div class="pipeline-step step-4">
-                    <div class="pipeline-icon">4</div>
-                    <div class="pipeline-label">Notify & Complete</div>
-                </div>
+            
+            <!-- Document Controls -->
+            <div class="document-controls">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search documents...">
+                <select class="filter-select" id="statusFilter">
+                    <option value="">All Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="processing">Processing</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                </select>
+                <select class="filter-select" id="typeFilter">
+                    <option value="">All Types</option>
+                    <option value="invoice">Invoice</option>
+                    <option value="contract">Contract</option>
+                    <option value="report">Report</option>
+                    <option value="document">Document</option>
+                </select>
+                <select class="filter-select" id="departmentFilter">
+                    <option value="">All Departments</option>
+                    <option value="finance">Finance</option>
+                    <option value="legal">Legal</option>
+                    <option value="hr">HR</option>
+                    <option value="operations">Operations</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="it">IT</option>
+                </select>
+                <button class="btn" id="refreshBtn">
+                    🔄 Refresh
+                </button>
             </div>
-
-            <!-- System Health -->
-            <div class="health-status">
-                <h4>🔧 System Health</h4>
-                <div id="healthStatus">
-                    <div class="service-status">
-                        <span>Checking backend services...</span>
-                        <span><div class="spinner"></div></span>
-                    </div>
+            
+            <!-- Document List -->
+            <div class="document-grid" id="documentGrid">
+                <div style="text-align: center; color: #7f8c8d; padding: 40px 20px;">
+                    No documents found
                 </div>
             </div>
         </div>
@@ -558,9 +761,10 @@
 
     <script>
         // Application State
+        let selectedFiles = [];
         let documents = [];
-        let stats = { total: 0, processed: 0, pending: 0, error: 0 };
-        let systemHealthy = false;
+        let stats = { total_documents: 0, processed_documents: 0, pending_documents: 0, error_documents: 0 };
+        let currentFilters = { status: '', type: '', department: '', search: '' };
 
         // API Configuration
         const API_BASE = window.location.origin;
@@ -568,20 +772,36 @@
         // DOM Elements
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
-        const documentList = document.getElementById('documentList');
-        const systemStatus = document.getElementById('systemStatus');
-        const healthStatus = document.getElementById('healthStatus');
-        const uploadProgress = document.getElementById('uploadProgress');
+        const filePreview = document.getElementById('filePreview');
+        const fileList = document.getElementById('fileList');
+        const batchName = document.getElementById('batchName');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const progressContainer = document.getElementById('progressContainer');
         const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const systemStatus = document.getElementById('systemStatus');
+        const documentGrid = document.getElementById('documentGrid');
+        const searchInput = document.getElementById('searchInput');
+        const statusFilter = document.getElementById('statusFilter');
+        const typeFilter = document.getElementById('typeFilter');
+        const departmentFilter = document.getElementById('departmentFilter');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const quickStats = document.getElementById('quickStats');
 
         // Initialize Application
         document.addEventListener('DOMContentLoaded', function() {
             setupEventListeners();
             checkSystemHealth();
-            loadSampleData();
+            loadDocuments();
+            loadStats();
 
-            // Check health every 30 seconds
-            setInterval(checkSystemHealth, 30000);
+            // Refresh data every 30 seconds
+            setInterval(() => {
+                checkSystemHealth();
+                loadDocuments();
+                loadStats();
+            }, 30000);
         });
 
         function setupEventListeners() {
@@ -593,6 +813,17 @@
 
             // File input change
             fileInput.addEventListener('change', handleFileSelect);
+
+            // Bulk upload controls
+            uploadBtn.addEventListener('click', handleBulkUpload);
+            clearBtn.addEventListener('click', clearSelectedFiles);
+
+            // Document filters
+            searchInput.addEventListener('input', handleSearch);
+            statusFilter.addEventListener('change', handleFilterChange);
+            typeFilter.addEventListener('change', handleFilterChange);
+            departmentFilter.addEventListener('change', handleFilterChange);
+            refreshBtn.addEventListener('click', () => loadDocuments());
         }
 
         // Drag and Drop Handlers
@@ -604,8 +835,8 @@
         function handleDrop(e) {
             e.preventDefault();
             uploadZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            processFiles(files);
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
         }
 
         function handleDragLeave(e) {
@@ -614,17 +845,35 @@
         }
 
         function handleFileSelect(e) {
-            const files = e.target.files;
-            processFiles(files);
+            const files = Array.from(e.target.files);
+            addFiles(files);
+            e.target.value = ''; // Reset input
         }
 
-        // File Processing
-        async function processFiles(files) {
-            for (let file of files) {
-                if (validateFile(file)) {
-                    await uploadDocument(file);
-                }
+        // File Management
+        function addFiles(files) {
+            const validFiles = files.filter(validateFile);
+            
+            if (validFiles.length === 0) {
+                showNotification('No valid files selected', 'error');
+                return;
             }
+
+            if (selectedFiles.length + validFiles.length > 50) {
+                showNotification('Maximum 50 files allowed per batch', 'error');
+                return;
+            }
+
+            validFiles.forEach(file => {
+                // Check for duplicates
+                if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+
+            updateFilePreview();
+            updateUploadButton();
+            showNotification(`Added ${validFiles.length} files`, 'success');
         }
 
         function validateFile(file) {
@@ -632,7 +881,12 @@
                 'application/pdf',
                 'application/msword', 
                 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'text/plain'
+                'text/plain',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'image/jpeg',
+                'image/png',
+                'image/tiff'
             ];
 
             if (!validTypes.includes(file.type)) {
@@ -648,161 +902,251 @@
             return true;
         }
 
-        async function uploadDocument(file) {
-            const docId = generateId();
-
-            // Create document entry
-            const newDoc = {
-                id: docId,
-                name: file.name,
-                size: file.size,
-                type: detectDocumentType(file.name),
-                status: 'pending',
-                uploadDate: new Date().toISOString(),
-                assignee: null,
-                progress: 0
-            };
-
-            documents.unshift(newDoc);
-            updateStats();
-            renderDocuments();
-
-            // Show upload progress
-            showProgress(0);
-
-            try {
-                // Simulate upload progress
-                for (let i = 0; i <= 100; i += 10) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    showProgress(i);
-                }
-
-                hideProgress();
-
-                // Process through backend
-                const response = await fetch(`${API_BASE}/api/classify`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    updateDocumentStatus(docId, 'processed', result.results);
-                    showNotification(`Document "${file.name}" processed successfully!`, 'success');
-                } else {
-                    updateDocumentStatus(docId, 'error', { error: result.error });
-                    showNotification(`Failed to process "${file.name}": ${result.error}`, 'error');
-                }
-            } catch (error) {
-                updateDocumentStatus(docId, 'error', { error: 'Backend services unavailable' });
-                showNotification(`Error processing "${file.name}": Backend unavailable`, 'error');
-                hideProgress();
-            }
-        }
-
-        function updateDocumentStatus(docId, status, data = {}) {
-            const doc = documents.find(d => d.id === docId);
-            if (doc) {
-                const oldStatus = doc.status;
-                doc.status = status;
-
-                if (status === 'processed') {
-                    doc.assignee = data.routing?.assignee || getDefaultAssignee(doc.type);
-                    doc.classification = data.classification;
-                } else if (status === 'error') {
-                    doc.error = data.error;
-                }
-
-                // Update stats
-                if (oldStatus === 'pending') stats.pending--;
-                if (status === 'processed') stats.processed++;
-                else if (status === 'error') stats.error++;
-
-                updateStats();
-                renderDocuments();
-            }
-        }
-
-        function detectDocumentType(filename) {
-            const name = filename.toLowerCase();
-            if (name.includes('invoice') || name.includes('bill')) return 'invoice';
-            if (name.includes('contract') || name.includes('agreement')) return 'contract';
-            if (name.includes('receipt')) return 'receipt';
-            if (name.includes('report')) return 'report';
-            return 'document';
-        }
-
-        function getDefaultAssignee(type) {
-            const assignments = {
-                'invoice': 'Finance Team',
-                'contract': 'Legal Team', 
-                'receipt': 'Finance Team',
-                'report': 'Management Team',
-                'document': 'General Team'
-            };
-            return assignments[type] || 'General Team';
-        }
-
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
-        }
-
-        // UI Updates
-        function updateStats() {
-            document.getElementById('totalDocs').textContent = stats.total;
-            document.getElementById('processedDocs').textContent = stats.processed;
-            document.getElementById('pendingDocs').textContent = stats.pending;
-            document.getElementById('errorDocs').textContent = stats.error;
-        }
-
-        function renderDocuments() {
-            if (documents.length === 0) {
-                documentList.innerHTML = `
-                    <div style="text-align: center; color: #6c757d; padding: 40px 20px;">
-                        No documents uploaded yet
-                    </div>
-                `;
+        function updateFilePreview() {
+            if (selectedFiles.length === 0) {
+                filePreview.classList.add('hidden');
                 return;
             }
 
-            documentList.innerHTML = documents.slice(0, 8).map(doc => `
-                <div class="document-item">
-                    <div class="document-info">
-                        <h4>${doc.name}</h4>
-                        <div class="document-meta">
-                            ${formatFileSize(doc.size)} • ${doc.type} • ${formatDate(doc.uploadDate)}
-                            ${doc.assignee ? ` • Assigned to ${doc.assignee}` : ''}
-                        </div>
+            filePreview.classList.remove('hidden');
+            fileList.innerHTML = selectedFiles.map((file, index) => `
+                <div class="file-item">
+                    <div class="file-item-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)} • ${getFileTypeDisplay(file.type)}</div>
                     </div>
-                    <div class="status-badge status-${doc.status}">
-                        ${doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                    </div>
+                    <button class="remove-file" onclick="removeFile(${index})">×</button>
                 </div>
             `).join('');
         }
 
-        function showProgress(percent) {
-            uploadProgress.classList.remove('hidden');
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilePreview();
+            updateUploadButton();
+        }
+
+        function clearSelectedFiles() {
+            selectedFiles = [];
+            updateFilePreview();
+            updateUploadButton();
+            showNotification('Cleared all files', 'info');
+        }
+
+        function updateUploadButton() {
+            uploadBtn.disabled = selectedFiles.length === 0;
+        }
+
+        function getFileTypeDisplay(mimeType) {
+            const typeMap = {
+                'application/pdf': 'PDF',
+                'application/msword': 'DOC',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+                'text/plain': 'TXT',
+                'application/vnd.ms-excel': 'XLS',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+                'image/jpeg': 'JPG',
+                'image/png': 'PNG',
+                'image/tiff': 'TIFF'
+            };
+            return typeMap[mimeType] || 'Unknown';
+        }
+
+        // Bulk Upload Handler
+        async function handleBulkUpload() {
+            if (selectedFiles.length === 0) {
+                showNotification('No files selected', 'error');
+                return;
+            }
+
+            const batchNameValue = batchName.value.trim() || `Batch_${Date.now()}`;
+            
+            uploadBtn.disabled = true;
+            progressContainer.style.display = 'block';
+            updateProgress(0, 'Preparing upload...');
+
+            try {
+                const formData = new FormData();
+                formData.append('batch_name', batchNameValue);
+                
+                selectedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                updateProgress(25, 'Uploading files...');
+
+                const response = await fetch(`${API_BASE}/api/bulk-upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    updateProgress(100, 'Upload complete!');
+                    showNotification(`Successfully uploaded ${result.total_files} files`, 'success');
+                    
+                    // Clear selected files
+                    clearSelectedFiles();
+                    
+                    // Refresh data
+                    setTimeout(() => {
+                        loadDocuments();
+                        loadStats();
+                        progressContainer.style.display = 'none';
+                    }, 2000);
+                } else {
+                    throw new Error(result.detail || 'Upload failed');
+                }
+
+            } catch (error) {
+                showNotification(`Upload failed: ${error.message}`, 'error');
+                progressContainer.style.display = 'none';
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        function updateProgress(percent, text) {
             progressFill.style.width = percent + '%';
+            progressText.textContent = text;
         }
 
-        function hideProgress() {
-            uploadProgress.classList.add('hidden');
-            progressFill.style.width = '0%';
+        // Data Loading Functions
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/stats`);
+                const data = await response.json();
+                
+                stats = data;
+                updateStatsDisplay();
+                updateQuickStats(data);
+                
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
         }
 
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
-            notification.textContent = message;
-            notification.className = `notification ${type}`;
-            notification.classList.add('show');
+        function updateStatsDisplay() {
+            document.getElementById('totalDocs').textContent = stats.total_documents || 0;
+            document.getElementById('processedDocs').textContent = stats.processed_documents || 0;
+            document.getElementById('pendingDocs').textContent = stats.pending_documents || 0;
+            document.getElementById('errorDocs').textContent = stats.error_documents || 0;
+        }
 
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 4000);
+        function updateQuickStats(data) {
+            let html = '';
+            
+            // Document types
+            if (data.document_types && Object.keys(data.document_types).length > 0) {
+                html += '<h4>Document Types</h4>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">';
+                for (const [type, count] of Object.entries(data.document_types)) {
+                    html += `<span class="type-badge type-${type}">${type}: ${count}</span>`;
+                }
+                html += '</div>';
+            }
+            
+            // Departments
+            if (data.departments && Object.keys(data.departments).length > 0) {
+                html += '<h4>Departments</h4>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">';
+                for (const [dept, count] of Object.entries(data.departments)) {
+                    html += `<span style="padding: 6px 12px; background: #e3f2fd; color: #1976d2; border-radius: 15px; font-size: 11px; font-weight: 600;">${dept}: ${count}</span>`;
+                }
+                html += '</div>';
+            }
+            
+            // Priorities
+            if (data.priorities && Object.keys(data.priorities).length > 0) {
+                html += '<h4>Priorities</h4>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 10px;">';
+                for (const [priority, count] of Object.entries(data.priorities)) {
+                    html += `<span class="priority-badge priority-${priority}">${priority}: ${count}</span>`;
+                }
+                html += '</div>';
+            }
+            
+            if (!html) {
+                html = '<div style="text-align: center; color: #7f8c8d; padding: 40px 20px;">Upload documents to see processing insights</div>';
+            }
+            
+            quickStats.innerHTML = html;
+        }
+
+        async function loadDocuments() {
+            try {
+                const params = new URLSearchParams({
+                    page: 1,
+                    page_size: 50,
+                    ...currentFilters
+                });
+
+                const response = await fetch(`${API_BASE}/api/documents?${params}`);
+                const data = await response.json();
+                
+                documents = data.documents || [];
+                renderDocuments();
+                
+            } catch (error) {
+                console.error('Failed to load documents:', error);
+                documentGrid.innerHTML = '<div style="text-align: center; color: #e74c3c; padding: 40px 20px;">Failed to load documents</div>';
+            }
+        }
+
+        function renderDocuments() {
+            if (documents.length === 0) {
+                documentGrid.innerHTML = '<div style="text-align: center; color: #7f8c8d; padding: 40px 20px;">No documents found</div>';
+                return;
+            }
+
+            documentGrid.innerHTML = documents.map(doc => `
+                <div class="document-item">
+                    <div class="document-info">
+                        <h4>${doc.original_name}</h4>
+                        <div class="document-meta">
+                            <div class="meta-item">
+                                📄 ${formatFileSize(doc.file_size)}
+                            </div>
+                            <div class="meta-item">
+                                📅 ${formatDate(doc.uploaded_at)}
+                            </div>
+                            ${doc.page_count ? `<div class="meta-item">📃 ${doc.page_count} pages</div>` : ''}
+                            ${doc.classification_confidence ? `<div class="meta-item">🎯 ${Math.round(doc.classification_confidence * 100)}% confidence</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="status-badge status-${doc.processing_status}">
+                        ${doc.processing_status}
+                    </div>
+                    ${doc.document_type ? `<div class="type-badge type-${doc.document_type}">${doc.document_type}</div>` : '<div>-</div>'}
+                    ${doc.priority ? `<div class="priority-badge priority-${doc.priority}">${doc.priority}</div>` : '<div>-</div>'}
+                </div>
+            `).join('');
+        }
+
+        // Filter Handlers
+        function handleSearch() {
+            currentFilters.search = searchInput.value;
+            debounce(loadDocuments, 500)();
+        }
+
+        function handleFilterChange() {
+            currentFilters.status = statusFilter.value;
+            currentFilters.type = typeFilter.value;
+            currentFilters.department = departmentFilter.value;
+            loadDocuments();
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
         }
 
         // System Health Check
@@ -811,49 +1155,28 @@
                 const response = await fetch(`${API_BASE}/health`, { timeout: 5000 });
                 const data = await response.json();
 
-                systemHealthy = true;
-                updateSystemStatus(data.services);
+                updateSystemStatus(true, data.services);
             } catch (error) {
-                systemHealthy = false;
-                updateSystemStatus(null);
+                updateSystemStatus(false, null);
             }
         }
 
-        function updateSystemStatus(services) {
-            if (systemHealthy && services) {
+        function updateSystemStatus(healthy, services) {
+            if (healthy && services) {
+                const healthyCount = Object.values(services).filter(status => status === 'healthy').length;
+                const totalServices = Object.keys(services).length;
+                
                 systemStatus.innerHTML = `
-                    <span style="color: #28a745;">●</span>
-                    <span>System Online</span>
+                    <span style="color: #27ae60;">●</span>
+                    <span>System Online (${healthyCount}/${totalServices})</span>
                 `;
                 systemStatus.className = 'status-indicator status-online';
-
-                // Update detailed health status
-                let healthHtml = '';
-                for (const [service, status] of Object.entries(services)) {
-                    const isHealthy = status === 'healthy';
-                    healthHtml += `
-                        <div class="service-status">
-                            <span>${service.replace('_', ' ').toUpperCase()}</span>
-                            <span class="${isHealthy ? 'service-healthy' : 'service-unhealthy'}">
-                                ${isHealthy ? '✓ Online' : '✗ Offline'}
-                            </span>
-                        </div>
-                    `;
-                }
-                healthStatus.innerHTML = healthHtml;
             } else {
                 systemStatus.innerHTML = `
-                    <span style="color: #dc3545;">●</span>
+                    <span style="color: #e74c3c;">●</span>
                     <span>System Offline</span>
                 `;
                 systemStatus.className = 'status-indicator status-offline';
-
-                healthStatus.innerHTML = `
-                    <div class="service-status">
-                        <span>Backend services unavailable</span>
-                        <span class="service-unhealthy">✗ Offline</span>
-                    </div>
-                `;
             }
         }
 
@@ -869,42 +1192,21 @@
             return new Date(dateString).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short', 
-                day: 'numeric'
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
             });
         }
 
-        // Load sample data for demonstration
-        function loadSampleData() {
-            documents = [
-                {
-                    id: 'demo1',
-                    name: 'Sample_Invoice.pdf',
-                    size: 245760,
-                    type: 'invoice',
-                    status: 'processed',
-                    uploadDate: new Date(Date.now() - 86400000).toISOString(),
-                    assignee: 'Finance Team'
-                },
-                {
-                    id: 'demo2', 
-                    name: 'Contract_Template.docx',
-                    size: 512000,
-                    type: 'contract',
-                    status: 'processed',
-                    uploadDate: new Date(Date.now() - 172800000).toISOString(),
-                    assignee: 'Legal Team'
-                }
-            ];
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
 
-            stats = {
-                total: documents.length,
-                processed: documents.filter(d => d.status === 'processed').length,
-                pending: documents.filter(d => d.status === 'pending').length,
-                error: documents.filter(d => d.status === 'error').length
-            };
-
-            updateStats();
-            renderDocuments();
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
         }
     </script>
 </body>
