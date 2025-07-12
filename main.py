@@ -14,24 +14,30 @@ import uvicorn
 
 app = FastAPI(title="IDCR Demo Server")
 
-# Add CORS middleware
+# Add CORS middleware with specific configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Global variable to track backend processes
 backend_processes = []
 
-# Mount static files
+# Mount static files for any additional assets
 app.mount("/static", StaticFiles(directory="Final-project_training"), name="static")
 
 @app.get("/")
 async def serve_frontend():
+    """Serve the main frontend application"""
     return FileResponse("Final-project_training/index.html")
+
+@app.get("/favicon.ico")
+async def favicon():
+    """Serve favicon to prevent 404 errors"""
+    return {"message": "No favicon"}
 
 @app.get("/health")
 async def health_check():
@@ -59,6 +65,11 @@ async def health_check():
 async def classify_document():
     """Classify document through the processing pipeline"""
     try:
+        # Check if backend services are running first
+        health_response = await health_check()
+        if not all(status == "healthy" for status in health_response["services"].values()):
+            return {"error": "Backend services not fully available", "success": False}
+        
         # Simulate the full pipeline
         async with httpx.AsyncClient(timeout=10.0) as client:
             # 1. Classify document

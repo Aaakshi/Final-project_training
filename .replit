@@ -15,10 +15,19 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Run Demo"
+runButton = "Start IDCR Demo"
 
 [[workflows.workflow]]
 name = "Run Demo"
+author = 44313974
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow]]
+name = "Start IDCR Demo"
 author = 44313974
 mode = "sequential"
 
