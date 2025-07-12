@@ -1470,4 +1470,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
 # Main startup
 if __name__ == "__main__":
+    print("🚀 Starting IDCR Demo Server...")
+    print("📂 Frontend available at: http://0.0.0.0:5000")
+    print("📊 API docs available at: http://0.0.0.0:5000/docs")
     uvicorn.run(app, host="0.0.0.0", port=5000)

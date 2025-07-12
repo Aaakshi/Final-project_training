@@ -996,15 +996,17 @@
 
         // File upload functionality
         document.addEventListener('DOMContentLoaded', function() {
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
+            setTimeout(() => {
+                const uploadArea = document.getElementById('uploadArea');
+                const fileInput = document.getElementById('fileInput');
 
-            if (uploadArea && fileInput) {
-                uploadArea.addEventListener('click', () => fileInput.click());
-                uploadArea.addEventListener('dragover', handleDragOver);
-                uploadArea.addEventListener('drop', handleDrop);
-                fileInput.addEventListener('change', handleFileSelect);
-            }
+                if (uploadArea && fileInput) {
+                    uploadArea.addEventListener('click', () => fileInput.click());
+                    uploadArea.addEventListener('dragover', handleDragOver);
+                    uploadArea.addEventListener('drop', handleDrop);
+                    fileInput.addEventListener('change', handleFileSelect);
+                }
+            }, 100);
         });
 
         function handleDragOver(e) {
