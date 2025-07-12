@@ -120,18 +120,22 @@ def start_backend():
     processes = []
     for service_path, port in services:
         try:
-            # Add the service path to Python path
+            # Set up environment with proper Python path
             env = os.environ.copy()
-            env['PYTHONPATH'] = f"{service_path}:{env.get('PYTHONPATH', '')}"
+            current_dir = os.getcwd()
+            project_root = os.path.join(current_dir, "Final-project_training")
+            env['PYTHONPATH'] = f"{project_root}:{env.get('PYTHONPATH', '')}"
             
+            # Start the service
             process = subprocess.Popen([
                 sys.executable, "-m", "uvicorn", "main:app", 
-                "--host", "0.0.0.0", "--port", str(port)
-            ], cwd=service_path, env=env)
+                "--host", "0.0.0.0", "--port", str(port), "--log-level", "info"
+            ], cwd=service_path, env=env, 
+               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
             processes.append(process)
             print(f"Started service at {service_path} on port {port}")
-            time.sleep(1)  # Small delay between service starts
+            time.sleep(2)  # Longer delay between service starts
             
         except Exception as e:
             print(f"Failed to start service {service_path}: {e}")

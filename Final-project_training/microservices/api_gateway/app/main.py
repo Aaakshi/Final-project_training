@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import ping
+import sys
+import os
+
+# Add the project root to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 app = FastAPI(title="API Gateway")
 
@@ -12,10 +16,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ping.router, prefix="/ping", tags=["ping"])
+@app.get("/ping")
+async def ping():
+    return {"message": "pong from API Gateway"}
 
 @app.on_event("startup")
 async def startup_event():
-    from libs.utils.logger import setup_logger
-    logger = setup_logger(__name__)
-    logger.info("API Gateway started")
+    try:
+        from libs.utils.logger import setup_logger
+        logger = setup_logger(__name__)
+        logger.info("API Gateway started")
+    except ImportError:
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.info("API Gateway started")

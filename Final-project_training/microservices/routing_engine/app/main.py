@@ -24,3 +24,37 @@ async def route_document(request: RoutingRequest):
 @app.get("/ping")
 async def ping():
     return {"message": "pong from Routing Engine"}
+from fastapi import FastAPI
+from pydantic import BaseModel
+from libs.utils.logger import setup_logger
+
+app = FastAPI(title="Routing Engine Service")
+logger = setup_logger(__name__)
+
+class RoutingRequest(BaseModel):
+    doc_id: str
+    doc_type: str
+
+class RoutingResponse(BaseModel):
+    assignee: str
+    department: str
+
+@app.post("/route")
+async def route_document(request: RoutingRequest):
+    # Mock routing logic based on document type
+    if request.doc_type == "invoice":
+        assignee = "finance_team"
+        department = "Finance"
+    elif request.doc_type == "contract":
+        assignee = "legal_team"
+        department = "Legal"
+    else:
+        assignee = "general_team"
+        department = "General"
+    
+    logger.info(f"Routed document {request.doc_id} to {assignee}")
+    return RoutingResponse(assignee=assignee, department=department)
+
+@app.get("/ping")
+async def ping():
+    return {"message": "pong from Routing Engine Service"}
