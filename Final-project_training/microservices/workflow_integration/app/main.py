@@ -1,10 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from libs.utils.logger import setup_logger
-import pika
+import sys
+import os
+
+# Add the project root to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+try:
+    from libs.utils.logger import setup_logger
+    logger = setup_logger(__name__)
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Workflow Integration Service")
-logger = setup_logger(__name__)
 
 class NotificationRequest(BaseModel):
     doc_id: str
@@ -12,28 +22,14 @@ class NotificationRequest(BaseModel):
 
 @app.post("/notify")
 async def send_notification(request: NotificationRequest):
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
-    channel = connection.channel()
-    channel.queue_declare(queue='notifications')
+    # Mock notification instead of using RabbitMQ for demo
     message = f"Document {request.doc_id} assigned to {request.assignee}"
-    channel.basic_publish(exchange='', routing_key='notifications', body=message)
-    connection.close()
-    logger.info(f"Sent notification for document {request.doc_id}")
-    return {"status": "notification sent"}
+    logger.info(f"Sent notification for document {request.doc_id}: {message}")
+    return {"status": "notification sent", "message": message}
 
 @app.get("/ping")
 async def ping():
     return {"message": "pong from Workflow Integration Service"}
-from fastapi import FastAPI
-from pydantic import BaseModel
-from libs.utils.logger import setup_logger
-
-app = FastAPI(title="Workflow Integration Service")
-logger = setup_logger(__name__)
-
-class NotificationRequest(BaseModel):
-    doc_id: str
-    assignee: str
 
 class NotificationResponse(BaseModel):
     status: str

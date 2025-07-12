@@ -1,9 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from libs.utils.logger import setup_logger
+import sys
+import os
 
-app = FastAPI(title="Routing Engine")
-logger = setup_logger(__name__)
+# Add the project root to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+try:
+    from libs.utils.logger import setup_logger
+    logger = setup_logger(__name__)
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+app = FastAPI(title="Routing Engine Service")
 
 class RoutingRequest(BaseModel):
     doc_id: str
@@ -23,17 +34,7 @@ async def route_document(request: RoutingRequest):
 
 @app.get("/ping")
 async def ping():
-    return {"message": "pong from Routing Engine"}
-from fastapi import FastAPI
-from pydantic import BaseModel
-from libs.utils.logger import setup_logger
-
-app = FastAPI(title="Routing Engine Service")
-logger = setup_logger(__name__)
-
-class RoutingRequest(BaseModel):
-    doc_id: str
-    doc_type: str
+    return {"message": "pong from Routing Engine Service"}
 
 class RoutingResponse(BaseModel):
     assignee: str
