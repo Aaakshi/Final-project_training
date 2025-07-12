@@ -22,6 +22,8 @@ app = FastAPI(title="Content Analysis Service")
 async def root():
     return {"message": "Content Analysis Service is running", "service": "content_analysis"}
 
+import re
+
 class AnalysisRequest(BaseModel):
     doc_id: str
     content: str

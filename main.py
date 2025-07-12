@@ -425,6 +425,11 @@ async def serve_frontend():
     """Serve the main frontend application"""
     return FileResponse("Final-project_training/index.html")
 
+@app.get("/index.html")
+async def serve_index():
+    """Alternative path to serve frontend"""
+    return FileResponse("Final-project_training/index.html")
+
 
 @app.get("/favicon.ico")
 async def favicon():

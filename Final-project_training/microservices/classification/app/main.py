@@ -23,6 +23,41 @@ async def root():
 
 class ClassificationResponse(BaseModel):
     doc_type: str
+    confidence: float
+
+@app.post("/classify", response_model=ClassificationResponse)
+async def classify_document(file: UploadFile = File(...)):
+    """Classify uploaded document"""
+    try:
+        # Read file content
+        content = await file.read()
+        filename = file.filename.lower()
+        
+        # Simple classification logic
+        if 'invoice' in filename or 'bill' in filename or 'payment' in filename:
+            return ClassificationResponse(doc_type="invoice", confidence=0.9)
+        elif 'contract' in filename or 'agreement' in filename:
+            return ClassificationResponse(doc_type="contract", confidence=0.85)
+        elif 'hr' in filename or 'employee' in filename:
+            return ClassificationResponse(doc_type="hr_document", confidence=0.8)
+        elif 'it' in filename or 'tech' in filename:
+            return ClassificationResponse(doc_type="it_document", confidence=0.8)
+        else:
+            return ClassificationResponse(doc_type="general", confidence=0.5)
+            
+    except Exception as e:
+        logger.error(f"Classification error: {e}")
+        return ClassificationResponse(doc_type="general", confidence=0.3)
+
+@app.get("/ping")
+async def ping():
+    return {"message": "pong from Classification Service"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8001)
+
+class ClassificationResponse(BaseModel):
+    doc_type: str
     department: str
     confidence: float
     priority: str

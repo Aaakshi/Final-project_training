@@ -809,11 +809,11 @@
         const pageSize = 20;
 
         // Check for existing auth token on page load
-        window.onload = function() {
+        window.onload = async function() {
             const token = localStorage.getItem('authToken');
             if (token) {
                 authToken = token;
-                checkAuth();
+                await checkAuth();
             }
         };
 
@@ -926,10 +926,10 @@
             showLoginForm();
         }
 
-        async function quickLogin(email, password) {
+        function quickLogin(email, password) {
             document.getElementById('loginEmail').value = email;
             document.getElementById('loginPassword').value = password;
-            await loginUser();
+            loginUser();
         }
 
         function showMainContent() {
@@ -999,10 +999,12 @@
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
 
-            uploadArea.addEventListener('click', () => fileInput.click());
-            uploadArea.addEventListener('dragover', handleDragOver);
-            uploadArea.addEventListener('drop', handleDrop);
-            fileInput.addEventListener('change', handleFileSelect);
+            if (uploadArea && fileInput) {
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', handleDragOver);
+                uploadArea.addEventListener('drop', handleDrop);
+                fileInput.addEventListener('change', handleFileSelect);
+            }
         });
 
         function handleDragOver(e) {
