@@ -1,732 +1,1834 @@
-
-from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import List, Optional
-import sqlite3
-import uuid
-import datetime
-import os
-import hashlib
-import jwt
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from pathlib import Path
-import PyPDF2
-import docx
-from werkzeug.utils import secure_filename
-import uvicorn
-
-# Configuration
-SECRET_KEY = "your-secret-key-change-in-production"
-ALGORITHM = "HS256"
-DB_PATH = "idcr_documents.db"
-
-app = FastAPI(title="IDCR System")
-security = HTTPBearer()
-
-# Email configuration
-EMAIL_CONFIG = {
-    'smtp_server': 'smtp-mail.outlook.com',
-    'smtp_port': 587,
-    'sender_email': 'your-email@outlook.com',
-    'sender_password': 'your-app-password'
-}
-
-def send_email(to_email, subject, body, cc_email=None, bcc_email=None, reply_to=None):
-    """Send email notification"""
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_CONFIG['sender_email']
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        
-        if cc_email:
-            msg['Cc'] = cc_email
-        if reply_to:
-            msg['Reply-To'] = reply_to
-
-        msg.attach(MIMEText(body, 'html'))
-
-        server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
-        server.starttls()
-        server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
-        
-        recipients = [to_email]
-        if cc_email:
-            recipients.append(cc_email)
-        if bcc_email:
-            recipients.append(bcc_email)
-            
-        server.sendmail(EMAIL_CONFIG['sender_email'], recipients, msg.as_string())
-        server.quit()
-        
-        print(f"✅ Email sent successfully to {to_email}")
-        return True
-    except Exception as e:
-        print(f"❌ Failed to send email to {to_email}: {e}")
-        return False
-
-def init_database():
-    """Initialize the SQLite database with required tables"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # Create users table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id VARCHAR(50) PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            full_name VARCHAR(255) NOT NULL,
-            department VARCHAR(100) NOT NULL,
-            role VARCHAR(50) DEFAULT 'employee' CHECK (role IN ('employee', 'manager', 'admin')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP,
-            is_active BOOLEAN DEFAULT TRUE
-        )
-    ''')
-    
-    # Create documents table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS documents (
-            doc_id VARCHAR(36) PRIMARY KEY,
-            user_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
-            original_name VARCHAR(255) NOT NULL,
-            file_path VARCHAR(500) NOT NULL,
-            file_size INTEGER NOT NULL,
-            file_type VARCHAR(50) NOT NULL,
-            mime_type VARCHAR(100),
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            processing_status VARCHAR(50) DEFAULT 'uploaded' CHECK (processing_status IN ('uploaded', 'processing', 'classified', 'routed', 'reviewed', 'archived')),
-            extracted_text TEXT,
-            document_type VARCHAR(100),
-            department VARCHAR(100),
-            priority VARCHAR(50) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
-            classification_confidence REAL,
-            page_count INTEGER,
-            language VARCHAR(10) DEFAULT 'en',
-            tags TEXT,
-            review_status VARCHAR(50) DEFAULT 'pending' CHECK (review_status IN ('pending', 'approved', 'rejected', 'needs_revision'))
-        )
-    ''')
-    
-    # Create upload_batches table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS upload_batches (
-            batch_id VARCHAR(36) PRIMARY KEY,
-            user_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
-            batch_name VARCHAR(255) NOT NULL,
-            total_files INTEGER NOT NULL,
-            processed_files INTEGER DEFAULT 0,
-            failed_files INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP,
-            status VARCHAR(50) DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed'))
-        )
-    ''')
-    
-    # Create document_reviews table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS document_reviews (
-            review_id VARCHAR(36) PRIMARY KEY,
-            doc_id VARCHAR(36) NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
-            reviewer_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
-            status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'needs_revision')),
-            comments TEXT,
-            reviewed_at TIMESTAMP,
-            decision VARCHAR(50),
-            metadata TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-    print("Database initialized successfully!")
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current user from JWT token"""
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-        user = cursor.fetchone()
-        conn.close()
-        
-        if user is None:
-            raise HTTPException(status_code=401, detail="User not found")
-        
-        return {
-            "user_id": user[0],
-            "email": user[1],
-            "full_name": user[3],
-            "department": user[4],
-            "role": user[5]
-        }
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-@app.get("/", response_class=HTMLResponse)
-async def get_frontend():
-    """Serve the main frontend"""
-    try:
-        with open("Final-project_training/index.html", "r") as f:
-            content = f.read()
-        return HTMLResponse(content=content)
-    except FileNotFoundError:
-        return HTMLResponse(content="<h1>Frontend file not found</h1>", status_code=404)
-
-@app.post("/api/register")
-async def register(request: Request):
-    """Register a new user"""
-    data = await request.json()
-    email = data.get("email")
-    password = data.get("password")
-    full_name = data.get("full_name")
-    department = data.get("department")
-    
-    if not all([email, password, full_name, department]):
-        raise HTTPException(status_code=400, detail="All fields are required")
-    
-    user_id = str(uuid.uuid4())
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO users (user_id, email, password_hash, full_name, department)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (user_id, email, password_hash, full_name, department))
-        conn.commit()
-        conn.close()
-        
-        return {"message": "User registered successfully", "user_id": user_id}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Email already exists")
-
-@app.post("/api/login")
-async def login(request: Request):
-    """Login user and return JWT token"""
-    data = await request.json()
-    email = data.get("email")
-    password = data.get("password")
-    
-    if not email or not password:
-        raise HTTPException(status_code=400, detail="Email and password required")
-    
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE email = ? AND password_hash = ?", (email, password_hash))
-    user = cursor.fetchone()
-    conn.close()
-    
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    token_data = {"sub": user[0]}
-    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
-    
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user": {
-            "user_id": user[0],
-            "email": user[1],
-            "full_name": user[3],
-            "department": user[4],
-            "role": user[5]
-        }
-    }
-
-@app.get("/api/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
-    """Get current user information"""
-    return current_user
-
-@app.post("/api/bulk-upload")
-async def bulk_upload(
-    files: List[UploadFile] = File(...),
-    batch_name: str = Form(...),
-    target_department: str = Form(...),
-    current_user: dict = Depends(get_current_user)
-):
-    """Upload multiple documents for classification and routing"""
-    if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
-
-    if not target_department:
-        raise HTTPException(status_code=400, detail="Target department is required")
-
-    batch_id = str(uuid.uuid4())
-    uploaded_files = []
-    failed_files = []
-
-    # Create batch record
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        INSERT INTO upload_batches (batch_id, user_id, batch_name, total_files, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (batch_id, current_user['user_id'], batch_name, len(files), datetime.datetime.utcnow().isoformat()))
-
-    # Create uploads directory if it doesn't exist
-    upload_dir = Path("uploads") / batch_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-
-    for file in files:
-        try:
-            # Validate file
-            if file.size > 10 * 1024 * 1024:  # 10MB limit
-                failed_files.append(f"{file.filename}: File too large")
-                continue
-
-            # Save file
-            file_path = upload_dir / secure_filename(file.filename)
-            with open(file_path, "wb") as buffer:
-                content = await file.read()
-                buffer.write(content)
-
-            # Extract text content
-            extracted_text = ""
-            try:
-                if file.filename.lower().endswith('.pdf'):
-                    with open(file_path, 'rb') as pdf_file:
-                        pdf_reader = PyPDF2.PdfReader(pdf_file)
-                        for page in pdf_reader.pages:
-                            extracted_text += page.extract_text()
-                elif file.filename.lower().endswith('.txt'):
-                    with open(file_path, 'r', encoding='utf-8') as txt_file:
-                        extracted_text = txt_file.read()
-                elif file.filename.lower().endswith('.docx'):
-                    doc = docx.Document(file_path)
-                    extracted_text = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
-            except Exception as e:
-                print(f"Text extraction failed for {file.filename}: {e}")
-                extracted_text = f"Text extraction failed: {str(e)}"
-
-            # Simulate classification
-            doc_type = "general_document"
-            priority = "medium"
-            if "invoice" in file.filename.lower() or "receipt" in file.filename.lower():
-                doc_type = "financial_document"
-                priority = "high"
-            elif "contract" in file.filename.lower() or "legal" in file.filename.lower():
-                doc_type = "legal_document"
-                priority = "high"
-            elif "hr" in file.filename.lower() or "employee" in file.filename.lower():
-                doc_type = "hr_document"
-                priority = "medium"
-
-            # Create document record
-            doc_id = str(uuid.uuid4())
-            cursor.execute('''
-                INSERT INTO documents (
-                    doc_id, user_id, original_name, file_path, file_size, file_type, 
-                    mime_type, uploaded_at, processing_status, extracted_text, 
-                    document_type, department, priority, classification_confidence,
-                    page_count, language, tags, review_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                doc_id, current_user['user_id'], file.filename, str(file_path), 
-                file.size, file.filename.split('.')[-1].lower(),
-                file.content_type or 'application/octet-stream',
-                datetime.datetime.utcnow().isoformat(), "classified", extracted_text,
-                doc_type, target_department, priority, 0.85, 1, 'en',
-                f'["{doc_type}", "{target_department}"]', "pending"
-            ))
-
-            uploaded_files.append({
-                'doc_id': doc_id,
-                'filename': file.filename,
-                'department': target_department,
-                'type': doc_type,
-                'priority': priority
-            })
-
-        except Exception as e:
-            failed_files.append(f"{file.filename}: {str(e)}")
-
-    # Update batch status
-    cursor.execute('''
-        UPDATE upload_batches 
-        SET processed_files = ?, failed_files = ?, status = ?, completed_at = ?
-        WHERE batch_id = ?
-    ''', (len(uploaded_files), len(failed_files), 'completed', 
-          datetime.datetime.utcnow().isoformat(), batch_id))
-
-    conn.commit()
-    conn.close()
-
-    # Send notifications to department managers
-    if uploaded_files:
-        # Get department manager emails
-        dept_manager_emails = {
-            'hr': 'hr.manager@company.com',
-            'finance': 'finance.manager@company.com',
-            'legal': 'legal.manager@company.com',
-            'sales': 'sales.manager@company.com',
-            'marketing': 'marketing.manager@company.com',
-            'it': 'it.manager@company.com',
-            'operations': 'operations.manager@company.com',
-            'support': 'support.manager@company.com',
-            'procurement': 'procurement.manager@company.com',
-            'product': 'product.manager@company.com',
-            'administration': 'administration.manager@company.com',
-            'executive': 'executive.manager@company.com'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDCR - Intelligent Document Classification & Routing</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        manager_email = dept_manager_emails.get(target_department, 'admin@company.com')
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+            color: #2d3748;
+            transition: all 0.3s ease;
+        }
 
-        # Send notification email to department manager
-        subject = f"New Documents Uploaded to {target_department.upper()} Department"
-        body = f"""
-        <html>
-            <body>
-                <h2>New Documents Uploaded for Review</h2>
-                <p>Dear Department Manager,</p>
-                <p>{current_user['full_name']} has uploaded {len(uploaded_files)} document(s) to the {target_department.upper()} department.</p>
+        /* Smooth page transitions */
+        .page-transition {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s ease;
+        }
 
-                <h3>Documents:</h3>
-                <ul>
-        """
+        .page-transition.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
 
-        for doc in uploaded_files:
-            body += f"""
-                    <li>
-                        <strong>{doc['filename']}</strong><br>
-                        Type: {doc['type']}<br>
-                        Priority: {doc['priority']}<br>
-                        Department: {doc['department'].upper()}
-                    </li>
-            """
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
 
-        body += """
-                </ul>
-                <p>Please review these documents in the IDCR system.</p>
-                <p>Best regards,<br>IDCR System</p>
-            </body>
-        </html>
-        """
+        .header {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 30px;
+        }
 
-        send_email(manager_email, subject, body, None, None, current_user['email'])
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
 
-        # Send confirmation email to uploader
-        confirmation_subject = f"Document Upload Confirmation - {len(uploaded_files)} files processed"
-        confirmation_body = f"""
-        <html>
-            <body>
-                <h2>Upload Successful</h2>
-                <p>Dear {current_user['full_name']},</p>
-                <p>Your {len(uploaded_files)} document(s) have been successfully uploaded and sent to the {target_department.upper()} department for review.</p>
-                <p>You will receive another notification once the documents are reviewed.</p>
-                <p>Best regards,<br>IDCR System</p>
-            </body>
-        </html>
-        """
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
 
-        send_email(current_user['email'], confirmation_subject, confirmation_body, None, None, "noreply@idcr-system.com")
+        .auth-container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 400px;
+            margin: 0 auto;
+        }
 
-    return {
-        "batch_id": batch_id,
-        "message": f"Successfully uploaded {len(uploaded_files)} files to {target_department} department",
-        "total_files": len(uploaded_files),
-        "failed_files": failed_files if failed_files else None
-    }
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
 
-@app.get("/api/documents")
-async def get_documents(
-    department: Optional[str] = None,
-    status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get documents with optional filtering"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    query = "SELECT * FROM documents WHERE 1=1"
-    params = []
-    
-    # Filter by department if user is manager/admin
-    if current_user['role'] in ['manager', 'admin']:
-        if department:
-            query += " AND department = ?"
-            params.append(department)
-        elif current_user['role'] == 'manager':
-            query += " AND department = ?"
-            params.append(current_user['department'])
-    else:
-        # Regular employees see only their documents
-        query += " AND user_id = ?"
-        params.append(current_user['user_id'])
-    
-    if status:
-        query += " AND processing_status = ?"
-        params.append(status)
-    
-    query += " ORDER BY uploaded_at DESC"
-    
-    cursor.execute(query, params)
-    documents = cursor.fetchall()
-    conn.close()
-    
-    return {"documents": [dict(zip([col[0] for col in cursor.description], doc)) for doc in documents]}
+        .nav {
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-@app.get("/api/stats")
-async def get_stats(current_user: dict = Depends(get_current_user)):
-    """Get dashboard statistics"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # Total documents
-    cursor.execute("SELECT COUNT(*) FROM documents")
-    total_docs = cursor.fetchone()[0]
-    
-    # Processed documents
-    cursor.execute("SELECT COUNT(*) FROM documents WHERE processing_status = 'classified'")
-    processed_docs = cursor.fetchone()[0]
-    
-    # Pending documents
-    cursor.execute("SELECT COUNT(*) FROM documents WHERE review_status = 'pending'")
-    pending_docs = cursor.fetchone()[0]
-    
-    # Error documents
-    cursor.execute("SELECT COUNT(*) FROM documents WHERE processing_status = 'failed'")
-    error_docs = cursor.fetchone()[0]
-    
-    # Processing rate
-    processing_rate = (processed_docs / total_docs * 100) if total_docs > 0 else 0
-    
-    # Documents by department
-    cursor.execute("SELECT department, COUNT(*) FROM documents GROUP BY department")
-    dept_stats = dict(cursor.fetchall())
-    
-    # Document types
-    cursor.execute("SELECT document_type, COUNT(*) FROM documents GROUP BY document_type")
-    doc_types = dict(cursor.fetchall())
-    
-    # Priorities
-    cursor.execute("SELECT priority, COUNT(*) FROM documents GROUP BY priority")
-    priorities = dict(cursor.fetchall())
-    
-    # Upload trends (last 30 days)
-    cursor.execute("""
-        SELECT DATE(uploaded_at) as date, COUNT(*) as count 
-        FROM documents 
-        WHERE uploaded_at >= datetime('now', '-30 days')
-        GROUP BY DATE(uploaded_at)
-        ORDER BY date
-    """)
-    upload_trends = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
-    
-    conn.close()
-    
-    return {
-        "total_documents": total_docs,
-        "processed_documents": processed_docs,
-        "pending_documents": pending_docs,
-        "error_documents": error_docs,
-        "processing_rate": round(processing_rate, 1),
-        "department_stats": dept_stats,
-        "document_types": doc_types,
-        "departments": dept_stats,
-        "priorities": priorities,
-        "upload_trends": upload_trends
-    }
+        .nav h2 {
+            margin: 0;
+        }
 
-@app.get("/api/documents/{doc_id}")
-async def get_document_details(
-    doc_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get detailed information about a document"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,))
-    doc = cursor.fetchone()
-    
-    if not doc:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    doc_dict = dict(zip(column_names, doc))
-    
-    # Get review information if available
-    cursor.execute("""
-        SELECT dr.*, u.full_name as reviewer_name 
-        FROM document_reviews dr
-        LEFT JOIN users u ON dr.reviewer_id = u.user_id
-        WHERE dr.doc_id = ?
-        ORDER BY dr.reviewed_at DESC
-        LIMIT 1
-    """, (doc_id,))
-    review = cursor.fetchone()
-    
-    if review:
-        doc_dict['reviewed_by'] = review[8]  # reviewer_name
-        doc_dict['reviewed_at'] = review[6]  # reviewed_at
-        doc_dict['review_comments'] = review[4]  # comments
-    
-    conn.close()
-    return doc_dict
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
 
-@app.get("/api/email-notifications")
-async def get_email_notifications(
-    page: int = 1,
-    page_size: int = 10,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get email notifications (simulated)"""
-    # This is a demo endpoint that simulates email notifications
-    # In a real system, this would fetch from an email logs table
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # Get recent documents for email simulation
-    cursor.execute("""
-        SELECT d.*, u.full_name as uploader_name, u.email as uploader_email
-        FROM documents d
-        LEFT JOIN users u ON d.user_id = u.user_id
-        WHERE d.department = ? OR d.user_id = ?
-        ORDER BY d.uploaded_at DESC
-        LIMIT ?
-    """, (current_user['department'], current_user['user_id'], page_size))
-    
-    documents = cursor.fetchall()
-    conn.close()
-    
-    # Simulate email notifications
-    emails = []
-    for doc in documents:
-        # Notification to department manager
-        if current_user['role'] in ['manager', 'admin']:
-            emails.append({
-                "subject": f"New Document Uploaded: {doc[2]}",
-                "sent_by": "noreply@idcr-system.com",
-                "sent_by_name": "IDCR System",
-                "received_by": f"{current_user['department']}.manager@company.com",
-                "received_by_name": f"{current_user['department'].title()} Manager",
-                "sent_at": doc[7],
-                "email_type": "received",
-                "status": "delivered",
-                "document_name": doc[2],
-                "document_type": doc[10] or "General",
-                "department": doc[11] or "General",
-                "priority": doc[12] or "Medium",
-                "body_preview": f"A new document has been uploaded and requires review..."
-            })
-        
-        # Confirmation to uploader
-        if doc[1] == current_user['user_id']:
-            emails.append({
-                "subject": f"Document Upload Confirmation: {doc[2]}",
-                "sent_by": "noreply@idcr-system.com", 
-                "sent_by_name": "IDCR System",
-                "received_by": current_user['email'],
-                "received_by_name": current_user['full_name'],
-                "sent_at": doc[7],
-                "email_type": "received",
-                "status": "delivered",
-                "document_name": doc[2],
-                "document_type": doc[10] or "General",
-                "department": doc[11] or "General",
-                "priority": doc[12] or "Medium",
-                "body_preview": f"Your document has been successfully uploaded and sent for review..."
-            })
-    
-    return {"emails": emails[:page_size]}
+        .btn {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
 
-@app.post("/api/documents/{doc_id}/review")
-async def review_document(
-    doc_id: str,
-    request: Request,
-    current_user: dict = Depends(get_current_user)
-):
-    """Review a document (approve/reject)"""
-    data = await request.json()
-    status = data.get("status")
-    comments = data.get("comments", "")
-    
-    if status not in ["approved", "rejected"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # Get document details for notification
-    cursor.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,))
-    doc = cursor.fetchone()
-    
-    if not doc:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    # Update document review status
-    cursor.execute('''
-        UPDATE documents 
-        SET review_status = ?, processing_status = ?
-        WHERE doc_id = ?
-    ''', (status, "reviewed", doc_id))
-    
-    # Create review record
-    review_id = str(uuid.uuid4())
-    cursor.execute('''
-        INSERT INTO document_reviews (review_id, doc_id, reviewer_id, status, comments, reviewed_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (review_id, doc_id, current_user['user_id'], status, comments, datetime.datetime.utcnow().isoformat()))
-    
-    # Get uploader details for notification
-    cursor.execute("SELECT email, full_name FROM users WHERE user_id = ?", (doc[1],))
-    uploader = cursor.fetchone()
-    
-    conn.commit()
-    conn.close()
-    
-    # Send notification email to document uploader
-    if uploader:
-        subject = f"Document Review Complete: {doc[2]} - {status.upper()}"
-        body = f"""
-        <html>
-            <body>
-                <h2>Document Review Update</h2>
-                <p>Dear {uploader[1]},</p>
-                <p>Your document <strong>{doc[2]}</strong> has been <strong>{status}</strong> by {current_user['full_name']}.</p>
-                
-                <h3>Review Details:</h3>
-                <ul>
-                    <li><strong>Document:</strong> {doc[2]}</li>
-                    <li><strong>Status:</strong> {status.upper()}</li>
-                    <li><strong>Reviewed by:</strong> {current_user['full_name']} ({current_user['department'].upper()} Department)</li>
-                    <li><strong>Date:</strong> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}</li>
-                    {f'<li><strong>Comments:</strong> {comments}</li>' if comments else ''}
-                </ul>
-                
-                <p>You can view the full details in the IDCR system.</p>
-                <p>Best regards,<br>IDCR System</p>
-            </body>
-        </html>
-        """
-        
-        send_email(uploader[0], subject, body, None, None, current_user['email'])
-    
-    return {"message": f"Document {status} successfully"}
+        .btn:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
 
-if __name__ == "__main__":
-    init_database()
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+        .btn-secondary {
+            background: #e53e3e;
+        }
+
+        .btn-secondary:hover {
+            background: #c53030;
+        }
+
+        .btn-success {
+            background: #38a169;
+        }
+
+        .btn-success:hover {
+            background: #2f855a;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f7fafc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: white;
+            border-bottom: 3px solid #3182ce;
+            color: #3182ce;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            padding: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 50px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .upload-area:hover {
+            border-color: #3182ce;
+            background: #f7fafc;
+        }
+
+        .upload-area.dragover {
+            border-color: #3182ce;
+            background: #ebf8ff;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3182ce;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .documents-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .documents-table th,
+        .documents-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .documents-table th {
+            background: #f7fafc;
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-uploaded { background: #bee3f8; color: #2b6cb0; }
+        .status-processing { background: #fbb6ce; color: #b83280; }
+        .status-classified { background: #c6f6d5; color: #2f855a; }
+        .status-completed { background: #9ae6b4; color: #276749; }
+        .status-failed { background: #fed7d7; color: #c53030; }
+
+        .review-status-pending { background: #fbb6ce; color: #b83280; }
+        .review-status-approved { background: #c6f6d5; color: #2f855a; }
+        .review-status-rejected { background: #fed7d7; color: #c53030; }
+
+        .priority-high { color: #e53e3e; font-weight: bold; }
+        .priority-medium { color: #dd6b20; }
+        .priority-low { color: #38a169; }
+
+        .hidden {
+            display: none;
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filters select,
+        .filters input {
+            padding: 8px 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .file-content {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+        .review-form {
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .review-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .department-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .dept-hr { background: #fbb6ce; color: #b83280; }
+        .dept-finance { background: #c6f6d5; color: #2f855a; }
+        .dept-legal { background: #fed7d7; color: #c53030; }
+        .dept-sales { background: #bee3f8; color: #2b6cb0; }
+        .dept-marketing { background: #e9d8fd; color: #6b46c1; }
+        .dept-it { background: #fbb6ce; color: #b83280; }
+        .dept-operations { background: #fed7e2; color: #97266d; }
+        .dept-support { background: #c6f6d5; color: #2f855a; }
+        .dept-procurement { background: #fef5e7; color: #dd6b20; }
+        .dept-product { background: #e6fffa; color: #319795; }
+        .dept-administration { background: #f0fff4; color: #38a169; }
+        .dept-executive { background: #f7fafc; color: #4a5568; }
+        .dept-general { background: #f7fafc; color: #4a5568; }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination button:hover {
+            background: #f7fafc;
+        }
+
+        .pagination button.active {
+            background: #3182ce;
+            color: white;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1001;
+            display: none;
+        }
+
+        .toast.success { background: #38a169; }
+        .toast.error { background: #e53e3e; }
+        .toast.info { background: #3182ce; }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .filters {
+                flex-direction: column;
+            }
+
+            .documents-table {
+                font-size: 14px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        .chart-container:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .chart-container canvas {
+            position: absolute !important;
+            top: 50px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            width: calc(100% - 40px) !important;
+            height: calc(100% - 70px) !important;
+        }
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .nav-btn:hover::before {
+            left: 100%;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Email notification styles */
+        .email-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+
+        .email-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .email-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .email-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-sent {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-received {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>IDCR System</h1>
+            <p>Intelligent Document Classification & Routing Platform</p>
+        </div>
+
+        <!-- Auth Container -->
+        <div id="authContainer" class="auth-container">
+            <div id="loginForm">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #2d3748;">Login to IDCR System</h2>
+
+                <!-- Demo Users Section -->
+                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+                    <h4 style="margin: 0 0 10px 0; color: #4a5568;">Demo Users - Click to Login:</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.manager@company.com', 'password123')">HR Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.employee@company.com', 'password123')">HR Employee</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('finance.manager@company.com', 'password123')">Finance Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('legal.manager@company.com', 'password123')">Legal Manager</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('general.employee@company.com', 'password123')">General Employee</button>
+                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('admin@company.com', 'admin123')">System Admin</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                </div>
+                <button class="btn" style="width: 100%; margin-bottom: 15px;" onclick="loginUser()">Login</button>
+                <p style="text-align: center;">
+                    Don't have an account? 
+                    <a href="#" onclick="showRegisterForm()" style="color: #4299e1;">Register here</a>
+                </p>
+            </div>
+
+            <div id="registerForm" class="hidden">
+                <h2 style="text-align: center; margin-bottom: 30px; color: #4a5568;">Register</h2>
+                <div class="form-group">
+                    <label>Full Name:</label>
+                    <input type="text" id="registerName" placeholder="Enter your full name" required>
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <input type="email" id="registerEmail" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="password" id="registerPassword" placeholder="Create a password" required>
+                </div>
+                <div class="form-group">
+                    <label>Department:</label>
+                    <select id="registerDepartment" required>
+                        <option value="">Select Department</option>
+                        <option value="hr">Human Resources (HR)</option>
+                        <option value="finance">Finance & Accounting</option>
+                        <option value="legal">Legal</option>
+                        <option value="sales">Sales</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="it">IT (Information Technology)</option>
+                        <option value="operations">Operations</option>
+                        <option value="support">Customer Support</option>
+                        <option value="procurement">Procurement / Purchase</option>
+                        <option value="product">Product / R&D</option>
+                        <option value="administration">Administration</option>
+                        <option value="executive">Executive / Management</option>
+                    </select>
+                </div>
+                <button class="btn" style="width: 100%; margin-bottom: 15px;" onclick="registerUser()">Register</button>
+                <p style="text-align: center;">
+                    Already have an account? 
+                    <a href="#" onclick="showLoginForm()" style="color: #3182ce;">Login here</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="main-content hidden">
+            <div class="nav">
+                <h2>IDCR Dashboard</h2>
+                <div class="user-info">
+                    <span id="userName">Welcome</span>
+                    <span id="userDept" class="department-badge"></span>
+                    <button class="btn btn-secondary" onclick="logout()">Logout</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('upload')" id="uploadTabBtn">Upload Documents</button>
+                <button class="tab" onclick="showTab('documents')" id="documentsTabBtn">My Documents</button>
+                <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
+                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn">Email Notifications</button>
+                <button class="tab" onclick="showTab('stats')" id="statsTabBtn">Statistics</button>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="uploadTab" class="tab-content">
+                <h3>Upload Documents</h3>
+                <p>Upload multiple documents for automatic classification and routing.</p>
+
+                <div class="form-group">
+                    <label>Batch Name:</label>
+                    <input type="text" id="batchName" placeholder="Enter a name for this batch" required>
+                </div>
+                 <div class="form-group">
+                    <label>Target Department:</label>
+                    <select id="targetDepartment" required>
+                        <option value="">Select Department</option>
+                        <option value="hr">Human Resources (HR)</option>
+                        <option value="finance">Finance & Accounting</option>
+                        <option value="legal">Legal</option>
+                        <option value="sales">Sales</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="it">IT (Information Technology)</option>
+                        <option value="operations">Operations</option>
+                        <option value="support">Customer Support</option>
+                        <option value="procurement">Procurement / Purchase</option>
+                        <option value="product">Product / R&D</option>
+                        <option value="administration">Administration</option>
+                        <option value="executive">Executive / Management</option>
+                         <option value="general">General</option>
+                    </select>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <div>
+                        <h3>📁 Drop files here or click to select</h3>
+                        <p>Supported formats: PDF, DOC, DOCX, TXT</p>
+                        <p>Maximum 50 files, 10MB per file</p>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
+                </div>
+
+                <div id="fileList" style="margin-top: 20px;"></div>
+                <button class="btn" id="uploadBtn" onclick="uploadFiles()" style="margin-top: 20px;" disabled>Upload Files</button>
+            </div>
+
+            <!-- Documents Tab -->
+            <div id="documentsTab" class="tab-content hidden">
+                <h3>Document Management</h3>
+
+                <div class="filters">
+                    <input type="text" id="searchInput" placeholder="Search documents..." onkeyup="loadDocuments()">
+                    <select id="statusFilter" onchange="loadDocuments()">
+                        <option value="">All Status</option>
+                        <option value="uploaded">Uploaded</option>
+                        <option value="processing">Processing</option>
+                        <option value="classified">Classified</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                    <select id="typeFilter" onchange="loadDocuments()">
+                        <option value="">All Types</option>
+                        <option value="invoice">Invoice</option>
+                        <option value="contract">Contract</option>
+                        <option value="hr_document">HR Document</option>
+                        <option value="it_document">IT Document</option>
+                        <option value="general">General</option>
+                    </select>
+                    <select id="deptFilter" onchange="loadDocuments()">
+                        <option value="">All Departments</option>
+                        <option value="hr">Human Resources</option>
+                        <option value="finance">Finance & Accounting</option>
+                        <option value="legal">Legal</option>
+                        <option value="sales">Sales</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="it">IT</option>
+                        <option value="operations">Operations</option>
+                        <option value="support">Customer Support</option>
+                        <option value="procurement">Procurement</option>
+                        <option value="product">Product / R&D</option>
+                        <option value="administration">Administration</option>
+                        <option value="executive">Executive</option>
+                    </select>
+                </div>
+
+                <table class="documents-table">
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Type</th>
+                            <th>Department</th>
+                            <th>Summary</th>
+                            <th>Status</th>
+                            <th>Review Status</th>
+                            <th>Priority</th>
+                            <th>Uploaded</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentsTableBody">
+                    </tbody>
+                </table>
+
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- Notifications Tab -->
+            <div id="notificationsTab" class="tab-content hidden">
+                <h3>📧 Email Notifications</h3>
+                <p>See email notifications related to document processing</p>
+
+                <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                    <h4 style="color: #2d3748; margin-bottom: 15px;">📬 Your Department Email: <span id="deptEmail" style="color: #4299e1;"></span></h4>
+                    <p style="color: #718096; margin-bottom: 10px;">Email notifications are sent when:</p>
+                    <ul style="color: #718096; margin-left: 20px;">
+                        <li>Your documents are processed and reviewed</li>
+                        <li>New documents are uploaded to your department (for managers)</li>
+                        <li>Documents require review and approval (for managers)</li>
+                        <li>High priority documents need immediate attention</li>
+                    </ul>
+                </div>
+
+                <div id="emailSimulation" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+                    <h4 style="color: #2d3748; margin-bottom: 15px;">📩 Recent Email Notifications (Demo)</h4>
+                    <div id="emailList">
+                        <p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review Tab -->
+            <div id="reviewTab" class="tab-content hidden">
+                <h3>Review Documents</h3>
+                <p>Documents pending review in your department</p>
+
+                <div class="filters">
+                    <input type="text" id="reviewSearchInput" placeholder="Search documents..." onkeyup="loadReviewDocuments()">
+                    <select id="reviewStatusFilter" onchange="loadReviewDocuments()">
+                        <option value="">All Review Status</option>
+                        <option value="pending">Pending Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </div>
+
+                <table class="documents-table">
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Uploaded By</th>
+                            <th>Type</th>
+                            <th>Summary</th>
+                            <th>Priority</th>
+                            <th>Review Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviewDocumentsTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Stats Tab -->
+            <div id="statsTab" class="tab-content hidden">
+                <h3>Statistics</h3>
+                <div class="stats-grid" id="statsGrid">
+                </div>
+                <div class="chart-grid">
+                    <div class="chart-container">
+                        <h3>Document Types Distribution</h3>
+                        <canvas id="docTypesChart" width="350" height="300"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Department Distribution</h3>
+                        <canvas id="departmentsChart" width="350" height="300"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Priority Distribution</h3>
+                        <canvas id="priorityChart" width="350" height="300"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Upload Trends (Last 30 Days)</h3>
+                        <canvas id="trendsChart" width="350" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Detail Modal -->
+    <div id="documentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Document Details</h2>
+            <div id="modalContent">
+                <!-- Document details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        let currentUser = null;
+        let authToken = null;
+        let currentPage = 1;
+        const pageSize = 20;
+
+        // Check for existing auth token on page load
+        window.onload = function() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                authToken = token;
+                checkAuth();
+            }
+        };
+
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    showLoginForm();
+                    return;
+                }
+
+                const response```text
+ = await fetch('/api/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    currentUser = await response.json();
+                    showMainContent();
+                } else {
+                    logout();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                logout();
+            }
+        }
+
+        function showLoginForm() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+        }
+
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        async function registerUser() {
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const department = document.getElementById('registerDepartment').value;
+
+            if (!name || !email || !password || !department) {
+                showToast('Please fill all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        full_name: name,
+                        email: email,
+                        password: password,
+                        department: department
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Registration successful! Please login.', 'success');
+                    showLoginForm();
+                } else {
+                    showToast(data.detail || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                console.error('Registration failed:', error);
+                showToast('Registration failed. Please try again.', 'error');
+            }
+        }
+
+        async function loginUser() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showToast('Please enter email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.access_token;
+                    currentUser = data.user;
+                    localStorage.setItem('authToken', authToken);
+                    showMainContent();
+                    showToast('Login successful!', 'success');
+                } else {
+                    showToast(data.detail || 'Login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Login failed:', error);
+                showToast('Login failed. Please try again.', 'error');
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('authToken');
+            document.getElementById('authContainer').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            showLoginForm();
+        }
+
+        function quickLogin(email, password) {
+            document.getElementById('loginEmail').value = email;
+            document.getElementById('loginPassword').value = password;
+            loginUser();
+        }
+
+        function showMainContent() {
+            document.getElementById('authContainer').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+
+            // Update user info
+            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
+            const deptBadge = document.getElementById('userDept');
+            deptBadge.textContent = currentUser.department.toUpperCase();
+            deptBadge.className = `department-badge dept-${currentUser.department}`;
+
+            // Show tabs based on role
+            if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+                document.getElementById('reviewTabBtn').style.display = 'block';
+            }
+
+            // Show notifications tab for all users - it's always visible now
+            document.getElementById('notificationsTabBtn').style.display = 'block';
+
+            // Set department email for notifications
+            const deptEmails = {
+                'hr': 'hr@company.com',
+                'finance': 'finance@company.com', 
+                'legal': 'legal@company.com',
+                'sales': 'sales@company.com',
+                'marketing': 'marketing@company.com',
+                'it': 'it@company.com',
+                'operations': 'operations@company.com',
+                'support': 'support@company.com',
+                'procurement': 'procurement@company.com',
+                'product': 'product@company.com',
+                'administration': 'administration@company.com',
+                'executive': 'executive@company.com'
+            };
+            document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
+
+            // Load initial data
+            loadStatistics();
+            loadDocuments();
+            loadEmailNotifications(); // Load for all users
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs first
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab
+            const tabContent = document.getElementById(`${tabName}Tab`);
+            if (tabContent) {
+                tabContent.classList.remove('hidden');
+            }
+
+            // Activate correct tab button based on tabName
+            const tabMapping = {
+                'upload': 'uploadTabBtn',
+                'documents': 'documentsTabBtn', 
+                'review': 'reviewTabBtn',
+                'notifications': 'notificationsTabBtn',
+                'stats': 'statsTabBtn'
+            };
+
+            const activeTabButton = document.getElementById(tabMapping[tabName]);
+            if (activeTabButton) {
+                activeTabButton.classList.add('active');
+            }
+
+            // Load data for specific tabs
+            if (tabName === 'documents') {
+                loadDocuments();
+            } else if (tabName === 'review') {
+                loadReviewDocuments();
+            } else if (tabName === 'stats') {
+                loadStatistics();
+            } else if (tabName === 'notifications') {
+                loadEmailNotifications();
+            } else if (tabName === 'upload') {
+                // Reinitialize upload functionality when switching back to upload tab
+                initializeFileUpload();
+            }
+        }
+
+        // File upload functionality
+        function initializeFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            if (uploadArea && fileInput) {
+                uploadArea.addEventListener('click', () => fileInput.click());
+                uploadArea.addEventListener('dragover', handleDragOver);
+                uploadArea.addEventListener('drop', handleDrop);
+                fileInput.addEventListener('change', handleFileSelect);
+            }
+        }
+
+        // Initialize file upload when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeFileUpload();
+        });
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            displayFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            displayFiles(files);
+        }
+
+        function displayFiles(files) {
+            const fileList = document.getElementById('fileList');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            fileList.innerHTML = '';
+
+            if (files.length > 0) {
+                fileList.innerHTML = '<h4>Selected Files:</h4>';
+                Array.from(files).forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.innerHTML = `
+                        <p>📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</p>
+                    `;
+                    fileList.appendChild(fileItem);
+                });
+                uploadBtn.disabled = false;
+            } else {
+                uploadBtn.disabled = true;
+            }
+        }
+
+        async function uploadFiles() {
+            const files = document.getElementById('fileInput').files;
+            const targetDepartment = document.getElementById('targetDepartment').value;
+
+            if (files.length === 0) return;
+
+            if (!targetDepartment) {
+                showToast('Please select a target department', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('batch_name', `Upload_${new Date().toISOString().split('T')[0]}`);
+            formData.append('target_department', targetDepartment);
+
+            Array.from(files).forEach(file => {
+                formData.append('files', file);
+            });
+
+            try {
+                showToast('Uploading files...', 'info');
+                const response = await fetch('/api/bulk-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Successfully uploaded ${data.total_files} files to ${targetDepartment.toUpperCase()} department`, 'success');
+                    document.getElementById('batchName').value = '';
+                    document.getElementById('fileInput').value = '';
+                    document.getElementById('targetDepartment').value = '';
+                    document.getElementById('fileList').innerHTML = '';
+                    document.getElementById('uploadBtn').disabled = true;
+                    loadStatistics();
+
+                    // Refresh notifications if user is manager/admin
+                    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+                        setTimeout(() => {
+                            loadEmailNotifications();
+                        }, 2000); // Wait for processing
+                    }
+                } else {
+                    showToast(data.detail || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                console.error('Upload failed:', error);
+                showToast('Upload failed. Please try again.', 'error');
+            }
+        }
+
+        async function loadDocuments() {
+            const search = document.getElementById('searchInput')?.value || '';
+            const status = document.getElementById('statusFilter')?.value || '';
+            const docType = document.getElementById('typeFilter')?.value || '';
+            const department = document.getElementById('deptFilter')?.value || '';
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    page_size: pageSize,
+                    search: search,
+                    status: status,
+                    doc_type: docType,
+                    department: department
+                });
+
+                const response = await fetch(`/api/documents?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDocuments(data.documents);
+                    updatePagination(data.total_count, data.page, data.page_size);
+                } else {
+                    showToast('Failed to load documents', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to load documents:', error);
+                showToast('Failed to load documents', 'error');
+            }
+        }
+
+        function displayDocuments(documents) {
+            const tbody = document.getElementById('documentsTableBody');
+            tbody.innerHTML = '';
+
+            documents.forEach(doc => {
+                const row = document.createElement('tr');
+                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 100) + '...' : 'Processing...';
+                row.innerHTML = `
+                    <td>${doc.original_name}</td>
+                    <td>${doc.document_type || 'Unknown'}</td>
+                    <td><span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></td>
+                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
+                    <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
+                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
+                    <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
+                    <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">Details</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function loadReviewDocuments() {
+            const search = document.getElementById('reviewSearchInput')?.value || '';
+            const reviewStatus = document.getElementById('reviewStatusFilter')?.value || '';
+
+            try {
+                const params = new URLSearchParams({
+                    page: 1,
+                    page_size: 50,
+                    search: search,
+                    department: currentUser.department
+                });
+
+                if (reviewStatus) {
+                    params.append('review_status', reviewStatus);
+                }
+
+                const response = await fetch(`/api/documents/review?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayReviewDocuments(data.documents);
+                } else {
+                    showToast('Failed to load review documents', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to load review documents:', error);
+                showToast('Failed to load review documents', 'error');
+            }
+        }
+
+        function displayReviewDocuments(documents) {
+            const tbody = document.getElementById('reviewDocumentsTableBody');
+            tbody.innerHTML = '';
+
+            documents.forEach(doc => {
+                const row = document.createElement('tr');
+                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 80) + '...' : 'Processing...';
+                row.innerHTML = `
+                    <td>${doc.original_name}</td>
+                    <td>${doc.uploaded_by || 'Unknown'}</td>
+                    <td>${doc.document_type || 'Unknown'}</td>
+                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
+                    <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
+                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
+                    <td>
+                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="reviewDocument('${doc.doc_id}')">Review</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function viewDocument(docId) {
+            try {
+                const response = await fetch(`/api/documents/${docId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const doc = await response.json();
+
+                if (response.ok) {
+                    showDocumentModal(doc, false);
+                } else {
+                    showToast('Failed to load document details', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to load document:', error);
+                showToast('Failed to load document details', 'error');
+            }
+        }
+
+        async function reviewDocument(docId) {
+            try {
+                const response = await fetch(`/api/documents/${docId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const doc = await response.json();
+
+                if (response.ok) {
+                    showDocumentModal(doc, true);
+                } else {
+                    showToast('Failed to load document details', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to load document:', error);
+                showToast('Failed to load document details', 'error');
+            }
+        }
+
+        function showDocumentModal(doc, isReview = false) {
+            const modal = document.getElementById('documentModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = doc.original_name;
+
+            let content = `
+                <div style="margin-bottom: 20px;">
+                    <h4>Document Information</h4>
+                    <p><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
+                    <p><strong>Department:</strong> <span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></p>
+                    <p><strong>Size:</strong> ${(doc.file_size / 1024).toFixed(2)} KB</p>
+                    <p><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
+                    <p><strong>Confidence:</strong> ${doc.classification_confidence ? (doc.classification_confidence * 100).toFixed(1) + '%' : 'N/A'}</p>
+                    <p><strong>Status:</strong> <span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></p>
+                    <p><strong>Review Status:</strong> <span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></p>
+                    <p><strong>Uploaded:</strong> ${new Date(doc.uploaded_at).toLocaleString()}</p>
+                </div>
+            `;
+
+            if (doc.extracted_text) {
+                content += `
+                    <h4>Document Content</h4>
+                    <div class="file-content">${doc.extracted_text}</div>
+                `;
+            }
+
+            if (isReview && (doc.review_status === 'pending' || !doc.review_status)) {
+                content += `
+                    <div class="review-form">
+                        <h4>Review Document</h4>
+                        <div class="form-group">
+                            <label>Comments (optional):</label>
+                            <textarea id="reviewComments" rows="3" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;"></textarea>
+                        </div>
+                        <div class="review-buttons">
+                            <button class="btn btn-success" onclick="submitReview('${doc.doc_id}', 'approved')">Approve</button>
+                            <button class="btn btn-secondary" onclick="submitReview('${doc.doc_id}', 'rejected')">Reject</button>
+                        </div>
+                    </div>
+                `;
+            } else if (doc.review_status && doc.review_status !== 'pending') {
+                content += `
+                    <div style="margin-top: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <h4>Review Information</h4>
+                        <p><strong>Status:</strong> <span class="status-badge review-status-${doc.review_status}">${doc.review_status}</span></p>
+                        <p><strong>Reviewed by:</strong> ${doc.reviewed_by || 'Unknown'}</p>
+                        <p><strong>Reviewed at:</strong> ${doc.reviewed_at ? new Date(doc.reviewed_at).toLocaleString() : 'Unknown'}</p>
+                        ${doc.review_comments ? `<p><strong>Comments:</strong> ${doc.review_comments}</p>` : ''}
+                    </div>
+                `;
+            }
+
+            modalContent.innerHTML = content;
+            modal.style.display = 'block';
+        }
+
+        async function submitReview(docId, status) {
+            const comments = document.getElementById('reviewComments').value;
+
+            try {
+                const response = await fetch(`/api/documents/${docId}/review`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        doc_id: docId,
+                        status: status,
+                        comments: comments || null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Document ${status} successfully! User will receive email notification.`, 'success');
+                    closeModal();
+                    loadReviewDocuments();
+                    loadEmailNotifications();
+                } else {
+                    showToast(data.detail || 'Review submission failed', 'error');
+                }
+            } catch (error) {
+                console.error('Review submission failed:', error);
+                showToast('Review submission failed', 'error');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('documentModal').style.display = 'none';
+        }
+
+
+
+async function loadStatistics() {
+            if (!authToken || !currentUser) {
+                console.warn('No auth token or user for statistics');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayStatistics(stats);
+                    renderCharts(stats);
+                } else {
+                    console.error('Statistics API error:', response.status, response.statusText);
+                    const errorData = await response.text();
+                    console.error('Error response:', errorData);
+                    showToast('Failed to load statistics: ' + response.status, 'error');
+
+                    // Show default empty statistics
+                    displayStatistics({
+                        total_documents: 0,
+                        processed_documents: 0,
+                        pending_documents: 0,
+                        error_documents: 0,
+                        processing_rate: 0,
+                        document_types: {},
+                        departments: {},
+                        priorities: {},
+                        upload_trends: []
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                showToast('Network error loading statistics', 'error');
+
+                // Show default empty statistics
+                displayStatistics({
+                    total_documents: 0,
+                    processed_documents: 0,
+                    pending_documents: 0,
+                    error_documents: 0,
+                    processing_rate: 0,
+                    document_types: {},
+                    departments: {},
+                    priorities: {},
+                    upload_trends: []
+                });
+            }
+        }
+
+        function displayStatistics(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            if (!statsGrid) {
+                console.error('Stats grid element not found');
+                return;
+            }
+
+            // Ensure stats object exists and has default values
+            const safeStats = {
+                total_documents: stats?.total_documents || 0,
+                processed_documents: stats?.processed_documents || 0,
+                pending_documents: stats?.pending_documents || 0,
+                error_documents: stats?.error_documents || 0,
+                processing_rate: stats?.processing_rate || 0
+            };
+
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <h3>${safeStats.total_documents}</h3>
+                    <p>Total Documents</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${safeStats.processed_documents}</h3>
+                    <p>Processed</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${safeStats.pending_documents}</h3>
+                    <p>Pending</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${safeStats.error_documents}</h3>
+                    <p>Errors</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${safeStats.processing_rate}%</h3>
+                    <p>Processing Rate</p>
+                </div>
+            `;
+        }
+
+        function renderCharts(stats) {
+            // Clear existing charts first
+            Chart.helpers.each(Chart.instances, function(instance) {
+                instance.destroy();
+            });
+
+            // Document Types Chart
+            if (stats.document_types && Object.keys(stats.document_types).length > 0) {
+                const docTypesCtx = document.getElementById('docTypesChart');
+                if (docTypesCtx) {
+                    docTypesCtx.width = 350;
+                    docTypesCtx.height = 300;
+                    new Chart(docTypesCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(stats.document_types),
+                            datasets: [{
+                                data: Object.values(stats.document_types),
+                                backgroundColor: ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#38b2ac', '#f56565']
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Departments Chart
+            if (stats.departments && Object.keys(stats.departments).length > 0) {
+                const deptCtx = document.getElementById('departmentsChart');
+                if (deptCtx) {
+                    deptCtx.width = 350;
+                    deptCtx.height = 300;
+                    new Chart(deptCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(stats.departments),
+                            datasets: [{
+                                label: 'Documents',
+                                data: Object.values(stats.departments),
+                                backgroundColor: '#4299e1'
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Priority Chart
+            if (stats.priorities && Object.keys(stats.priorities).length > 0) {
+                const priorityCtx = document.getElementById('priorityChart');
+                if (priorityCtx) {
+                    priorityCtx.width = 350;
+                    priorityCtx.height = 300;
+                    new Chart(priorityCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: Object.keys(stats.priorities),
+                            datasets: [{
+                                data: Object.values(stats.priorities),
+                                backgroundColor: ['#e53e3e', '#dd6b20', '#38a169']
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Upload Trends Chart
+            if (stats.upload_trends && stats.upload_trends.length > 0) {
+                const trendsCtx = document.getElementById('trendsChart');
+                if (trendsCtx) {
+                    trendsCtx.width = 350;
+                    trendsCtx.height = 300;
+                    new Chart(trendsCtx, {
+                        type: 'line',
+                        data: {
+                            labels: stats.upload_trends.map(item => item.date),
+                            datasets: [{
+                                label: 'Documents Uploaded',
+                                data: stats.upload_trends.map(item => item.count),
+                                borderColor: '#4299e1',
+                                backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        function updatePagination(totalCount, currentPageNum, pageSizeNum) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(totalCount / pageSizeNum);
+
+            let paginationHTML = '';
+
+            if (currentPageNum > 1) {
+                paginationHTML += `<button onclick="changePage(${currentPageNum - 1})">Previous</button>`;
+            }
+
+            for (let i = Math.max(1, currentPageNum - 2); i <= Math.min(totalPages, currentPageNum + 2); i++) {
+                paginationHTML += `<button onclick="changePage(${i})" ${i === currentPageNum ? 'class="active"' : ''}>${i}</button>`;
+            }
+
+            if (currentPageNum < totalPages) {
+                paginationHTML += `<button onclick="changePage(${currentPageNum + 1})">Next</button>`;
+            }
+
+            pagination.innerHTML = paginationHTML;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadDocuments();
+        }
+
+        async function loadEmailNotifications() {
+            const emailList = document.getElementById('emailList');
+
+            try {
+                const response = await fetch('/api/email-notifications?page=1&page_size=10', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.emails && data.emails.length > 0) {
+                    let emailHTML = '';
+                    data.emails.forEach(email => {
+                        const time = new Date(email.sent_at).toLocaleString();
+                        const emailIcon = email.email_type === 'sent' ? '📤' : '📧';
+                        const emailDirection = email.email_type === 'sent' ? 'Sent' : 'Received';
+
+                        emailHTML += `
+                            <div class="email-item">
+                                <div class="email-header">
+                                    <strong style="color: #2d3748;">${emailIcon} ${email.subject}</strong>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span class="email-status status-${email.email_type}">${emailDirection}</span>
+                                        <small style="color: #718096;">${time}</small>
+                                    </div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>From:</strong> ${email.sent_by_name || 'IDCR System'} (${email.sent_by})</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>To:</strong> ${email.received_by_name || email.received_by} (${email.received_by})</p>
+                                </div>
+                                ${email.document_name && email.document_name !== 'N/A' ? `
+                                <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Document:</strong> ${email.document_name}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Type:</strong> ${email.document_type}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Department:</strong> ${email.department}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
+                                </div>
+                                ` : ''}
+                                ${email.body_preview ? `<p style="margin: 8px 0; color: #718096; font-size: 14px; font-style: italic;">${email.body_preview}</p>` : ''}
+                                <div style="text-align: right; margin-top: 10px;">
+                                    <small style="color: #a0aec0;">Status: ${email.status}</small>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    emailList.innerHTML = emailHTML;
+                } else {
+                    emailList.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #718096;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+                            <h4 style="margin-bottom: 8px;">No Email Notifications Yet</h4>
+                            <p>Email notifications will appear here when:</p>
+                            <ul style="list-style: none; padding: 0; margin: 16px 0;">
+                                <li>📄 Documents are uploaded and classified</li>
+                                <li>🔍 Documents require review and approval</li>
+                                <li>⚡ High priority documents need attention</li>
+                            </ul>
+                            <p style="margin-top: 16px;"><em>Upload a document to see email notifications in action!</em></p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading email notifications:', error);
+                emailList.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #e53e3e;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                        <h4>Error Loading Notifications</h4>
+                        <p>Unable to load email notifications. Please try again.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        ```text
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('documentModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Check if upload is ready (files + department selected)
+        function checkUploadReadiness() {
+            const files = document.getElementById('fileInput').files;
+            const department = document.getElementById('targetDepartment').value;
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (files.length > 0 && department) {
+                uploadBtn.disabled = false;
+                displayFiles(files);
+            } else {
+                uploadBtn.disabled = true;
+                if (files.length === 0) {
+                    document.getElementById('fileList').innerHTML = '';
+                }
+            }
+        }
+
+        // Initialize event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // File upload handling
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const targetDepartment = document.getElementById('targetDepartment');
+
+            if (uploadArea) {
+                uploadArea.addEventListener('click', () => {
+                    fileInput.click();
+                });
+
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#007bff';
+                });
+
+                uploadArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+
+                    const files = e.dataTransfer.files;
+                    fileInput.files = files;
+                    checkUploadReadiness();
+                });
+            }
+
+            if (fileInput) {
+                fileInput.addEventListener('change', checkUploadReadiness);
+            }
+
+            if (targetDepartment) {
+                targetDepartment.addEventListener('change', checkUploadReadiness);
+            }
+        });
+    </script>
+</body>
+</html>
