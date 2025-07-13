@@ -634,7 +634,7 @@
                 <button class="tab active" onclick="showTab('upload')" id="uploadTabBtn">Upload Documents</button>
                 <button class="tab" onclick="showTab('documents')" id="documentsTabBtn">My Documents</button>
                 <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
-                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn" style="display: none;">Email Notifications</button>
+                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn">Email Notifications</button>
                 <button class="tab" onclick="showTab('stats')" id="statsTabBtn">Statistics</button>
             </div>
 
@@ -961,8 +961,8 @@
                 document.getElementById('reviewTabBtn').style.display = 'block';
             }
             
-            // Show notifications tab for all users
-            document.getElementById('notificationsTab').style.display = 'block';
+            // Show notifications tab for all users - it's always visible now
+            document.getElementById('notificationsTabBtn').style.display = 'block';
 
             // Set department email for notifications
             const deptEmails = {
@@ -988,7 +988,7 @@
         }
 
         function showTab(tabName) {
-            // Hide all tabs
+            // Hide all tabs first
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
 
@@ -998,14 +998,19 @@
                 tabContent.classList.remove('hidden');
             }
             
-            // Find and activate the correct tab button
-            const tabButtons = document.querySelectorAll('.tab');
-            tabButtons.forEach(button => {
-                if (button.textContent.toLowerCase().includes(tabName.toLowerCase()) || 
-                    button.onclick && button.onclick.toString().includes(tabName)) {
-                    button.classList.add('active');
-                }
-            });
+            // Activate correct tab button based on tabName
+            const tabMapping = {
+                'upload': 'uploadTabBtn',
+                'documents': 'documentsTabBtn', 
+                'review': 'reviewTabBtn',
+                'notifications': 'notificationsTabBtn',
+                'stats': 'statsTabBtn'
+            };
+
+            const activeTabButton = document.getElementById(tabMapping[tabName]);
+            if (activeTabButton) {
+                activeTabButton.classList.add('active');
+            }
 
             // Load data for specific tabs
             if (tabName === 'documents') {

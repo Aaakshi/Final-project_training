@@ -841,12 +841,14 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
             # Update status to processing
             update_document_status(file_info['doc_id'], 'processing')
 
-            # Read file content for classification
+            # Enhanced content extraction for all document types
             try:
                 file_path = doc_row[3]
                 content = ""
+                mime_type = doc_row[6]
+                filename = doc_row[2]
 
-                if doc_row[6] == 'application/pdf':
+                if mime_type == 'application/pdf':
                     # Handle PDF files
                     try:
                         import PyPDF2
@@ -856,43 +858,86 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                             for page in pdf_reader.pages[:5]:  # Limit to first 5 pages
                                 text_content.append(page.extract_text())
                             content = '\n'.join(text_content)
+                            if not content.strip():
+                                content = f"PDF document: {filename} - Contains {len(pdf_reader.pages)} pages"
                     except Exception as pdf_error:
                         print(f"PDF reading error: {pdf_error}")
-                        content = f"PDF document with {len(open(file_path, 'rb').read())} bytes"
+                        content = f"PDF document: {filename} - Unable to extract text content"
 
-                elif doc_row[6] == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                elif mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                     # Handle DOCX files
                     try:
                         import docx
                         doc = docx.Document(file_path)
                         paragraphs = []
                         for para in doc.paragraphs[:50]:  # Limit to first 50 paragraphs
-                            paragraphs.append(para.text)
+                            if para.text.strip():
+                                paragraphs.append(para.text)
                         content = '\n'.join(paragraphs)
+                        if not content.strip():
+                            content = f"DOCX document: {filename} - Document structure detected but no readable text"
                     except Exception as docx_error:
                         print(f"DOCX reading error: {docx_error}")
-                        content = f"DOCX document: {doc_row[2]}"
+                        content = f"DOCX document: {filename} - Unable to extract text content"
 
-                elif doc_row[6].startswith('text/'):
+                elif mime_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+                    # Handle Excel files
+                    try:
+                        import openpyxl
+                        workbook = openpyxl.load_workbook(file_path)
+                        sheet_data = []
+                        for sheet_name in workbook.sheetnames[:3]:  # Limit to first 3 sheets
+                            sheet = workbook[sheet_name]
+                            for row in sheet.iter_rows(max_row=20, values_only=True):  # Limit to first 20 rows
+                                row_text = ' '.join([str(cell) for cell in row if cell is not None])
+                                if row_text.strip():
+                                    sheet_data.append(row_text)
+                        content = '\n'.join(sheet_data)
+                        if not content.strip():
+                            content = f"Excel spreadsheet: {filename} - Contains data in {len(workbook.sheetnames)} sheets"
+                    except Exception as excel_error:
+                        print(f"Excel reading error: {excel_error}")
+                        content = f"Excel spreadsheet: {filename} - Unable to extract content"
+
+                elif mime_type.startswith('text/'):
                     # Handle text files
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()[:10000]  # Limit to 10KB
-
-                elif doc_row[6].startswith('image/'):
-                    # Handle image files
-                    content = f"Image file: {doc_row[2]} - Image content requires OCR processing"
-
-                else:
-                    # Other file types
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()[:5000]  # Limit to 5KB
+                            content = f.read()[:10000]  # Limit to 10KB
+                    except Exception as text_error:
+                        print(f"Text file reading error: {text_error}")
+                        content = f"Text file: {filename} - Unable to read content"
+
+                elif mime_type.startswith('image/'):
+                    # Handle image files with OCR potential
+                    try:
+                        # Try to use OCR if available (optional)
+                        import pytesseract
+                        from PIL import Image
+                        image = Image.open(file_path)
+                        ocr_text = pytesseract.image_to_string(image)
+                        content = ocr_text if ocr_text.strip() else f"Image file: {filename} - Image processed, no readable text detected"
+                    except ImportError:
+                        content = f"Image file: {filename} - Image content detected, OCR not available"
+                    except Exception as image_error:
+                        print(f"Image processing error: {image_error}")
+                        content = f"Image file: {filename} - Image format recognized"
+
+                else:
+                    # Other file types - try to read as text
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            potential_content = f.read()[:5000]  # Limit to 5KB
+                            if potential_content.strip():
+                                content = potential_content
+                            else:
+                                content = f"Binary file: {filename} - File type: {mime_type}"
                     except:
-                        content = f"Binary file: {doc_row[2]}"
+                        content = f"Binary file: {filename} - File type: {mime_type}"
 
             except Exception as e:
                 print(f"File reading error: {e}")
-                content = f"Error reading file: {doc_row[2]}"
+                content = f"Error reading file: {filename} - {str(e)}"
 
             # Simple local classification (fallback if microservice not available)
             classification_result = classify_document_locally(content, doc_row[2])
@@ -945,6 +990,9 @@ def classify_document_locally(content: str, filename: str):
     content_to_analyze = content[:5000] if len(content) > 5000 else content
     content_lower = content_to_analyze.lower()
     filename_lower = filename.lower()
+    
+    # Enhanced file type detection
+    file_extension = filename_lower.split('.')[-1] if '.' in filename_lower else ''
 
     # Define keywords for priority
     high_priority_keywords = ["EOD", "end of day", "today", "asap", "urgent", "immediate", "24 hours", "deadline today", "due today", "respond by", "reply immediately",
@@ -967,9 +1015,9 @@ def classify_document_locally(content: str, filename: str):
     classification_rules = [
         # Finance & Accounting - High Priority
         {
-            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense", "revenue", "profit", "loss", "tax", "audit", "financial statement", "balance sheet", "cash flow", "accounts payable", "accounts receivable", "payroll", "salary", "wage", "reimbursement", "cost", "expenditure", "vendor payment", "purchase order"],
-            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense", "budget", "financial", "tax", "audit", "payroll", "cost", "po", "purchase"],
-            "doc_type": "financial_document",
+            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense", "revenue", "profit", "loss", "tax", "audit", "financial statement", "balance sheet", "cash flow", "accounts payable", "accounts receivable", "payroll", "salary", "wage", "reimbursement", "cost", "expenditure", "vendor payment", "purchase order", "billing", "transaction", "refund", "deposit"],
+            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense", "budget", "financial", "tax", "audit", "payroll", "cost", "po", "purchase", "billing", "transaction"],
+            "doc_type": "receipt" if "receipt" in filename_lower or "receipt" in content_lower else "financial_document",
             "department": "finance",
             "confidence": 0.95,
             "base_priority": "high",
@@ -1127,42 +1175,48 @@ async def notify_department(doc_id: str, classification_result: dict,
                             user: dict):
     """Send notification to department about new document"""
     department = classification_result.get('department', 'general')
+    doc_type = classification_result.get('doc_type', 'document')
 
-    # Get department email
+    # Get department email and document details
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
                    (department, ))
     dept_result = cursor.fetchone()
+    
+    cursor.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
+    doc_result = cursor.fetchone()
+    file_name = doc_result[0] if doc_result else "Unknown"
     conn.close()
 
     if dept_result:
         dept_email = dept_result[0]
 
-        # Send email to department
-        subject = f"New Document for Review - {classification_result.get('doc_type', 'Document')}"
+        # Create descriptive subject based on document type
+        doc_type_display = doc_type.replace('_', ' ').title()
+        if doc_type == 'receipt':
+            subject = f"New Receipt Uploaded by {user['full_name']} - {file_name}"
+        else:
+            subject = f"New {doc_type_display} Uploaded - {file_name}"
+
         body = f"""
         <html>
             <body>
-                <h2>New Document Uploaded for Review</h2>
-                <p><strong>Uploaded by:</strong> {user['full_name']} ({user['email']})</p>
-                <p><strong>Document Type:</strong> {classification_result.get('doc_type', 'Unknown')}</p>
-                <p><strong>Priority:</strong> {classification_result.get('priority', 'Medium')}</p>
-                <p><strong>Confidence:</strong> {classification_result.get('confidence', 0):.2%}</p>
-                <p><strong>Document ID:</strong> {doc_id}</p>
+                <h2>📄 New Document Uploaded for Review</h2>
+                <p><strong>📋 Document:</strong> {file_name}</p>
+                <p><strong>👤 Uploaded by:</strong> {user['full_name']} ({user['email']})</p>
+                <p><strong>📂 Document Type:</strong> {doc_type_display}</p>
+                <p><strong>🏢 Department:</strong> {department.title()}</p>
+                <p><strong>⚡ Priority:</strong> {classification_result.get('priority', 'Medium').title()}</p>
+                <p><strong>🎯 Confidence:</strong> {classification_result.get('confidence', 0):.1%}</p>
+                <p><strong>🆔 Document ID:</strong> {doc_id}</p>
+                <hr style="margin: 20px 0;">
                 <p>Please log into the IDCR system to review this document.</p>
+                <p><em>This notification was sent to the {department.title()} department.</em></p>
                 <p>Best regards,<br>IDCR System</p>
             </body>
         </html>
         """
-
-        # Get document name
-        conn2 = sqlite3.connect(DB_PATH)
-        cursor2 = conn2.cursor()
-        cursor2.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
-        doc_result = cursor2.fetchone()
-        file_name = doc_result[0] if doc_result else "Unknown"
-        conn2.close()
 
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
 
@@ -1518,7 +1572,7 @@ async def get_document_details(doc_id: str,
 async def get_email_notifications(page: int = 1, 
                                   page_size: int = 20,
                                   current_user: dict = Depends(get_current_user)):
-    """Get email notifications for the current user"""
+    """Get email notifications for the current user with department-specific filtering"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -1527,11 +1581,11 @@ async def get_email_notifications(page: int = 1,
     dept_result = cursor.fetchone()
     user_dept_email = dept_result[0] if dept_result else f"{current_user['department']}@company.com"
 
-    # Get emails based on user role
+    # Get emails based on user role with strict department filtering
     offset = (page - 1) * page_size
     
-    if current_user['role'] == 'employee':
-        # Employees see emails sent to/from them personally or about their uploaded documents
+    if current_user['role'] == 'admin':
+        # Admins see all email notifications
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1541,14 +1595,13 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], page_size, offset])
+        cursor.execute(query, [page_size, offset])
         
-    else:
-        # Managers and admins see all emails related to their department plus their personal emails
+    elif current_user['role'] == 'employee':
+        # Employees see only emails related to them or their uploaded documents
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1558,40 +1611,57 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR 
-                  (d.department IS NULL AND (e.sent_by LIKE ? OR e.received_by LIKE ?))
+            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        dept_pattern = f"%{current_user['department']}%"
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], dept_pattern, dept_pattern, page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
+        
+    else:  # managers
+        # Managers see emails related to their department only
+        query = '''
+            SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
+                   e.file_name, e.status, e.sent_at, e.read_at,
+                   d.original_name, d.document_type, d.priority, d.department,
+                   u.full_name as sender_name, u2.full_name as recipient_name
+            FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            LEFT JOIN users u ON e.sent_by = u.email
+            LEFT JOIN users u2 ON e.received_by = u2.email
+            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
+            ORDER BY e.sent_at DESC
+            LIMIT ? OFFSET ?
+        '''
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
 
     emails = cursor.fetchall()
     
-    # Get total count separately
-    if current_user['role'] == 'employee':
+    # Get total count with same filtering logic
+    if current_user['role'] == 'admin':
+        cursor.execute('SELECT COUNT(*) FROM email_notifications')
+        total_count_result = cursor.fetchone()
+    elif current_user['role'] == 'employee':
         cursor.execute('''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
-        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['user_id']])
-    else:
-        dept_pattern = f"%{current_user['department']}%"
+            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+        ''', [current_user['email'], current_user['email'], current_user['user_id']])
+        total_count_result = cursor.fetchone()
+    else:  # managers
         cursor.execute('''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR 
-                  (d.department IS NULL AND (e.sent_by LIKE ? OR e.received_by LIKE ?))
-        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department'], dept_pattern, dept_pattern])
+            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
+        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
+        total_count_result = cursor.fetchone()
     
-    total_count_result = cursor.fetchone()
     total_count = total_count_result[0] if total_count_result else 0
 
     conn.close()
 
     email_list = []
     for email in emails:
-        # Determine if email was sent or received by current user
+        # Determine if email was sent or received by current user or department
         email_type = "sent" if email[1] == current_user['email'] else "received"
         
         email_list.append({
