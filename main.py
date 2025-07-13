@@ -634,12 +634,7 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
         return True  # Return True so the process continues
 
 
-# Mount static files for the project
-app.mount("/static",
-          StaticFiles(directory="Final-project_training"),
-          name="static")
-
-# Mount uploads directory
+# Mount uploads directory first
 app.mount("/uploads",
           StaticFiles(directory="uploads"),
           name="uploads")
@@ -653,7 +648,7 @@ async def serve_frontend():
 async def custom_404_handler(request, exc):
     """Custom 404 handler to prevent HTML responses for API calls"""
     if request.url.path.startswith("/api/"):
-        return {"detail": "Not found"}
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
     return FileResponse("Final-project_training/index.html", media_type="text/html")
 
 @app.get("/index.html")
