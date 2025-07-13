@@ -92,6 +92,49 @@ def init_database():
         )
     ''')
     
+    # Document versions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS document_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_id TEXT NOT NULL,
+            version_number INTEGER NOT NULL,
+            file_path TEXT NOT NULL,
+            uploaded_by INTEGER NOT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            changes_description TEXT,
+            FOREIGN KEY (uploaded_by) REFERENCES users (id)
+        )
+    ''')
+    
+    # Audit logs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            resource_type TEXT NOT NULL,
+            resource_id TEXT,
+            details TEXT,
+            ip_address TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # Workflow states table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS workflow_states (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_id TEXT NOT NULL,
+            state TEXT NOT NULL,
+            assigned_to INTEGER,
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
+            notes TEXT,
+            FOREIGN KEY (assigned_to) REFERENCES users (id)
+        )
+    ''')
+    
     # Insert default users
     default_users = [
         ('HR Manager', 'hr.manager@company.com', 'password123', 'hr', 'manager'),
@@ -162,6 +205,20 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         }
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+# Audit logging function
+async def log_audit(user_id: int, action: str, resource_type: str, resource_id: str = None, details: str = None, ip_address: str = None):
+    try:
+        conn = sqlite3.connect('idcr_documents.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, action, resource_type, resource_id, details, ip_address))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"✗ Failed to log audit: {e}")
 
 # Email sending function
 async def send_email(to_email: str, subject: str, body: str, notification_type: str):
@@ -302,6 +359,20 @@ async def bulk_upload(
         ''', (doc_id, batch_id, batch_name, file.filename, file_path, file.size,
               current_user['id'], target_department, document_type, priority))
         
+        # Create initial document version
+        cursor.execute('''
+            INSERT INTO document_versions 
+            (doc_id, version_number, file_path, uploaded_by, changes_description)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (doc_id, 1, file_path, current_user['id'], 'Initial upload'))
+        
+        # Create initial workflow state
+        cursor.execute('''
+            INSERT INTO workflow_states 
+            (doc_id, state, notes)
+            VALUES (?, ?, ?)
+        ''', (doc_id, 'uploaded', f'Document uploaded to {target_department} department'))
+        
         uploaded_files.append({
             "filename": file.filename,
             "doc_id": doc_id,
@@ -311,6 +382,15 @@ async def bulk_upload(
     
     conn.commit()
     conn.close()
+    
+    # Log audit trail
+    await log_audit(
+        current_user['id'], 
+        'BULK_UPLOAD', 
+        'documents', 
+        batch_id, 
+        f'Uploaded {len(uploaded_files)} files to {target_department}'
+    )
     
     # Send notification to department managers
     await notify_department_managers(target_department, batch_name, current_user, uploaded_files)
@@ -511,6 +591,144 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
             for email in emails
         ]
     }
+
+@app.get("/api/audit-trail")
+async def get_audit_trail(current_user: dict = Depends(get_current_user)):
+    conn = sqlite3.connect('idcr_documents.db')
+    cursor = conn.cursor()
+    
+    # Only admins and managers can view full audit trail
+    if current_user['role'] not in ['admin', 'manager']:
+        cursor.execute('''
+            SELECT a.*, u.full_name 
+            FROM audit_logs a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.user_id = ?
+            ORDER BY a.timestamp DESC
+            LIMIT 100
+        ''', (current_user['id'],))
+    else:
+        cursor.execute('''
+            SELECT a.*, u.full_name 
+            FROM audit_logs a
+            JOIN users u ON a.user_id = u.id
+            ORDER BY a.timestamp DESC
+            LIMIT 200
+        ''')
+    
+    logs = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "audit_logs": [
+            {
+                "id": log[0],
+                "user_name": log[-1],
+                "action": log[2],
+                "resource_type": log[3],
+                "resource_id": log[4],
+                "details": log[5],
+                "timestamp": log[7]
+            }
+            for log in logs
+        ]
+    }
+
+@app.get("/api/workflow-status")
+async def get_workflow_status(current_user: dict = Depends(get_current_user)):
+    conn = sqlite3.connect('idcr_documents.db')
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT w.*, d.original_name, u.full_name as assigned_name
+        FROM workflow_states w
+        JOIN documents d ON w.doc_id = d.doc_id
+        LEFT JOIN users u ON w.assigned_to = u.id
+        WHERE w.completed_at IS NULL
+        ORDER BY w.started_at DESC
+        LIMIT 50
+    ''')
+    
+    workflows = cursor.fetchall()
+    conn.close()
+    
+    return {
+        "active_workflows": [
+            {
+                "id": wf[0],
+                "doc_id": wf[1],
+                "state": wf[2],
+                "document_name": wf[-2],
+                "assigned_to": wf[-1] or "Unassigned",
+                "started_at": wf[4],
+                "notes": wf[6]
+            }
+            for wf in workflows
+        ]
+    }
+
+@app.post("/api/documents/{doc_id}/review")
+async def review_document(
+    doc_id: str,
+    action: str = Form(...),
+    comments: str = Form(""),
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user['role'] not in ['manager', 'admin']:
+        raise HTTPException(status_code=403, detail="Only managers can review documents")
+    
+    conn = sqlite3.connect('idcr_documents.db')
+    cursor = conn.cursor()
+    
+    # Update document status
+    cursor.execute('''
+        UPDATE documents 
+        SET review_status = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
+        WHERE doc_id = ?
+    ''', (action, current_user['id'], doc_id))
+    
+    # Update workflow state
+    cursor.execute('''
+        UPDATE workflow_states 
+        SET state = ?, completed_at = CURRENT_TIMESTAMP, notes = ?
+        WHERE doc_id = ? AND completed_at IS NULL
+    ''', (action, comments, doc_id))
+    
+    # Get document details for notification
+    cursor.execute('''
+        SELECT d.original_name, d.uploaded_by, u.email, u.full_name
+        FROM documents d
+        JOIN users u ON d.uploaded_by = u.id
+        WHERE d.doc_id = ?
+    ''', (doc_id,))
+    
+    doc_info = cursor.fetchone()
+    conn.commit()
+    conn.close()
+    
+    if doc_info:
+        # Send notification to document uploader
+        subject = f"Document Review: {doc_info[0]} - {action.title()}"
+        body = f"""
+        <h2>Document Review Complete</h2>
+        <p>Hello {doc_info[3]},</p>
+        <p>Your document <strong>{doc_info[0]}</strong> has been <strong>{action}</strong> by {current_user['full_name']}.</p>
+        {f'<p><strong>Comments:</strong> {comments}</p>' if comments else ''}
+        <p>Please check the IDCR system for more details.</p>
+        """
+        
+        await send_email(doc_info[2], subject, body, "document_review")
+    
+    # Log audit trail
+    await log_audit(
+        current_user['id'],
+        f'DOCUMENT_{action.upper()}',
+        'document',
+        doc_id,
+        f'Document {action} with comments: {comments}'
+    )
+    
+    return {"message": f"Document {action} successfully", "doc_id": doc_id}
 
 # Mount static files and serve frontend
 app.mount("/static", StaticFiles(directory="Final-project_training"), name="static")
