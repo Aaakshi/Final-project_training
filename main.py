@@ -718,7 +718,7 @@ async def health_check():
     }
 
     status = {}
-```python
+    
     async with httpx.AsyncClient(timeout=3.0) as client:
         for service, url in services.items():
             try:
