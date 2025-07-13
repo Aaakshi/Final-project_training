@@ -426,6 +426,9 @@
             margin: 20px 0;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             transition: transform 0.3s ease;
+            position: relative;
+            height: 400px;
+            width: 100%;
         }
 
         .chart-container:hover {
@@ -438,6 +441,16 @@
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 20px;
             margin: 20px 0;
+        }
+
+        .chart-container canvas {
+            position: absolute !important;
+            top: 50px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            width: calc(100% - 40px) !important;
+            height: calc(100% - 70px) !important;
         }
         .nav-buttons {
             display: flex;
@@ -769,19 +782,19 @@
                 <div class="chart-grid">
                     <div class="chart-container">
                         <h3>Document Types Distribution</h3>
-                        <canvas id="docTypesChart" width="400" height="200"></canvas>
+                        <canvas id="docTypesChart" width="350" height="300"></canvas>
                     </div>
                     <div class="chart-container">
                         <h3>Department Distribution</h3>
-                        <canvas id="departmentsChart" width="400" height="200"></canvas>
+                        <canvas id="departmentsChart" width="350" height="300"></canvas>
                     </div>
                     <div class="chart-container">
                         <h3>Priority Distribution</h3>
-                        <canvas id="priorityChart" width="400" height="200"></canvas>
+                        <canvas id="priorityChart" width="350" height="300"></canvas>
                     </div>
                     <div class="chart-container">
                         <h3>Upload Trends (Last 30 Days)</h3>
-                        <canvas id="trendsChart" width="400" height="200"></canvas>
+                        <canvas id="trendsChart" width="350" height="300"></canvas>
                     </div>
                 </div>
             </div>
@@ -1449,10 +1462,17 @@ async function loadStatistics() {
         }
 
         function renderCharts(stats) {
+            // Clear existing charts first
+            Chart.helpers.each(Chart.instances, function(instance) {
+                instance.destroy();
+            });
+
             // Document Types Chart
             if (stats.document_types && Object.keys(stats.document_types).length > 0) {
                 const docTypesCtx = document.getElementById('docTypesChart');
                 if (docTypesCtx) {
+                    docTypesCtx.width = 350;
+                    docTypesCtx.height = 300;
                     new Chart(docTypesCtx, {
                         type: 'doughnut',
                         data: {
@@ -1463,8 +1483,13 @@ async function loadStatistics() {
                             }]
                         },
                         options: {
-                            responsive: true,
-                            maintainAspectRatio: false
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
                         }
                     });
                 }
@@ -1474,6 +1499,8 @@ async function loadStatistics() {
             if (stats.departments && Object.keys(stats.departments).length > 0) {
                 const deptCtx = document.getElementById('departmentsChart');
                 if (deptCtx) {
+                    deptCtx.width = 350;
+                    deptCtx.height = 300;
                     new Chart(deptCtx, {
                         type: 'bar',
                         data: {
@@ -1485,11 +1512,16 @@ async function loadStatistics() {
                             }]
                         },
                         options: {
-                            responsive: true,
+                            responsive: false,
                             maintainAspectRatio: false,
                             scales: {
                                 y: {
                                     beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
                                 }
                             }
                         }
@@ -1501,6 +1533,8 @@ async function loadStatistics() {
             if (stats.priorities && Object.keys(stats.priorities).length > 0) {
                 const priorityCtx = document.getElementById('priorityChart');
                 if (priorityCtx) {
+                    priorityCtx.width = 350;
+                    priorityCtx.height = 300;
                     new Chart(priorityCtx, {
                         type: 'pie',
                         data: {
@@ -1511,8 +1545,13 @@ async function loadStatistics() {
                             }]
                         },
                         options: {
-                            responsive: true,
-                            maintainAspectRatio: false
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                }
+                            }
                         }
                     });
                 }
@@ -1522,6 +1561,8 @@ async function loadStatistics() {
             if (stats.upload_trends && stats.upload_trends.length > 0) {
                 const trendsCtx = document.getElementById('trendsChart');
                 if (trendsCtx) {
+                    trendsCtx.width = 350;
+                    trendsCtx.height = 300;
                     new Chart(trendsCtx, {
                         type: 'line',
                         data: {
@@ -1535,11 +1576,16 @@ async function loadStatistics() {
                             }]
                         },
                         options: {
-                            responsive: true,
+                            responsive: false,
                             maintainAspectRatio: false,
                             scales: {
                                 y: {
                                     beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true
                                 }
                             }
                         }
