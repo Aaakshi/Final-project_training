@@ -651,10 +651,10 @@
                 <div class="upload-area" id="uploadArea">
                     <div>
                         <h3>📁 Drop files here or click to select</h3>
-                        <p>Supported formats: PDF, DOC, DOCX, TXT, XLS, XLSX, JPG, PNG, TIFF</p>
+                        <p>Supported formats: PDF, DOC, DOCX, TXT only</p>
                         <p>Maximum 50 files, 10MB per file</p>
                     </div>
-                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.jpg,.jpeg,.png,.tiff" style="display: none;">
+                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
                 </div>
 
                 <div id="fileList" style="margin-top: 20px;"></div>
@@ -704,10 +704,10 @@
                     <thead>
                         <tr>
                             <th>Document Name</th>
+                            <th>Summary</th>
                             <th>Type</th>
                             <th>Department</th>
                             <th>Status</th>
-                            <th>Review Status</th>
                             <th>Priority</th>
                             <th>Uploaded</th>
                             <th>Actions</th>
@@ -1173,16 +1173,28 @@
 
             documents.forEach(doc => {
                 const row = document.createElement('tr');
+                
+                // Extract summary from extracted_text (first line before "Full Content:")
+                let summary = 'No summary available';
+                if (doc.extracted_text) {
+                    const lines = doc.extracted_text.split('\n');
+                    summary = lines[0] || 'No summary available';
+                    // Limit summary length for display
+                    if (summary.length > 120) {
+                        summary = summary.substring(0, 120) + '...';
+                    }
+                }
+                
                 row.innerHTML = `
-                    <td>${doc.original_name}</td>
+                    <td style="font-weight: bold;">${doc.original_name}</td>
+                    <td style="font-size: 13px; color: #4a5568; max-width: 300px;">${summary}</td>
                     <td>${doc.document_type || 'Unknown'}</td>
                     <td><span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></td>
                     <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
-                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
                     <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
                     <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">View</button>
+                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">Details</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -1293,26 +1305,51 @@
 
             modalTitle.textContent = doc.original_name;
 
+            // Extract summary and key information
+            let summary = 'No summary available';
+            let keyInfo = '';
+            
+            if (doc.extracted_text) {
+                const lines = doc.extracted_text.split('\n');
+                summary = lines[0] || 'No summary available';
+                
+                // Extract key information based on document type
+                if (doc.document_type === 'financial_document') {
+                    keyInfo = 'Financial document containing payment, invoice, or accounting information.';
+                } else if (doc.document_type === 'legal_document') {
+                    keyInfo = 'Legal document containing contracts, agreements, or compliance information.';
+                } else if (doc.document_type === 'hr_document') {
+                    keyInfo = 'HR document containing employee, personnel, or human resources information.';
+                } else if (doc.document_type === 'it_document') {
+                    keyInfo = 'IT document containing technical, system, or technology information.';
+                } else {
+                    keyInfo = 'General business document.';
+                }
+            }
+
             let content = `
                 <div style="margin-bottom: 20px;">
-                    <h4>Document Information</h4>
-                    <p><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
-                    <p><strong>Department:</strong> <span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></p>
-                    <p><strong>Size:</strong> ${(doc.file_size / 1024).toFixed(2)} KB</p>
-                    <p><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
-                    <p><strong>Confidence:</strong> ${doc.classification_confidence ? (doc.classification_confidence * 100).toFixed(1) + '%' : 'N/A'}</p>
-                    <p><strong>Status:</strong> <span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></p>
-                    <p><strong>Review Status:</strong> <span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></p>
-                    <p><strong>Uploaded:</strong> ${new Date(doc.uploaded_at).toLocaleString()}</p>
+                    <h4>📄 Document Information</h4>
+                    <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <p><strong>Summary:</strong> ${summary}</p>
+                        <p><strong>Document Type:</strong> ${keyInfo}</p>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <p><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
+                            <p><strong>Department:</strong> <span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></p>
+                            <p><strong>Size:</strong> ${(doc.file_size / 1024).toFixed(2)} KB</p>
+                            <p><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
+                        </div>
+                        <div>
+                            <p><strong>Classification Confidence:</strong> ${doc.classification_confidence ? (doc.classification_confidence * 100).toFixed(1) + '%' : 'N/A'}</p>
+                            <p><strong>Processing Status:</strong> <span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></p>
+                            <p><strong>Review Status:</strong> <span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></p>
+                            <p><strong>Uploaded:</strong> ${new Date(doc.uploaded_at).toLocaleString()}</p>
+                        </div>
+                    </div>
                 </div>
             `;
-
-            if (doc.extracted_text) {
-                content += `
-                    <h4>Document Content</h4>
-                    <div class="file-content">${doc.extracted_text}</div>
-                `;
-            }
 
             if (isReview && (doc.review_status === 'pending' || !doc.review_status)) {
                 content += `

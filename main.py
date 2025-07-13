@@ -339,7 +339,7 @@ def init_database():
         ('hr.employee@company.com', 'hr@company.com', 'URGENT: Employee Contract Review Required', 
          '<html><body><h2>URGENT: Contract Review</h2><p>New employee contract requires immediate HR review before deadline today.</p><p><strong>Priority:</strong> High</p></body></html>',
          'doc3', 'Urgent_Employee_Contract.pdf'),
-        
+
         # Finance Department emails
         ('finance.manager@company.com', 'finance@company.com', 'New Financial Document - Invoice_2024_001.pdf', 
          '<html><body><h2>New Invoice Processed</h2><p>A new invoice has been uploaded and classified to finance department.</p><p><strong>Priority:</strong> High</p></body></html>',
@@ -350,7 +350,7 @@ def init_database():
         ('finance.employee@company.com', 'finance@company.com', 'Budget Review Document Uploaded', 
          '<html><body><h2>Budget Review</h2><p>Quarterly budget review document has been uploaded for approval.</p></body></html>',
          'doc6', 'Q4_Budget_Review.xlsx'),
-        
+
         # Legal Department emails  
         ('legal.manager@company.com', 'legal@company.com', 'High Priority Legal Document - Contract_ABC_Corp.pdf', 
          '<html><body><h2>URGENT: Legal Review Required</h2><p>A high priority contract document requires immediate legal attention by EOD.</p><p><strong>Priority:</strong> High</p></body></html>',
@@ -364,7 +364,7 @@ def init_database():
         ('sales.manager@company.com', 'legal@company.com', 'Contract Review Required - ABC Client', 
          '<html><body><h2>Contract Review Request</h2><p>New client contract requires legal review before signing tomorrow.</p></body></html>',
          'doc10', 'ABC_Client_Contract.pdf'),
-        
+
         # IT Department emails
         ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required', 
          '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
@@ -372,12 +372,12 @@ def init_database():
         ('noreply@idcr-system.com', 'it.manager@company.com', 'System Update Documentation', 
          '<html><body><h2>System Documentation</h2><p>New system documentation has been uploaded to IT department.</p></body></html>',
          'doc12', 'System_Update_Docs.pdf'),
-        
+
         # Sales Department emails
         ('sales.manager@company.com', 'sales@company.com', 'New Sales Proposal Uploaded', 
          '<html><body><h2>Sales Proposal</h2><p>New client proposal document has been uploaded for review.</p></body></html>',
          'doc13', 'Client_Proposal_2024.pdf'),
-        
+
         # General/Admin emails
         ('admin@company.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
@@ -385,7 +385,7 @@ def init_database():
         ('noreply@idcr-system.com', 'admin@company.com', 'System Status Report', 
          '<html><body><h2>Weekly System Report</h2><p>This week: 25 documents processed, 20 approved, 5 pending review.</p></body></html>',
          None, None),
-        
+
         # Inter-department communications
         ('hr.manager@company.com', 'finance@company.com', 'Payroll Document Review Required', 
          '<html><body><h2>Payroll Review</h2><p>Monthly payroll document requires finance department approval.</p></body></html>',
@@ -396,7 +396,7 @@ def init_database():
         ('legal.manager@company.com', 'hr@company.com', 'Employment Contract Template Updated', 
          '<html><body><h2>Contract Template Update</h2><p>The employment contract template has been updated with new legal requirements.</p></body></html>',
          'doc16', 'Employment_Contract_Template.docx'),
-        
+
         # Document status notifications
         ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Employee Policy Update', 
          '<html><body><h2>Document Approved</h2><p>Your submitted policy update document has been approved and is now active.</p></body></html>',
@@ -421,10 +421,6 @@ def init_database():
     conn.commit()
     conn.close()
     print("✓ Database initialized")
-
-
-# Initialize database on startup
-init_database()
 
 
 # Pydantic models
@@ -722,6 +718,7 @@ async def health_check():
     }
 
     status = {}
+```python
     async with httpx.AsyncClient(timeout=3.0) as client:
         for service, url in services.items():
             try:
@@ -753,13 +750,12 @@ async def bulk_upload_documents(
             status_code=400,
             detail="Too many files. Maximum 50 files per batch.")
 
-    # Validate file types
+    # Validate file types - only allow PDF, DOC, DOCX, TXT
     allowed_types = {
-        'application/pdf', 'text/plain',
+        'application/pdf',
+        'text/plain',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'image/jpeg', 'image/png', 'image/tiff'
+        'application/msword'  # For older .doc files
     }
 
     # Validate files
@@ -900,32 +896,21 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
 
                 elif doc_row[6] in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
                     # Handle Excel files (XLS/XLSX)
-                    try:
-                        if pd is not None:
-                            if doc_row[6] == 'application/vnd.ms-excel':
-                                df = pd.read_excel(file_path, engine='xlrd', nrows=20)  # Limit rows
-                            else:
-                                df = pd.read_excel(file_path, engine='openpyxl', nrows=20)  # Limit rows
-                            
-                            content_parts = []
-                            content_parts.append(f"Excel Spreadsheet: {doc_row[2]}")
-                            content_parts.append(f"Columns: {', '.join(df.columns.astype(str))}")
-                            content_parts.append("Sample Data:")
-                            content_parts.append(df.head(10).to_string(max_cols=6, max_colwidth=30))
-                            content = '\n'.join(content_parts)
-                        else:
-                            content = f"Excel spreadsheet: {doc_row[2]} - Contains spreadsheet data (pandas not available for detailed extraction)"
-                    except Exception as excel_error:
-                        print(f"Excel reading error: {excel_error}")
-                        content = f"Excel spreadsheet: {doc_row[2]} - Contains financial/data content"
+                    #The file type of excel are not validated and uploaded on the server so no need to handle it here.
+                    pass
 
                 elif doc_row[6] == 'application/msword':
                     # Handle older DOC files
                     try:
-                        # For older .doc files, we'll extract basic info
-                        content = f"Microsoft Word Document: {doc_row[2]} - Legacy format document with business content"
-                    except Exception:
-                        content = f"DOC document: {doc_row[2]} - Legacy Word document"
+                        doc = docx.Document(file_path)
+                        paragraphs = []
+                        for para in doc.paragraphs[:50]:  # Limit to first 50 paragraphs
+                            if para.text.strip():
+                                paragraphs.append(para.text.strip())
+                        content = '\n'.join(paragraphs)
+                    except Exception as docx_error:
+                        print(f"DOC reading error: {docx_error}")
+                        content = f"DOC document: {doc_row[2]} - Content extraction failed"
 
                 elif doc_row[6].startswith('text/'):
                     # Handle text files
@@ -934,26 +919,8 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
 
                 elif doc_row[6].startswith('image/'):
                     # Handle image files with basic OCR attempt
-                    try:
-                        # Try basic image processing
-                        content = f"Image Document: {doc_row[2]}\n"
-                        content += f"Image Type: {doc_row[6]}\n"
-                        content += f"File Size: {doc_row[4]} bytes\n"
-                        content += "Image content detected - may contain text, receipts, invoices, or other business documents.\n"
-                        content += "Professional OCR processing would extract text content from this image."
-                        
-                        # Add classification hints based on filename
-                        filename_lower = doc_row[2].lower()
-                        if any(word in filename_lower for word in ['receipt', 'invoice', 'bill']):
-                            content += "\nLikely contains: Financial transaction document"
-                        elif any(word in filename_lower for word in ['contract', 'agreement', 'legal']):
-                            content += "\nLikely contains: Legal document content"
-                        elif any(word in filename_lower for word in ['employee', 'hr', 'personnel']):
-                            content += "\nLikely contains: HR/Employee related content"
-                            
-                    except Exception as img_error:
-                        print(f"Image processing error: {img_error}")
-                        content = f"Image file: {doc_row[2]} - Image content requires OCR processing"
+                    #The file type of images are not validated and uploaded on the server so no need to handle it here.
+                    pass
 
                 else:
                     # Other file types
@@ -1033,7 +1000,7 @@ def classify_document_locally(content: str, filename: str):
         # Meetings / Events
         "today's meeting", "final review", "must attend", "confirmation needed", "urgent meeting"
     ]
-    
+
     medium_priority_keywords = [
         # Follow-ups
         "reminder", "follow up", "this week", "pending", "awaiting response", "check status", 
@@ -1048,7 +1015,7 @@ def classify_document_locally(content: str, filename: str):
         "work in progress", "assigned", "need update", "submit by", "to be reviewed",
         "in progress", "task assigned", "please review"
     ]
-    
+
     low_priority_keywords = [
         # FYI / Reference
         "for your information", "no action needed", "for record", "just sharing", 
@@ -1064,25 +1031,25 @@ def classify_document_locally(content: str, filename: str):
     # Enhanced priority determination with weighted scoring
     priority_score = 0
     matched_keywords = []
-    
+
     # Check for high priority keywords (score +3 each)
     for keyword in high_priority_keywords:
         if keyword.lower() in content_lower or keyword.lower() in filename_lower:
             priority_score += 3
             matched_keywords.append(keyword)
-    
+
     # Check for medium priority keywords (score +2 each)
     for keyword in medium_priority_keywords:
         if keyword.lower() in content_lower or keyword.lower() in filename_lower:
             priority_score += 2
             matched_keywords.append(keyword)
-    
+
     # Check for low priority keywords (score +1 each, but caps at low)
     for keyword in low_priority_keywords:
         if keyword.lower() in content_lower or keyword.lower() in filename_lower:
             priority_score += 1
             matched_keywords.append(keyword)
-    
+
     # Determine final priority based on score
     if priority_score >= 6:  # Multiple high priority indicators
         keyword_priority = "high"
@@ -1275,7 +1242,7 @@ async def notify_department(doc_id: str, classification_result: dict,
 
         # Get document name
         conn2 = sqlite3.connect(DB_PATH)
-        cursor2 = conn2.cursor()
+        cursor2 = conn2.cursor2()
         cursor2.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
         doc_result = cursor2.fetchone()
         file_name = doc_result[0] if doc_result else "Unknown"
@@ -1480,7 +1447,8 @@ async def get_documents(page: int = 1,
     for row in rows:
         tags = json.loads(row[11]) if row[11] else []
         doc = DocumentInfo(doc_id=row[0],
-                           original_name=row[1],
+                           ```python
+original_name=row[1],
                            file_size=row[2],
                            file_type=row[3],
                            uploaded_at=row[4],
@@ -1809,10 +1777,10 @@ async def generate_sample_emails(current_user: dict = Depends(get_current_user))
     """Generate additional sample emails for testing (admin only)"""
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     # Generate some fresh sample emails
     new_sample_emails = [
         (current_user['email'], 'hr@company.com', 'Test Email from Current User', 
@@ -1825,7 +1793,7 @@ async def generate_sample_emails(current_user: dict = Depends(get_current_user))
          '<html><body><h2>Processing Update</h2><p>Your recently uploaded financial document has been processed and classified.</p></body></html>',
          None, None)
     ]
-    
+
     for sent_by, received_by, subject, body, doc_id, file_name in new_sample_emails:
         email_id = str(uuid.uuid4())
         sent_time = datetime.datetime.utcnow() - datetime.timedelta(minutes=random.randint(1, 60))
@@ -1833,10 +1801,10 @@ async def generate_sample_emails(current_user: dict = Depends(get_current_user))
             INSERT INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (email_id, sent_by, received_by, subject, body, doc_id, file_name, 'sent', sent_time.isoformat()))
-    
+
     conn.commit()
     conn.close()
-    
+
     return {"message": "Sample emails generated successfully", "count": len(new_sample_emails)}
 
 @app.get("/api/stats")
