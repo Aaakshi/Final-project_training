@@ -160,6 +160,9 @@ def init_database():
         ''', (user_id, email, password_hash, name, dept, role, datetime.datetime.utcnow().isoformat()))
         user_ids[email] = user_id
 
+    # Email to name mapping for uploaded_by field
+    email_to_name = {email: name for email, name, _, _, _ in demo_users}
+
     # Create sample documents for better statistics
 
     # Create sample priority documents first
@@ -184,19 +187,22 @@ def init_database():
             'txt': 'text/plain'
         }.get(file_type, 'application/octet-stream')
 
+        # Get readable name for uploaded_by
+        uploaded_by_name = email_to_name.get(user_email, 'General Employee')
+
         # Create sample document records
         cursor.execute('''
             INSERT OR IGNORE INTO documents (
                 doc_id, user_id, original_name, file_path, file_size, file_type, 
                 mime_type, uploaded_at, processing_status, document_type, department, 
                 priority, classification_confidence, page_count, language, tags, 
-                review_status, extracted_text
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                review_status, extracted_text, uploaded_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             doc_id, user_id, original_name, file_path, file_size, file_type,
             mime_type, datetime.datetime.utcnow().isoformat(), status, doc_type, dept,
             priority, 0.85, 1, 'en', '["' + doc_type + '", "' + dept + '"]',
-            'approved' if status == 'approved' else 'pending', content
+            'approved' if status == 'approved' else 'pending', content, uploaded_by_name
         ))
 
     sample_documents = [
@@ -213,8 +219,15 @@ def init_database():
     ]
 
     for original_name, user_email, dept, doc_type, priority, status in sample_documents:
+        # Find user_id for the email
+        cursor.execute("SELECT user_id FROM users WHERE email = ?", (user_email,))
+        user_row = cursor.fetchone()
+        user_id = user_row[0] if user_row else None
+
+        # Get readable name for uploaded_by
+        uploaded_by_name = email_to_name.get(user_email, 'General Employee')
+
         doc_id = str(uuid.uuid4())
-        user_id = user_ids.get(user_email, user_ids['admin@company.com'])
         file_path = f"uploads/sample/{original_name}"
         file_size = 150000 + len(original_name) * 1000  # Simulate file size
         file_type = original_name.split('.')[-1].lower()
@@ -231,14 +244,14 @@ def init_database():
                 doc_id, user_id, original_name, file_path, file_size, file_type, 
                 mime_type, uploaded_at, processing_status, document_type, department, 
                 priority, classification_confidence, page_count, language, tags, 
-                review_status, extracted_text
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                review_status, extracted_text, uploaded_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             doc_id, user_id, original_name, file_path, file_size, file_type,
             mime_type, datetime.datetime.utcnow().isoformat(), status, doc_type, dept,
             priority, 0.85, 1, 'en', '["' + doc_type + '", "' + dept + '"]',
             'approved' if status == 'approved' else 'pending',
-            f"Sample content for {original_name} - This is a {doc_type} document for {dept} department."
+            f"Sample content for {original_name} - This is a {doc_type} document for {dept} department.", uploaded_by_name
         ))
 
     # Create documents table (updated with user info)
@@ -267,6 +280,7 @@ def init_database():
             review_status TEXT DEFAULT 'pending',
             review_comments TEXT,
             reviewed_at TEXT,
+            uploaded_by TEXT,
             FOREIGN KEY (user_id) REFERENCES users (user_id)
         )
     ''')
@@ -719,7 +733,7 @@ async def health_check():
     services = {
         "api_gateway": "http://0.0.0.0:8000",
         "classification": "http://0.0.0.0:8001",
-        "routing_engine": "http://0Applying changes to the code based on the provided instructions..0.0:8002",
+        "routing_engine": "http://0.0.0.0:8002",
         "content_analysis": "http://0.0.0.0:8003",
         "workflow_integration": "http://0.0.0.0:8004"
     }
@@ -805,6 +819,10 @@ async def bulk_upload_documents(
         try:
             doc_id = str(uuid.uuid4())
             file_path = f"{upload_dir}/{file.filename}"
+            file_size = len(content)
+
+            # Get user's readable name
+            uploaded_by_name = current_user.get('full_name', 'General Employee')
 
             # Save file to disk
             content = await file.read()
@@ -816,12 +834,12 @@ async def bulk_upload_documents(
                 '''
                 INSERT INTO documents (
                     doc_id, user_id, original_name, file_path, file_size, file_type, 
-                    mime_type, uploaded_at, processing_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    mime_type, uploaded_at, processing_status, extracted_text, uploaded_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
                 (doc_id, current_user['user_id'], file.filename, file_path,
-                 len(content), file.filename.split('.')[-1].lower(),
-                 file.content_type, datetime.datetime.utcnow().isoformat(), 'uploaded'))
+                 file_size, file.filename.split('.')[-1].lower(),
+                 file.content_type, datetime.datetime.utcnow().isoformat(), 'uploaded', content, uploaded_by_name))
 
             saved_files.append({
                 'doc_id': doc_id,
@@ -1416,7 +1434,7 @@ async def get_documents(page: int = 1,
                         current_user: dict = Depends(get_current_user)):
     """Get paginated list of documents with filtering"""
     conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    cursor =conn.cursor()
 
     # Build query with filters
     where_clauses = []
@@ -1514,7 +1532,7 @@ async def get_review_documents(page: int = 1,
     if current_user['role'] == 'admin':
         # Admin can see all documents
         pass
-    elif current_user['role'] == 'manager':
+    elif current_user['role'] in ('manager', 'hr', 'legal', 'finance'):
         # Managers can see documents routed to their department (not just uploaded by them)
         where_clauses.append("d.department = ?")
         params.append(current_user['department'])
@@ -1541,7 +1559,7 @@ async def get_review_documents(page: int = 1,
         SELECT d.doc_id, d.original_name, d.file_size, d.file_type, d.uploaded_at, 
                d.processing_status, d.document_type, d.department, d.priority, 
                d.classification_confidence, d.page_count, d.tags, d.review_status, 
-               d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email
+               d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email, d.review_comments
         FROM documents d
         LEFT JOIN users u ON d.user_id = u.user_id
         {where_sql}
@@ -1586,7 +1604,9 @@ async def get_review_documents(page: int = 1,
             "review_status": row[12] or "pending",
             "reviewed_by": row[13] or "",
             "user_id": row[14],
-            "uploaded_by": row[15] or "Unknown"
+            "uploaded_by": row[15] or "General Employee",
+            "uploaded_by_email": row[16] or "",
+            "review_comments": row[17] or ""
         }
         documents.append(doc)
 
@@ -1629,7 +1649,7 @@ async def get_document_details(doc_id: str,
         'extracted_text', 'ocr_confidence', 'document_type', 'department',
         'priority', 'classification_confidence', 'page_count', 'language',
         'tags', 'assigned_to', 'reviewed_by', 'review_status',
-        'review_comments', 'reviewed_at'
+        'review_comments', 'reviewed_at', 'uploaded_by'
     ]
 
     doc_dict = dict(zip(columns, row))
@@ -1655,40 +1675,6 @@ async def get_document_details(doc_id: str,
         doc_dict['summary'] = 'No summary available'
 
     return doc_dict
-
-@app.get("/api/documents/{doc_id}/analysis")
-async def get_document_analysis(doc_id: str, current_user: dict = Depends(get_current_user)):
-    """Get detailed document analysis"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute('''
-        SELECT file_path, original_name, mime_type FROM documents WHERE doc_id = ?
-    ''', (doc_id,))
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    file_path, original_name, mime_type = row
-
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Document file not found")
-
-    # Return basic analysis since comprehensive analysis function is not implemented
-    return {
-        "doc_id": doc_id,
-        "analysis": {
-            "summary": "Document analysis available",
-            "word_count": 100,
-            "urgency": {"level": "medium", "score": 5, "signal": "⚠️"},
-            "detected_dates": [],
-            "due_dates": [],
-            "matched_keywords": []
-        }
-    }
 
 @app.get("/api/stats")
 async def get_statistics(current_user: dict = Depends(get_current_user)):
