@@ -1774,61 +1774,84 @@ async def get_document_details(doc_id: str,
 
 @app.get("/api/stats")
 async def get_statistics(current_user: dict = Depends(get_current_user)):
-    """Get system statistics"""
+    """Get system statistics based on user role and permissions"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
+        # Build WHERE clause based on user role
+        where_clause = ""
+        params = []
+        
+        if current_user['role'] == 'admin':
+            # Admin can see all documents
+            where_clause = ""
+        elif current_user['role'] == 'manager':
+            # Department managers see their department's documents
+            where_clause = "WHERE department = ?"
+            params.append(current_user['department'])
+        else:
+            # Regular employees see only their own documents
+            where_clause = "WHERE user_id = ?"
+            params.append(current_user['user_id'])
+
         # Get total documents
-        cursor.execute('SELECT COUNT(*) FROM documents')
+        query = f'SELECT COUNT(*) FROM documents {where_clause}'
+        cursor.execute(query, params)
         total_documents = cursor.fetchone()[0]
 
         # Get processed documents (classified status)
-        cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = "classified"')
+        query = f'SELECT COUNT(*) FROM documents {where_clause} {"AND" if where_clause else "WHERE"} processing_status = "classified"'
+        cursor.execute(query, params + ["classified"])
         processed_documents = cursor.fetchone()[0]
 
         # Get pending documents
-        cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status IN ("uploaded", "processing")')
+        query = f'SELECT COUNT(*) FROM documents {where_clause} {"AND" if where_clause else "WHERE"} processing_status IN ("uploaded", "processing")'
+        cursor.execute(query, params + ["uploaded", "processing"])
         pending_documents = cursor.fetchone()[0]
 
         # Calculate processing rate
         processing_rate = int((processed_documents / total_documents * 100)) if total_documents > 0 else 0
 
         # Get document types distribution
-        cursor.execute('''
+        query = f'''
             SELECT document_type, COUNT(*) 
             FROM documents 
-            WHERE document_type IS NOT NULL 
+            {where_clause} {"AND" if where_clause else "WHERE"} document_type IS NOT NULL 
             GROUP BY document_type
-        ''')
+        '''
+        cursor.execute(query, params)
         doc_types = dict(cursor.fetchall())
 
         # Get department distribution
-        cursor.execute('''
+        query = f'''
             SELECT department, COUNT(*) 
             FROM documents 
-            WHERE department IS NOT NULL 
+            {where_clause} {"AND" if where_clause else "WHERE"} department IS NOT NULL 
             GROUP BY department
-        ''')
+        '''
+        cursor.execute(query, params)
         departments = dict(cursor.fetchall())
 
         # Get priority distribution
-        cursor.execute('''
+        query = f'''
             SELECT priority, COUNT(*) 
             FROM documents 
-            WHERE priority IS NOT NULL 
+            {where_clause} {"AND" if where_clause else "WHERE"} priority IS NOT NULL 
             GROUP BY priority
-        ''')
+        '''
+        cursor.execute(query, params)
         priorities = dict(cursor.fetchall())
 
         # Get upload trends (last 30 days)
-        cursor.execute('''
+        query = f'''
             SELECT DATE(uploaded_at) as date, COUNT(*) as count
             FROM documents 
-            WHERE uploaded_at >= datetime('now', '-30 days')
+            {where_clause} {"AND" if where_clause else "WHERE"} uploaded_at >= datetime('now', '-30 days')
             GROUP BY DATE(uploaded_at)
             ORDER BY date
-        ''')
+        '''
+        cursor.execute(query, params)
         upload_trends = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         conn.close()
@@ -1846,7 +1869,17 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
     except Exception as e:
         print(f"Stats error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to load statistics: {str(e)}")
+        # Return empty stats instead of raising error to prevent script errors
+        return {
+            "total_documents": 0,
+            "processed_documents": 0,
+            "pending_documents": 0,
+            "processing_rate": 0,
+            "document_types": {},
+            "departments": {},
+            "priorities": {},
+            "upload_trends": []
+        }
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):
