@@ -724,6 +724,60 @@
             background-color: #3182ce;
             color: white;
         }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane:not(.hidden) {
+            display: block;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .info-item label {
+            font-weight: bold;
+            color: #4a5568;
+        }
+
+        .extracted-text {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            background: #bee3f8;
+            color: #2b6cb0;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+
+        .no-tags {
+            color: #718096;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -900,8 +954,7 @@
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody```javascript
-                    id="documentsTableBody">
+                    <tbody id="documentsTableBody">
                     </tbody>
                 </table>
 
@@ -997,89 +1050,86 @@
                     </div>
 
 
-             <div class="tab-content">
-                        <div id="basic-info" class="tab-pane active">
-                            <div class="info-grid">
-                                <div class="info-item">
-                                    <label>Document Type:</label>
-                                    <span id="modalDocType"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Department:</label>
-                                    <span id="modalDepartment"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Priority:</label>
-                                    <span id="modalPriority"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Status:</label>
-                                    <span id="modalStatus"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>File Size:</label>
-                                    <span id="modalFileSize"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Upload Date:</label>
-                                    <span id="modalUploadDate"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Uploaded By:</label>
-                                    <span id="modalUploadedBy"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Confidence:</label>
-                                    <span id="modalConfidence"></span>
-                                </div>
-                                <div class="info-item">
-                                    <label>Summary:</label>
-                                    <div id="modalSummary" class="summary-text"></div>
-                                </div>
-                            </div>
+             <div id="basic-info" class="tab-pane" style="display: block;">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Document Type:</label>
+                        <span id="modalDocType"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Department:</label>
+                        <span id="modalDepartment"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Priority:</label>
+                        <span id="modalPriority"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Status:</label>
+                        <span id="modalStatus"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>File Size:</label>
+                        <span id="modalFileSize"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Upload Date:</label>
+                        <span id="modalUploadDate"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Uploaded By:</label>
+                        <span id="modalUploadedBy"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Confidence:</label>
+                        <span id="modalConfidence"></span>
+                    </div>
+                    <div class="info-item">
+                        <label>Summary:</label>
+                        <div id="modalSummary" class="summary-text"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="analysis-tab" class="tab-pane hidden">
+                <div class="analysis-section">
+                    <h4>Document Analysis</h4>
+                    <div class="analysis-grid">
+                        <div class="analysis-item">
+                            <label>Urgency Level:</label>
+                            <span id="modalUrgency" class="urgency-indicator"></span>
                         </div>
-                        <div id="analysis-tab" class="tab-pane">
-                            <div class="analysis-section">
-                                <h4>Document Analysis</h4>
-                                <div class="analysis-grid">
-                                    <div class="analysis-item">
-                                        <label>Summary:</label>
-                                        <div id="modalSummary" class="summary-text"></div>
-                                    </div>
-                                    <div class="analysis-item">
-                                        <label>Urgency Level:</label>
-                                        <span id="modalUrgency" class="urgency-indicator"></span>
-                                    </div>
-                                    <div class="analysis-item">
-                                        <label>Word Count:</label>
-                                        <span id="modalWordCount"></span>
-                                    </div>
-                                    <div class="analysis-item">
-                                        <label>Detected Dates:</label>
-                                        <div id="modalDetectedDates" class="dates-list"></div>
-                                    </div>
-                                    <div class="analysis-item">
-                                        <label>Due Dates:</label>
-                                        <div id="modalDueDates" class="due-dates-list"></div>
-                                    </div>
-                                    <div class="analysis-item">
-                                        <label>Urgency Keywords:</label>
-                                        <div id="modalUrgencyKeywords" class="keywords-list"></div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="analysis-item">
+                            <label>Word Count:</label>
+                            <span id="modalWordCount"></span>
                         </div>
-                        <div id="content-preview" class="tab-pane">
-                            <div class="content-preview">
-                                <h4>Document Content Preview</h4>
-                                <div id="modalExtractedText" class="extracted-text"></div>
-                            </div>
+                        <div class="analysis-item">
+                            <label>Detected Dates:</label>
+                            <div id="modalDetectedDates" class="dates-list"></div>
                         </div>
-                        <div id="tags-section" class="tab-pane">
-                            <h4>Tags</h4>
-                            <div id="modalTags" class="tags-container"></div>
+                        <div class="analysis-item">
+                            <label>Due Dates:</label>
+                            <div id="modalDueDates" class="due-dates-list"></div>
+                        </div>
+                        <div class="analysis-item">
+                            <label>Urgency Keywords:</label>
+                            <div id="modalUrgencyKeywords" class="keywords-list"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+            
+            <div id="content-preview" class="tab-pane hidden">
+                <div class="content-preview">
+                    <h4>Document Content Preview</h4>
+                    <div id="modalExtractedText" class="extracted-text"></div>
+                </div>
+            </div>
+            
+            <div id="tags-section" class="tab-pane hidden">
+                <h4>Tags</h4>
+                <div id="modalTags" class="tags-container"></div>
+            </div>
 
             <div id="modalContent">
                 <!-- Document details will be loaded here -->
@@ -1248,6 +1298,19 @@
         }
 
         function showTab(tabName) {
+            // Handle modal tabs
+            if (document.getElementById('documentModal').style.display === 'block') {
+                const modalTabContents = document.querySelectorAll('.modal-content .tab-pane');
+                modalTabContents.forEach(content => content.classList.add('hidden'));
+
+                const modalTabs = document.querySelectorAll('.modal-content .tab-buttons .tab-btn');
+                modalTabs.forEach(tab => tab.classList.remove('active'));
+
+                document.getElementById(tabName).classList.remove('hidden');
+                event.target.classList.add('active');
+                return;
+            }
+
             // Hide all tab contents
             const tabContents = document.querySelectorAll('.tab-content');
             tabContents.forEach(content => content.classList.add('hidden'));
@@ -1260,21 +1323,9 @@
             document.getElementById(tabName + 'TabContent').classList.remove('hidden');
 
             // Add active class to clicked tab
-            event.target.classList.add('active');
-
-               // Handle modal tabs
-            if (document.getElementById('documentModal').style.display === 'block') {
-                const modalTabContents = document.querySelectorAll('.modal-content .tab-content');
-                modalTabContents.forEach(content => content.classList.add('hidden'));
-
-                const modalTabs = document.querySelectorAll('.modal-content .tab-buttons .tab-btn');
-                 modalTabs.forEach(tab => tab.classList.remove('active'));
-
-                 document.getElementById(tabName).classList.remove('hidden');
-                 document.querySelector(`.modal-content .tab-buttons .tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
-                  return;
+            if (event && event.target) {
+                event.target.classList.add('active');
             }
-
 
             // Load data based on tab
             if (tabName === 'documents') {
@@ -1495,7 +1546,7 @@
             try {
                 const response = await fetch('/api/documents/' + docId, {
                     headers: {
-                        'Authorization': 'Bearer ' + authToken
+                        'Authorization': `Bearer ${authToken}`
                     }
                 });
 
@@ -1779,11 +1830,11 @@
 
             tbody.innerHTML = documents.map(doc => `
                 <tr>
-                    <td>${doc.file_name}</td>
-                    <td>${doc.uploaded_by_name}</td>
-                    <td>${doc.document_type}</td>
-                    <td><span class="priority-${doc.priority}">${doc.priority}</span></td>
-                    <td><span class="status-badge review-status-${doc.review_status}">${doc.review_status}</span></td>
+                    <td>${doc.file_name || doc.original_name || 'Unknown'}</td>
+                    <td>${doc.uploaded_by_name || doc.uploaded_by || 'Unknown'}</td>
+                    <td>${doc.document_type || 'Unknown'}</td>
+                    <td><span class="priority-${doc.priority || 'medium'}">${doc.priority || 'medium'}</span></td>
+                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'pending'}</span></td>
                     <td>
                         <button class="btn" onclick="reviewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">Review</button>
                     </td>
