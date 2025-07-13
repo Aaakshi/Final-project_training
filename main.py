@@ -1,4 +1,4 @@
-def bulk_upload(
+async def bulk_upload(
     files: List[UploadFile] = File(...),
     batch_name: str = Form(...),
     target_department: str = Form(...),
