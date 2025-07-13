@@ -1447,8 +1447,7 @@ async def get_documents(page: int = 1,
     for row in rows:
         tags = json.loads(row[11]) if row[11] else []
         doc = DocumentInfo(doc_id=row[0],
-                           ```python
-original_name=row[1],
+                           original_name=row[1],
                            file_size=row[2],
                            file_type=row[3],
                            uploaded_at=row[4],
