@@ -1484,29 +1484,58 @@ async def get_email_notifications(page: int = 1,
     dept_result = cursor.fetchone()
     user_dept_email = dept_result[0] if dept_result else current_user['email']
 
-    # Get emails sent to or from the user or their department
+    # Get emails based on user role
     offset = (page - 1) * page_size
-    query = '''
-        SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
-               e.file_name, e.status, e.sent_at, e.read_at,
-               d.original_name, d.document_type, d.priority, d.department,
-               u.full_name as sender_name
-        FROM email_notifications e
-        LEFT JOIN documents d ON e.doc_id = d.doc_id
-        LEFT JOIN users u ON e.sent_by = u.email
-        WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ?
-        ORDER BY e.sent_at DESC
-        LIMIT ? OFFSET ?
-    '''
+    
+    if current_user['role'] == 'employee':
+        # Employees see emails sent to them personally or about their uploaded documents
+        query = '''
+            SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
+                   e.file_name, e.status, e.sent_at, e.read_at,
+                   d.original_name, d.document_type, d.priority, d.department,
+                   u.full_name as sender_name, u2.full_name as recipient_name
+            FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            LEFT JOIN users u ON e.sent_by = u.email
+            LEFT JOIN users u2 ON e.received_by = u2.email
+            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+            ORDER BY e.sent_at DESC
+            LIMIT ? OFFSET ?
+        '''
+        cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
+        
+        # Get total count for employees
+        cursor.execute('''
+            SELECT COUNT(*) FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+        ''', [current_user['email'], current_user['email'], current_user['user_id']])
+        
+    else:
+        # Managers and admins see all emails related to their department
+        query = '''
+            SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
+                   e.file_name, e.status, e.sent_at, e.read_at,
+                   d.original_name, d.document_type, d.priority, d.department,
+                   u.full_name as sender_name, u2.full_name as recipient_name
+            FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            LEFT JOIN users u ON e.sent_by = u.email
+            LEFT JOIN users u2 ON e.received_by = u2.email
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
+            ORDER BY e.sent_at DESC
+            LIMIT ? OFFSET ?
+        '''
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
+        
+        # Get total count for managers/admins
+        cursor.execute('''
+            SELECT COUNT(*) FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
+        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
 
-    cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, page_size, offset])
     emails = cursor.fetchall()
-
-    # Get total count
-    cursor.execute('''
-        SELECT COUNT(*) FROM email_notifications 
-        WHERE sent_by = ? OR received_by = ? OR received_by = ?
-    ''', [current_user['email'], current_user['email'], user_dept_email])
     total_count = cursor.fetchone()[0]
 
     conn.close()
@@ -1518,6 +1547,7 @@ async def get_email_notifications(page: int = 1,
             "sent_by": email[1],
             "sent_by_name": email[14] or "IDCR System",
             "received_by": email[2],
+            "received_by_name": email[15] if len(email) > 15 else "Unknown",
             "subject": email[3],
             "body_preview": email[4][:200] + "..." if email[4] and len(email[4]) > 200 else email[4],
             "doc_id": email[5],
@@ -1546,16 +1576,20 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     cursor = conn.cursor()
 
     try:
-        # Build base query based on user role
+        # Build base query based on user role and department
         base_where = ""
         params = []
 
-        # Allow all managers and admins to see all statistics
         if current_user['role'] == 'employee':
+            # Employees see only their own documents
             base_where = "WHERE user_id = ?"
             params.append(current_user['user_id'])
-        elif current_user['role'] in ['manager', 'admin']:
-            # Managers and admins can see all documents for better oversight
+        elif current_user['role'] == 'manager':
+            # Managers see only documents from their department
+            base_where = "WHERE department = ?"
+            params.append(current_user['department'])
+        elif current_user['role'] == 'admin':
+            # Only admins see all documents
             base_where = ""
             params = []
 

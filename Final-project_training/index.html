@@ -723,14 +723,15 @@
             <!-- Notifications Tab -->
             <div id="notificationsTab" class="tab-content hidden">
                 <h3>📧 Email Notifications</h3>
-                <p>See what email notifications would be sent to your department</p>
+                <p>See email notifications related to document processing</p>
 
                 <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
                     <h4 style="color: #2d3748; margin-bottom: 15px;">📬 Your Department Email: <span id="deptEmail" style="color: #4299e1;"></span></h4>
-                    <p style="color: #718096; margin-bottom: 10px;">You would receive email notifications when:</p>
+                    <p style="color: #718096; margin-bottom: 10px;">Email notifications are sent when:</p>
                     <ul style="color: #718096; margin-left: 20px;">
-                        <li>New documents are uploaded and classified to your department</li>
-                        <li>Documents require review and approval</li>
+                        <li>Your documents are processed and reviewed</li>
+                        <li>New documents are uploaded to your department (for managers)</li>
+                        <li>Documents require review and approval (for managers)</li>
                         <li>High priority documents need immediate attention</li>
                     </ul>
                 </div>
@@ -958,32 +959,32 @@
             // Show tabs based on role
             if (currentUser.role === 'admin' || currentUser.role === 'manager') {
                 document.getElementById('reviewTabBtn').style.display = 'block';
-                document.getElementById('notificationsTab').style.display = 'block';
-
-                // Set department email for notifications
-                const deptEmails = {
-                    'hr': 'hr@company.com',
-                    'finance': 'finance@company.com', 
-                    'legal': 'legal@company.com',
-                    'sales': 'sales@company.com',
-                    'marketing': 'marketing@company.com',
-                    'it': 'it@company.com',
-                    'operations': 'operations@company.com',
-                    'support': 'support@company.com',
-                    'procurement': 'procurement@company.com',
-                    'product': 'product@company.com',
-                    'administration': 'administration@company.com',
-                    'executive': 'executive@company.com'
-                };
-                document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
             }
+            
+            // Show notifications tab for all users
+            document.getElementById('notificationsTab').style.display = 'block';
+
+            // Set department email for notifications
+            const deptEmails = {
+                'hr': 'hr@company.com',
+                'finance': 'finance@company.com', 
+                'legal': 'legal@company.com',
+                'sales': 'sales@company.com',
+                'marketing': 'marketing@company.com',
+                'it': 'it@company.com',
+                'operations': 'operations@company.com',
+                'support': 'support@company.com',
+                'procurement': 'procurement@company.com',
+                'product': 'product@company.com',
+                'administration': 'administration@company.com',
+                'executive': 'executive@company.com'
+            };
+            document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
 
             // Load initial data
             loadStatistics();
             loadDocuments();
-            if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-                loadEmailNotifications();
-            }
+            loadEmailNotifications(); // Load for all users
         }
 
         function showTab(tabName) {
@@ -1649,15 +1650,17 @@ async function loadStatistics() {
                                     </div>
                                 </div>
                                 <div style="margin-bottom: 10px;">
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>From:</strong> ${email.sent_by_name} (${email.sent_by})</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>To:</strong> ${email.received_by}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>From:</strong> ${email.sent_by_name || 'IDCR System'} (${email.sent_by})</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>To:</strong> ${email.received_by_name || email.received_by} (${email.received_by})</p>
                                 </div>
+                                ${email.document_name && email.document_name !== 'N/A' ? `
                                 <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0;">
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>Document:</strong> ${email.document_name}</p>
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>Type:</strong> ${email.document_type}</p>
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>Department:</strong> ${email.department}</p>
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
                                 </div>
+                                ` : ''}
                                 ${email.body_preview ? `<p style="margin: 8px 0; color: #718096; font-size: 14px; font-style: italic;">${email.body_preview}</p>` : ''}
                                 <div style="text-align: right; margin-top: 10px;">
                                     <small style="color: #a0aec0;">Status: ${email.status}</small>
