@@ -1801,57 +1801,102 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         total_documents = cursor.fetchone()[0]
 
         # Get processed documents (classified status)
-        query = f'SELECT COUNT(*) FROM documents {where_clause} {"AND" if where_clause else "WHERE"} processing_status = "classified"'
-        cursor.execute(query, params + ["classified"])
+        if where_clause:
+            query = f'SELECT COUNT(*) FROM documents {where_clause} AND processing_status = ?'
+            cursor.execute(query, params + ["classified"])
+        else:
+            query = 'SELECT COUNT(*) FROM documents WHERE processing_status = ?'
+            cursor.execute(query, ["classified"])
         processed_documents = cursor.fetchone()[0]
 
         # Get pending documents
-        query = f'SELECT COUNT(*) FROM documents {where_clause} {"AND" if where_clause else "WHERE"} processing_status IN ("uploaded", "processing")'
-        cursor.execute(query, params + ["uploaded", "processing"])
+        if where_clause:
+            query = f'SELECT COUNT(*) FROM documents {where_clause} AND processing_status IN (?, ?)'
+            cursor.execute(query, params + ["uploaded", "processing"])
+        else:
+            query = 'SELECT COUNT(*) FROM documents WHERE processing_status IN (?, ?)'
+            cursor.execute(query, ["uploaded", "processing"])
         pending_documents = cursor.fetchone()[0]
 
         # Calculate processing rate
         processing_rate = int((processed_documents / total_documents * 100)) if total_documents > 0 else 0
 
         # Get document types distribution
-        query = f'''
-            SELECT document_type, COUNT(*) 
-            FROM documents 
-            {where_clause} {"AND" if where_clause else "WHERE"} document_type IS NOT NULL 
-            GROUP BY document_type
-        '''
-        cursor.execute(query, params)
+        if where_clause:
+            query = f'''
+                SELECT document_type, COUNT(*) 
+                FROM documents 
+                {where_clause} AND document_type IS NOT NULL 
+                GROUP BY document_type
+            '''
+            cursor.execute(query, params)
+        else:
+            query = '''
+                SELECT document_type, COUNT(*) 
+                FROM documents 
+                WHERE document_type IS NOT NULL 
+                GROUP BY document_type
+            '''
+            cursor.execute(query)
         doc_types = dict(cursor.fetchall())
 
         # Get department distribution
-        query = f'''
-            SELECT department, COUNT(*) 
-            FROM documents 
-            {where_clause} {"AND" if where_clause else "WHERE"} department IS NOT NULL 
-            GROUP BY department
-        '''
-        cursor.execute(query, params)
+        if where_clause:
+            query = f'''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                {where_clause} AND department IS NOT NULL 
+                GROUP BY department
+            '''
+            cursor.execute(query, params)
+        else:
+            query = '''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                WHERE department IS NOT NULL 
+                GROUP BY department
+            '''
+            cursor.execute(query)
         departments = dict(cursor.fetchall())
 
         # Get priority distribution
-        query = f'''
-            SELECT priority, COUNT(*) 
-            FROM documents 
-            {where_clause} {"AND" if where_clause else "WHERE"} priority IS NOT NULL 
-            GROUP BY priority
-        '''
-        cursor.execute(query, params)
+        if where_clause:
+            query = f'''
+                SELECT priority, COUNT(*) 
+                FROM documents 
+                {where_clause} AND priority IS NOT NULL 
+                GROUP BY priority
+            '''
+            cursor.execute(query, params)
+        else:
+            query = '''
+                SELECT priority, COUNT(*) 
+                FROM documents 
+                WHERE priority IS NOT NULL 
+                GROUP BY priority
+            '''
+            cursor.execute(query)
         priorities = dict(cursor.fetchall())
 
         # Get upload trends (last 30 days)
-        query = f'''
-            SELECT DATE(uploaded_at) as date, COUNT(*) as count
-            FROM documents 
-            {where_clause} {"AND" if where_clause else "WHERE"} uploaded_at >= datetime('now', '-30 days')
-            GROUP BY DATE(uploaded_at)
-            ORDER BY date
-        '''
-        cursor.execute(query, params)
+        if where_clause:
+            query = f'''
+                SELECT DATE(uploaded_at) as date, COUNT(*) as count
+                FROM documents 
+                {where_clause} AND uploaded_at >= datetime('now', '-30 days')
+                GROUP BY DATE(uploaded_at)
+                ORDER BY date
+            '''
+            cursor.execute(query, params)
+        else:
+            query = '''
+                SELECT DATE(uploaded_at) as date, COUNT(*) as count
+                FROM documents 
+                WHERE uploaded_at >= datetime('now', '-30 days')
+                GROUP BY DATE(uploaded_at)
+                ORDER BY date
+            '''
+            cursor.execute(query)
         upload_trends = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         conn.close()
