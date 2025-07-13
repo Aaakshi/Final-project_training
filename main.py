@@ -1229,24 +1229,20 @@ async def notify_department(doc_id: str, classification_result: dict,
     """Send notification to department about new document"""
     department = classification_result.get('department', 'general')
 
-    # Get department email
+    # Get department email and document details
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
                    (department, ))
     dept_result = cursor.fetchone()
+    
+    cursor.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
+    doc_result = cursor.fetchone()
+    file_name = doc_result[0] if doc_result else "Unknown"
     conn.close()
 
     if dept_result:
         dept_email = dept_result[0]
-
-        # Get document name
-        conn2 = sqlite3.connect(DB_PATH)
-        cursor2 = conn2.cursor2()
-        cursor2.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
-        doc_result = cursor2.fetchone()
-        file_name = doc_result[0] if doc_result else "Unknown"
-        conn2.close()
 
         # Create better description based on document type
         doc_type_desc = {
@@ -1258,7 +1254,7 @@ async def notify_department(doc_id: str, classification_result: dict,
             'marketing_document': 'Marketing Document (Campaign/Content)',
         }.get(classification_result.get('doc_type', ''), classification_result.get('doc_type', 'Document'))
 
-        # Send email to department
+        # Send email notification to department
         subject = f"New {doc_type_desc} Uploaded - {file_name}"
         body = f"""
         <html>
@@ -1277,7 +1273,32 @@ async def notify_department(doc_id: str, classification_result: dict,
         </html>
         """
 
+        # Send to department
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
+        
+        # Also send confirmation email to the uploader
+        confirmation_subject = f"Document Upload Confirmation - {file_name}"
+        confirmation_body = f"""
+        <html>
+            <body>
+                <h2>✅ Document Upload Successful</h2>
+                <p>Dear {user['full_name']},</p>
+                <p>Your document <strong>{file_name}</strong> has been successfully uploaded and routed to the <strong>{department.title()}</strong> department.</p>
+                <p><strong>Document Details:</strong></p>
+                <ul>
+                    <li><strong>Document Type:</strong> {doc_type_desc}</li>
+                    <li><strong>Priority:</strong> {classification_result.get('priority', 'Medium').title()}</li>
+                    <li><strong>Department:</strong> {department.title()}</li>
+                    <li><strong>Document ID:</strong> {doc_id}</li>
+                </ul>
+                <p>You will receive another notification once the document has been reviewed by the department.</p>
+                <p>Best regards,<br>🤖 IDCR Automated System</p>
+            </body>
+        </html>
+        """
+        
+        # Send confirmation to uploader
+        send_email(user['email'], confirmation_subject, confirmation_body, doc_id, file_name, "noreply@idcr-system.com")
 
 
 def update_document_status(doc_id: str, status: str):

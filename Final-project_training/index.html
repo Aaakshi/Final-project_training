@@ -537,6 +537,70 @@
             background: #dbeafe;
             color: #1e40af;
         }
+
+        .notification-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .notification-item h4 {
+            margin-top: 0;
+            color: #495057;
+        }
+
+        .email-type-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .email-type-badge.sent {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .email-type-badge.received {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .priority-badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+
+        .priority-high {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .priority-medium {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .priority-low {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .pagination {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -631,15 +695,15 @@
             </div>
 
             <div class="tabs">
-                <button class="tab active" onclick="showTab('upload')" id="uploadTab">Upload Documents</button>
-                <button class="tab" onclick="showTab('documents')" id="documentsTab">My Documents</button>
+                <button class="tab active" onclick="showTab('upload')" id="uploadTabBtn">Upload Documents</button>
+                <button class="tab" onclick="showTab('documents')" id="documentsTabBtn">My Documents</button>
                 <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
-                <button class="tab" onclick="showTab('notifications')" id="notificationsTab" style="display: none;">Email Notifications</button>
-                <button class="tab" onclick="showTab('stats')">Statistics</button>
+                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn" style="display: none;">Email Notifications</button>
+                <button class="tab" onclick="showTab('stats')" id="statsTabBtn">Statistics</button>
             </div>
 
             <!-- Upload Tab -->
-            <div id="uploadTab" class="tab-content">
+            <div id="uploadTabContent" class="tab-content">
                 <h3>Upload Documents</h3>
                 <p>Upload multiple documents for automatic classification and routing.</p>
 
@@ -662,7 +726,7 @@
             </div>
 
             <!-- Documents Tab -->
-            <div id="documentsTab" class="tab-content hidden">
+            <div id="documentsTabContent" class="tab-content hidden">
                 <h3>Document Management</h3>
 
                 <div class="filters">
@@ -720,32 +784,25 @@
                 <div class="pagination" id="pagination"></div>
             </div>
 
-            <!-- Notifications Tab -->
-            <div id="notificationsTab" class="tab-content hidden">
-                <h3>📧 Email Notifications</h3>
-                <p>See email notifications related to document processing</p>
-
-                <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                    <h4 style="color: #2d3748; margin-bottom: 15px;">📬 Your Department Email: <span id="deptEmail" style="color: #4299e1;"></span></h4>
-                    <p style="color: #718096; margin-bottom: 10px;">Email notifications are sent when:</p>
-                    <ul style="color: #718096; margin-left: 20px;">
-                        <li>Your documents are processed and reviewed</li>
-                        <li>New documents are uploaded to your department (for managers)</li>
-                        <li>Documents require review and approval (for managers)</li>
-                        <li>High priority documents need immediate attention</li>
-                    </ul>
+            <!-- Email Notifications Tab -->
+            <div id="notificationsTabContent" class="tab-content hidden">
+                <h3>Email Notifications</h3>
+                <div class="filters" style="margin-bottom: 20px;">
+                    <button class="btn btn-secondary" onclick="loadEmailNotifications()" style="margin-right: 10px;">
+                        🔄 Refresh
+                    </button>
+                    <span id="emailCount" style="color: #666;">Loading...</span>
                 </div>
-
-                <div id="emailSimulation" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-                    <h4 style="color: #2d3748; margin-bottom: 15px;">📩 Recent Email Notifications (Demo)</h4>
-                    <div id="emailList">
-                        <p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>
+                <div id="emailNotifications">
+                    <div class="notification-item">
+                        <h4>📧 Loading notifications...</h4>
                     </div>
                 </div>
+                <div id="emailPagination" style="margin-top: 20px; text-align: center;"></div>
             </div>
 
             <!-- Review Tab -->
-            <div id="reviewTab" class="tab-content hidden">
+            <div id="reviewTabContent" class="tab-content hidden">
                 <h3>Review Documents</h3>
                 <p>Documents pending review in your department</p>
 
@@ -776,7 +833,7 @@
             </div>
 
             <!-- Stats Tab -->
-            <div id="statsTab" class="tab-content hidden">
+            <div id="statsTabContent" class="tab-content hidden">
                 <h3>Statistics</h3>
                 <div class="stats-grid" id="statsGrid">
                 </div>
@@ -842,7 +899,8 @@
                 if (response.ok) {
                     currentUser = await response.json();
                     showMainContent();
-                } else {
+                }```text
+ else {
                     logout();
                 }
             } catch (error) {
@@ -956,71 +1014,57 @@
             deptBadge.textContent = currentUser.department.toUpperCase();
             deptBadge.className = `department-badge dept-${currentUser.department}`;
 
-            // Show tabs based on role
-            if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-                document.getElementById('reviewTabBtn').style.display = 'block';
-            }
+            // Update UI based on user role
+                        if (currentUser.role === 'manager' || currentUser.role === 'admin') {
+                            document.getElementById('reviewTabBtn').style.display = 'block';
+                        }
 
-            // Show notifications tab for all users
-            document.getElementById('notificationsTab').style.display = 'block';
+                        // Email notifications tab is always visible for all users
+                        document.getElementById('notificationsTabBtn').style.display = 'block';
 
-            // Set department email for notifications
-            const deptEmails = {
-                'hr': 'hr@company.com',
-                'finance': 'finance@company.com', 
-                'legal': 'legal@company.com',
-                'sales': 'sales@company.com',
-                'marketing': 'marketing@company.com',
-                'it': 'it@company.com',
-                'operations': 'operations@company.com',
-                'support': 'support@company.com',
-                'procurement': 'procurement@company.com',
-                'product': 'product@company.com',
-                'administration': 'administration@company.com',
-                'executive': 'executive@company.com'
-            };
-            document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
+                        // Show main content
+                        document.getElementById('loginSection').style.display = 'none';
+                        document.getElementById('mainContent').classList.remove('hidden');
 
-            // Load initial data
-            loadStatistics();
-            loadDocuments();
-            loadEmailNotifications(); // Load for all users
+                        // Show upload tab by default
+                        showTab('upload');
+
+                        // Load initial data
+                        loadDocuments();
+                        loadStatistics();
+                        loadEmailNotifications();
         }
 
         function showTab(tabName) {
             // Hide all tab contents
-            const allTabContents = ['uploadTab', 'documentsTab', 'reviewTab', 'notificationsTab', 'statsTab'];
-            allTabContents.forEach(tabId => {
-                const tab = document.getElementById(tabId);
-                if (tab) {
-                    tab.classList.add('hidden');
-                }
-            });
-            
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(tab => tab.classList.add('hidden'));
+
             // Remove active class from all tabs
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
 
             // Show selected tab content
-            const targetTabContent = document.getElementById(`${tabName}Tab`);
-            if (targetTabContent) {
-                targetTabContent.classList.remove('hidden');
+            const selectedTab = document.getElementById(tabName + 'TabContent');
+            if (selectedTab) {
+                selectedTab.classList.remove('hidden');
             }
 
-            // Update active tab button
-            const clickedTab = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+            // Add active class to clicked tab
+            const clickedTab = document.getElementById(tabName + 'TabBtn');
             if (clickedTab) {
                 clickedTab.classList.add('active');
             }
 
-            // Load data for specific tabs
+            // Load data based on tab
             if (tabName === 'documents') {
                 loadDocuments();
             } else if (tabName === 'review') {
                 loadReviewDocuments();
-            } else if (tabName === 'stats') {
-                loadStatistics();
             } else if (tabName === 'notifications') {
                 loadEmailNotifications();
+            } else if (tabName === 'stats') {
+                loadStatistics();
             }
         }
 
@@ -1173,7 +1217,7 @@
 
             documents.forEach(doc => {
                 const row = document.createElement('tr');
-                
+
                 // Extract summary from extracted_text (first line before "Full Content:")
                 let summary = 'No summary available';
                 if (doc.extracted_text) {
@@ -1184,7 +1228,7 @@
                         summary = summary.substring(0, 120) + '...';
                     }
                 }
-                
+
                 row.innerHTML = `
                     <td style="font-weight: bold;">${doc.original_name}</td>
                     <td style="font-size: 13px; color: #4a5568; max-width: 300px;">${summary}</td>
@@ -1308,11 +1352,11 @@
             // Extract summary and key information
             let summary = 'No summary available';
             let keyInfo = '';
-            
+
             if (doc.extracted_text) {
                 const lines = doc.extracted_text.split('\n');
                 summary = lines[0] || 'No summary available';
-                
+
                 // Extract key information based on document type
                 if (doc.document_type === 'financial_document') {
                     keyInfo = 'Financial document containing payment, invoice, or accounting information.';
@@ -1674,86 +1718,105 @@ async function loadStatistics() {
             loadDocuments();
         }
 
-        async function loadEmailNotifications() {
-            const emailList = document.getElementById('emailList');
+        let currentEmailPage = 1;
+        const emailPageSize = 10;
 
+        async function loadEmailNotifications(page = 1) {
             try {
-                const response = await fetch('/api/email-notifications?page=1&page_size=10', {
+                document.getElementById('emailNotifications').innerHTML = '<div class="notification-item"><h4>📧 Loading notifications...</h4></div>';
+
+                const response = await fetch(`/api/email-notifications?page=${page}&page_size=${emailPageSize}`, {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 });
 
-                const data = await response.json();
-
-                if (response.ok && data.emails && data.emails.length > 0) {
-                    let emailHTML = '';
-                    data.emails.forEach(email => {
-                        const time = new Date(email.sent_at).toLocaleString();
-                        const emailIcon = email.email_type === 'sent' ? '📤' : '📧';
-                        const emailDirection = email.email_type === 'sent' ? 'Sent' : 'Received';
-
-                        emailHTML += `
-                            <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
-                                    <div style="flex: 1;">
-                                        <h4 style="margin: 0; color: #2d3748; font-size: 16px;">${emailIcon} ${email.subject}</h4>
-                                        <div style="margin: 8px 0; padding: 8px; background: #f7fafc; border-radius: 4px;">
-                                            <p style="margin: 2px 0; color: #2d3748; font-size: 13px;"><strong>From:</strong> ${email.sent_by_name} <span style="color: #718096;">(${email.sent_by})</span></p>
-                                            <p style="margin: 2px 0; color: #2d3748; font-size: 13px;"><strong>To:</strong> ${email.received_by_name} <span style="color: #718096;">(${email.received_by})</span></p>
-                                        </div>
-                                        <p style="margin: 3px 0; color: #718096; font-size: 12px;">📅 ${time}</p>
-                                    </div>
-                                    <div style="background: ${email.email_type === 'sent' ? '#e6fffa' : '#f0fff4'}; color: ${email.email_type === 'sent' ? '#2d3748' : '#2d3748'}; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">
-                                        ${email.email_type === 'sent' ? 'SENT' : 'RECEIVED'}
-                                    </div>
-                                </div>
-                                ${email.doc_id ? `
-                                <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #4299e1;">
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>📄 Document:</strong> ${email.document_name}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>🏷️ Type:</strong> ${email.document_type}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>🏢 Routed to:</strong> ${email.department}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>⚡ Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
-                                </div>
-                                ` : ''}
-                                ${email.body_preview ? `
-                                <div style="margin: 10px 0; padding: 10px; background: #fafafa; border-radius: 4px; border-left: 3px solid #cbd5e0;">
-                                    <p style="margin: 0; color: #4a5568; font-size: 14px; font-style: italic;">${email.body_preview}</p>
-                                </div>
-                                ` : ''}
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
-                                    <small style="color: #a0aec0;">📊 Status: ${email.status}</small>
-                                    <small style="color: #a0aec0;">🆔 Email ID: ${email.email_id.substring(0, 8)}...</small>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    emailList.innerHTML = emailHTML;
+                if (response.ok) {
+                    const data = await response.json();
+                    currentEmailPage = page;
+                    displayEmailNotifications(data.emails, data.total_count, data.page, data.page_size);
+                    updateEmailCount(data.total_count);
                 } else {
-                    emailList.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: #718096;">
-                            <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
-                            <h4 style="margin-bottom: 8px;">No Email Notifications Yet</h4>
-                            <p>Email notifications will appear here when:</p>
-                            <ul style="list-style: none; padding: 0; margin: 16px 0;">
-                                <li>📄 Documents are uploaded and classified</li>
-                                <li>🔍 Documents require review and approval</li>
-                                <li>⚡ High priority documents need attention</li>
-                            </ul>
-                            <p style="margin-top: 16px;"><em>Upload a document to see email notifications in action!</em></p>
-                        </div>
-                    `;
+                    document.getElementById('emailNotifications').innerHTML = '<div class="notification-item"><h4>❌ Failed to load notifications</h4></div>';
+                    console.error('Failed to load email notifications');
                 }
             } catch (error) {
+                document.getElementById('emailNotifications').innerHTML = '<div class="notification-item"><h4>❌ Error loading notifications</h4></div>';
                 console.error('Error loading email notifications:', error);
-                emailList.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #e53e3e;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-                        <h4>Error Loading Notifications</h4>
-                        <p>Unable to load email notifications. Please try again.</p>
-                    </div>
-                `;
             }
+        }
+
+        function updateEmailCount(totalCount) {
+            document.getElementById('emailCount').textContent = `Total: ${totalCount} notifications`;
+        }
+
+        function displayEmailNotifications(emails, totalCount, page, pageSize) {
+            const container = document.getElementById('emailNotifications');
+            if (!emails || emails.length === 0) {
+                container.innerHTML = '<div class="notification-item"><h4>📭 No email notifications found</h4></div>';
+                document.getElementById('emailPagination').innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = emails.map(email => `
+                <div class="notification-item" style="border-left: 4px solid ${email.email_type === 'sent' ? '#007bff' : '#28a745'};">
+                    <div style="display: flex; justify-content: between; align-items: start;">
+                        <div style="flex: 1;">
+                            <h4>📧 ${email.subject}</h4>
+                            <p>
+                                <strong>${email.email_type === 'sent' ? 'To' : 'From'}:</strong> 
+                                ${email.email_type === 'sent' ? email.received_by_name + ' (' + email.received_by + ')' : email.sent_by_name + ' (' + email.sent_by + ')'}
+                            </p>
+                            ${email.document_name && email.document_name !== 'N/A' ? `
+                                <p><strong>Document:</strong> ${email.document_name} 
+                                ${email.priority && email.priority !== 'Medium' ? `<span class="priority-badge priority-${email.priority.toLowerCase()}">${email.priority}</span>` : ''}
+                                </p>
+                            ` : ''}
+                            <p><strong>Department:</strong> ${email.department}</p>
+                            <p><strong>Sent:</strong> ${new Date(email.sent_at).toLocaleString()}</p>
+                        </div>
+                        <div style="margin-left: 10px;">
+                            <span class="email-type-badge ${email.email_type === 'sent' ? 'sent' : 'received'}">${email.email_type === 'sent' ? 'Sent' : 'Received'}</span>
+                        </div>
+                    </div>
+                    <div class="email-body" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                        ${email.body_preview}
+                    </div>
+                </div>
+            `).join('');
+
+            // Create pagination
+            createEmailPagination(totalCount, page, pageSize);
+        }
+
+        function createEmailPagination(totalCount, currentPage, pageSize) {
+            const totalPages = Math.ceil(totalCount / pageSize);
+            const pagination = document.getElementById('emailPagination');
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '<div class="pagination">';
+
+            // Previous button
+            if (currentPage > 1) {
+                paginationHTML += `<button class="btn btn-secondary" onclick="loadEmailNotifications(${currentPage - 1})">Previous</button>`;
+            }
+
+            // Page numbers
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                paginationHTML += `<button class="btn ${i === currentPage ? 'btn-primary' : 'btn-secondary'}" onclick="loadEmailNotifications(${i})">${i}</button>`;
+            }
+
+            // Next button
+            if (currentPage < totalPages) {
+                paginationHTML += `<button class="btn btn-secondary" onclick="loadEmailNotifications(${currentPage + 1})">Next</button>`;
+            }
+
+            paginationHTML += '</div>';
+            pagination.innerHTML = paginationHTML;
         }
 
         function showToast(message, type = 'info') {
