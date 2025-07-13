@@ -903,22 +903,81 @@ def classify_document_locally(content: str, filename: str):
     content_lower = content_to_analyze.lower()
     filename_lower = filename.lower()
 
-    # Define keywords for priority
-    high_priority_keywords = ["EOD", "end of day", "today", "asap", "urgent", "immediate", "24 hours", "deadline today", "due today", "respond by", "reply immediately",
-                              "action required", "requires immediate attention", "please review urgently", "critical issue", "resolve now",
-                              "escalated", "service disruption", "breach", "incident", "system down", "customer complaint", "payment failed",
-                              "today's meeting", "final review", "must attend", "confirmation needed"]
-    medium_priority_keywords = ["reminder", "follow up", "this week", "pending", "awaiting response", "check status", "update needed",
-                                "tomorrow", "due in 2 days", "schedule by", "before Friday", "complete by", "ETA",
-                                "scheduled for", "calendar invite", "tentative", "planned discussion", "agenda",
-                                "work in progress", "assigned", "need update", "submit by", "to be reviewed"]
+    # Enhanced priority classification keywords
+    high_priority_keywords = [
+        # Deadlines
+        "by EOD", "by end of day", "by today", "asap", "urgent", "immediate", "within 24 hours", 
+        "deadline today", "due today", "respond by", "reply immediately", "EOD", "end of day", "today",
+        # Action Requests
+        "action required", "requires immediate attention", "please review urgently", "high priority", 
+        "critical issue", "resolve now", "immediate action", "urgent response",
+        # Escalations / Issues
+        "escalated", "service disruption", "breach", "incident", "system down", "customer complaint", 
+        "payment failed", "critical error", "emergency", "outage", "security breach",
+        # Meetings / Events
+        "today's meeting", "final review", "must attend", "confirmation needed", "urgent meeting"
+    ]
+    
+    medium_priority_keywords = [
+        # Follow-ups
+        "reminder", "follow up", "this week", "pending", "awaiting response", "check status", 
+        "update needed", "follow-up", "status update",
+        # Upcoming Deadlines
+        "by tomorrow", "due in 2 days", "schedule by", "before Friday", "complete by", "ETA",
+        "due this week", "by end of week", "within 3 days",
+        # Meetings
+        "scheduled for", "calendar invite", "tentative", "planned discussion", "agenda",
+        "meeting request", "schedule meeting",
+        # Tasks
+        "work in progress", "assigned", "need update", "submit by", "to be reviewed",
+        "in progress", "task assigned", "please review"
+    ]
+    
+    low_priority_keywords = [
+        # FYI / Reference
+        "for your information", "no action needed", "for record", "just sharing", 
+        "reference document", "read only", "optional", "fyi", "for reference",
+        # Long-Term
+        "next quarter", "next month", "future release", "roadmap", "tentative plan", 
+        "long-term goal", "backlog item", "future consideration",
+        # General Updates
+        "weekly summary", "monthly report", "feedback", "draft version", "notes", 
+        "not urgent", "informational", "general update"
+    ]
 
-    # Determine keyword-based priority
-    keyword_priority = "low"  # Default
-    if any(keyword in content_lower for keyword in high_priority_keywords):
+    # Enhanced priority determination with weighted scoring
+    priority_score = 0
+    matched_keywords = []
+    
+    # Check for high priority keywords (score +3 each)
+    for keyword in high_priority_keywords:
+        if keyword.lower() in content_lower or keyword.lower() in filename_lower:
+            priority_score += 3
+            matched_keywords.append(keyword)
+    
+    # Check for medium priority keywords (score +2 each)
+    for keyword in medium_priority_keywords:
+        if keyword.lower() in content_lower or keyword.lower() in filename_lower:
+            priority_score += 2
+            matched_keywords.append(keyword)
+    
+    # Check for low priority keywords (score +1 each, but caps at low)
+    for keyword in low_priority_keywords:
+        if keyword.lower() in content_lower or keyword.lower() in filename_lower:
+            priority_score += 1
+            matched_keywords.append(keyword)
+    
+    # Determine final priority based on score
+    if priority_score >= 6:  # Multiple high priority indicators
         keyword_priority = "high"
-    elif any(keyword in content_lower for keyword in medium_priority_keywords):
+    elif priority_score >= 3:  # At least one high priority or multiple medium
+        keyword_priority = "high" if any(kw.lower() in content_lower for kw in high_priority_keywords[:10]) else "medium"
+    elif priority_score >= 2:  # Medium priority indicators
         keyword_priority = "medium"
+    elif priority_score >= 1:  # Low priority indicators or no matches
+        keyword_priority = "low"
+    else:
+        keyword_priority = "low"  # Default
 
     # Enhanced classification for all departments with improved keywords
     classification_rules = [
@@ -1064,7 +1123,8 @@ def classify_document_locally(content: str, filename: str):
                 "extracted_text": content[:1000],  # Increased content length
                 "page_count": 1,
                 "language": "en",
-                "tags": rule["tags"]
+                "tags": rule["tags"] + matched_keywords[:3],  # Add up to 3 matched keywords
+                "priority_keywords": matched_keywords[:5]  # Track matched priority keywords
             }
 
     # Default classification
@@ -1072,11 +1132,12 @@ def classify_document_locally(content: str, filename: str):
         "doc_type": "general_document",
         "department": "general",
         "confidence": 0.5,
-        "priority": "low",
+        "priority": keyword_priority,  # Use keyword-based priority even for general docs
         "extracted_text": content[:1000],
         "page_count": 1,
         "language": "en",
-        "tags": ["general"]
+        "tags": ["general"] + matched_keywords[:3],  # Add matched keywords
+        "priority_keywords": matched_keywords[:5]  # Track matched priority keywords
     }
 
 
@@ -1505,11 +1566,13 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
 
         # Get total count for employees
-        cursor.execute('''
+        count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
-        ''', [current_user['email'], current_user['email'], current_user['user_id']])
+        '''
+        cursor.execute(count_query, [current_user['email'], current_user['email'], current_user['user_id']])
+        total_count = cursor.fetchone()[0]
 
     else:
         # Managers and admins see all emails related to their department
@@ -1529,14 +1592,15 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
 
         # Get total count for managers/admins
-        cursor.execute('''
+        count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
-        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
+        '''
+        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
+        total_count = cursor.fetchone()[0]
 
     emails = cursor.fetchall()
-    total_count = cursor.fetchone()[0]
 
     conn.close()
 
