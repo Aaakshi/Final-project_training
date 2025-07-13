@@ -1480,8 +1480,8 @@
                             '<textarea id="reviewComments" style="width: 100%; height: 80px; margin-top: 5px; padding: 8px; border: 1px solid #ddd;" placeholder="Add your review comments here..."></textarea>' +
                             '</div>' +
                             '<div style="margin-top: 20px; text-align: center;">' +
-                            '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approve\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
-                            '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'reject\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
+                            '<button class="btn btn-success" onclick="submitReview(\'' + docId + '\', \'approve\');" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
+                            '<button class="btn btn-danger" onclick="submitReview(\'' + docId + '\', \'reject\');" style="padding: 10px 20px;">✗ Reject</button>' +
                             '</div>' +
                             '</div>';
                         document.body.appendChild(modal);
@@ -1494,6 +1494,42 @@
             } catch (error) {
                 console.error('Error fetching document for review:', error);
                 showToast('Error loading document details - network error', 'error');
+            }
+        }
+
+        async function submitReview(docId, action) {
+            const comments = document.getElementById('reviewComments').value || '';
+            
+            try {
+                const response = await fetch('/api/review-document/' + docId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        comments: comments
+                    })
+                });
+
+                const contentType = response.headers.get('content-type');
+                if (response.ok) {
+                    showToast('Document ' + action + 'd successfully!', 'success');
+                    // Remove the modal
+                    const modals = document.querySelectorAll('.modal');
+                    modals.forEach(modal => modal.remove());
+                    // Reload the review documents
+                    loadReviewDocuments();
+                } else if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    showToast(data.detail || 'Review submission failed', 'error');
+                } else {
+                    showToast('Review submission failed - server error', 'error');
+                }
+            } catch (error) {
+                console.error('Submit review error:', error);
+                showToast('Review submission failed - network error', 'error');
             }
         }
 
@@ -1514,14 +1550,13 @@
 
                 const contentType = response.headers.get('content-type');
                 if (response.ok) {
-                    showToast('Document ' + action + ' successfully!', 'success');
+                    showToast('Document ' + action + 'd successfully!', 'success');
                     closeModal();
                     loadReviewDocuments();
                 } else if (contentType && contentType.includes('application/json')) {
                     const data = await response.json();
                     showToast(data.detail || 'Review submission failed', 'error');
-                }
-                 else {
+                } else {
                     showToast('Review submission failed - server error', 'error');
                 }
             } catch (error) {

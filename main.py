@@ -1507,36 +1507,53 @@ async def review_document(
 
     conn.commit()
 
-    # Get uploader's email for notification
-    cursor.execute("SELECT email FROM users WHERE user_id = ?", [uploaded_by])
-    uploader_result = cursor.fetchone()
+    # Get uploader's email for notification - uploaded_by might be user_id or name
+    if uploaded_by:
+        # First try to find by user_id
+        cursor.execute("SELECT email, full_name FROM users WHERE user_id = ?", [uploaded_by])
+        uploader_result = cursor.fetchone()
+        
+        if not uploader_result:
+            # If not found by user_id, try to find by full_name
+            cursor.execute("SELECT email, full_name FROM users WHERE full_name = ?", [uploaded_by])
+            uploader_result = cursor.fetchone()
+    else:
+        uploader_result = None
 
     conn.close()
 
     # Send email notification to uploader
     if uploader_result:
         uploader_email = uploader_result[0]
+        uploader_name = uploader_result[1] if len(uploader_result) > 1 else uploader_email
         subject = f"Document Review Update - {action.title()}"
         status_msg = "approved" if action == 'approve' else "rejected"
 
         body = f"""
-        Your document has been {status_msg}.
+        <html>
+            <body>
+                <h2>Document Review Update</h2>
+                <p>Dear {uploader_name},</p>
+                <p>Your document has been <strong>{status_msg}</strong>.</p>
+                
+                <h3>Document Details:</h3>
+                <ul>
+                    <li><strong>File Name:</strong> {file_name}</li>
+                    <li><strong>Document ID:</strong> {doc_id}</li>
+                    <li><strong>Status:</strong> {status_msg.title()}</li>
+                    <li><strong>Reviewed by:</strong> {current_user.get('email')}</li>
+                    <li><strong>Review Date:</strong> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}</li>
+                </ul>
 
-        Document Details:
-        - File Name: {file_name}
-        - Document ID: {doc_id}
-        - Status: {status_msg.title()}
-        - Reviewed by: {current_user.get('email')}
-        - Review Date: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+                {f'<p><strong>Comments:</strong> {comments}</p>' if comments else ''}
 
-        {f'Comments: {comments}' if comments else ''}
-
-        Best regards,
-        IDCR System
+                <p>Best regards,<br>IDCR System</p>
+            </body>
+        </html>
         """
 
         try:
-            send_email(uploader_email, subject, body)
+            send_email(uploader_email, subject, body, doc_id, file_name, current_user.get('email'))
             print(f"Review notification sent to {uploader_email} for document {doc_id}")
         except Exception as e:
             print(f"Failed to send review notification: {e}")
