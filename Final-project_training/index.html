@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -920,8 +921,7 @@
                         <option value="">All Types</option>
                         <option value="invoice">Invoice</option>
                         <option value="contract">Contract</option>
-                        ```python
-        <option value="hr_document">HR Document</option>
+                        <option value="hr_document">HR Document</option>
                         <option value="it_document">IT Document</option>
                         <option value="general">General</option>
                     </select>
@@ -950,6 +950,7 @@
                             <th>Department</th>
                             <th>Status</th>
                             <th>Priority</th>
+                            <th>Uploaded By</th>
                             <th>Uploaded</th>
                             <th>Actions</th>
                         </tr>
@@ -1160,7 +1161,7 @@
             try {
                 const response = await fetch('/api/me', {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': 'Bearer ' + authToken
                     }
                 });
 
@@ -1272,10 +1273,10 @@
             document.getElementById('authContainer').classList.add('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
 
-            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
+            document.getElementById('userName').textContent = 'Welcome, ' + currentUser.full_name + ' (' + currentUser.role + ')';
             const deptBadge = document.getElementById('userDept');
             deptBadge.textContent = currentUser.department.toUpperCase();
-            deptBadge.className = `department-badge dept-${currentUser.department}`;
+            deptBadge.className = 'department-badge dept-' + currentUser.department;
 
             // Update UI based on user role
             if (currentUser.role === 'manager' || currentUser.role === 'admin') {
@@ -1381,8 +1382,7 @@
 
             let html = '<h4>Selected Files:</h4><ul>';
             selectedFiles.forEach((file, index) => {
-                html += `<li>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) 
-                         <button onclick="removeFile(${index})" style="margin-left: 10px; color: red;">Remove</button></li>`;
+                html += '<li>' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB) <button onclick="removeFile(' + index + ')" style="margin-left: 10px; color: red;">Remove</button></li>';
             });
             html += '</ul>';
             fileList.innerHTML = html;
@@ -1417,7 +1417,7 @@
                 const response = await fetch('/api/bulk-upload', {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': 'Bearer ' + authToken
                     },
                     body: formData
                 });
@@ -1425,7 +1425,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(`${data.uploaded_count} files uploaded successfully!`, 'success');
+                    showToast(data.total_files + ' files uploaded successfully!', 'success');
                     selectedFiles = [];
                     displayFileList();
                     document.getElementById('batchName').value = '';
@@ -1441,10 +1441,10 @@
         }
 
         async function loadDocuments() {
-            const search = document.getElementById('searchInput')?.value || '';
-            const status = document.getElementById('statusFilter')?.value || '';
-            const type = document.getElementById('typeFilter')?.value || '';
-            const department = document.getElementById('deptFilter')?.value || '';
+            const search = document.getElementById('searchInput') ? document.getElementById('searchInput').value : '';
+            const status = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : '';
+            const type = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : '';
+            const department = document.getElementById('deptFilter') ? document.getElementById('deptFilter').value : '';
 
             try {
                 const params = new URLSearchParams({
@@ -1456,9 +1456,9 @@
                     department: department
                 });
 
-                const response = await fetch(`/api/documents?${params}`, {
+                const response = await fetch('/api/documents?' + params, {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': 'Bearer ' + authToken
                     }
                 });
 
@@ -1506,7 +1506,7 @@
                     const tagsContainer = document.getElementById('modalTags');
                     if (doc.tags && doc.tags.length > 0) {
                         tagsContainer.innerHTML = doc.tags.map(tag => 
-                            '<span class="badge">' + tag + '</span>'
+                            '<span class="tag">' + tag + '</span>'
                         ).join(' ');
                     } else {
                         tagsContainer.innerHTML = '<span class="no-tags">No tags available</span>';
@@ -1529,7 +1529,7 @@
                 }
             } catch (error) {
                 console.error('Error fetching document:', error);
-                showNotification('Error loading document details', 'error');
+                showToast('Error loading document details', 'error');
             }
         }
 
@@ -1542,19 +1542,16 @@
                 const docType = doc.document_type || 'general';
                 const department = doc.department || 'general';
 
-                return `
-                    <tr>
-                        <td>${doc.original_name}</td>
-                        <td><span class="badge doc-type-${docType}">${docType.replace('_', ' ')}</span></td>
-                        <td><span class="badge dept-${department}">${department.toUpperCase()}</span></td>
-                        <td><span class="badge status-${status}">${status}</span></td>
-                        <td><span class="badge priority-${priority}">${priority}</span></td>
-                        <td>${uploadDate}</td>
-                        <td>
-                            <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">View</button>
-                        </td>
-                    </tr>
-                `;
+                return '<tr>' +
+                    '<td>' + doc.original_name + '</td>' +
+                    '<td><span class="status-badge doc-type-' + docType + '">' + docType.replace('_', ' ') + '</span></td>' +
+                    '<td><span class="department-badge dept-' + department + '">' + department.toUpperCase() + '</span></td>' +
+                    '<td><span class="status-badge status-' + status + '">' + status + '</span></td>' +
+                    '<td><span class="priority-' + priority + '">' + priority + '</span></td>' +
+                    '<td>Unknown User</td>' +
+                    '<td>' + uploadDate + '</td>' +
+                    '<td><button class="btn" onclick="viewDocument(\'' + doc.doc_id + '\')" style="padding: 5px 10px; font-size: 12px;">View</button></td>' +
+                    '</tr>';
             }).join('');
         }
 
@@ -1570,16 +1567,16 @@
             let html = '';
 
             if (page > 1) {
-                html += `<button onclick="changePage(${page - 1})">Previous</button>`;
+                html += '<button onclick="changePage(' + (page - 1) + ')">Previous</button>';
             }
 
             for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) {
                 const activeClass = i === page ? 'active' : '';
-                html += `<button class="${activeClass}" onclick="changePage(${i})">${i}</button>`;
+                html += '<button class="' + activeClass + '" onclick="changePage(' + i + ')">' + i + '</button>';
             }
 
             if (page < totalPages) {
-                html += `<button onclick="changePage(${page + 1})">Next</button>`;
+                html += '<button onclick="changePage(' + (page + 1) + ')">Next</button>';
             }
 
             pagination.innerHTML = html;
@@ -1593,16 +1590,14 @@
         function addReviewSection(doc) {
             const modalContent = document.getElementById('modalContent');
             if (doc.review_status === 'pending') {
-                modalContent.innerHTML += `
-                    <div class="review-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
-                        <h3>Review Document</h3>
-                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin: 10px 0;"></textarea>
-                        <div>
-                            <button class="btn btn-success" onclick="reviewDocument('${doc.doc_id}', 'approved', document.getElementById('reviewComments').value)" style="margin-right: 10px;">Approve</button>
-                            <button class="btn btn-danger" onclick="reviewDocument('${doc.doc_id}', 'rejected', document.getElementById('reviewComments').value)">Reject</button>
-                        </div>
-                    </div>
-                `;
+                modalContent.innerHTML += '<div class="review-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">' +
+                    '<h3>Review Document</h3>' +
+                    '<textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin: 10px 0;"></textarea>' +
+                    '<div>' +
+                    '<button class="btn btn-success" onclick="reviewDocument(\'' + doc.doc_id + '\', \'approved\', document.getElementById(\'reviewComments\').value)" style="margin-right: 10px;">Approve</button>' +
+                    '<button class="btn btn-secondary" onclick="reviewDocument(\'' + doc.doc_id + '\', \'rejected\', document.getElementById(\'reviewComments\').value)">Reject</button>' +
+                    '</div>' +
+                    '</div>';
             }
         }
 
@@ -1610,41 +1605,41 @@
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
-            modal.innerHTML = `
-                <div class="modal-content" style="max-width: 500px;">
-                    <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
-                    <h2>Review Document</h2>
-                    <div style="margin: 20px 0;">
-                        <label>Comments (optional):</label>
-                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin-top: 10px;"></textarea>
-                    </div>
-                    <div style="margin-top: 20px;">
-                        <button class="btn btn-success" onclick="reviewDocument('${docId}', 'approved', document.getElementById('reviewComments').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px;">Approve</button>
-                        <button class="btn btn-danger" onclick="reviewDocument('${docId}', 'rejected', document.getElementById('reviewComments').value); this.parentElement.parentElement.parentElement.remove();">Reject</button>
-                    </div>
-                </div>
-            `;
+            modal.innerHTML = '<div class="modal-content" style="max-width: 500px;">' +
+                '<span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>' +
+                '<h2>Review Document</h2>' +
+                '<div style="margin: 20px 0;">' +
+                '<label>Comments (optional):</label>' +
+                '<textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin-top: 10px;"></textarea>' +
+                '</div>' +
+                '<div style="margin-top: 20px;">' +
+                '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px;">Approve</button>' +
+                '<button class="btn btn-secondary" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();">Reject</button>' +
+                '</div>' +
+                '</div>';
             document.body.appendChild(modal);
         }
 
-        async function reviewDocument(docId, action, comments = '') {
+        async function reviewDocument(docId, action, comments) {
+            comments = comments || '';
             try {
-                const response = await fetch(\`/api/documents/\${docId}/review\`, {
+                const response = await fetch('/api/documents/' + docId + '/review', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': \`Bearer \${authToken}\`
+                        'Authorization': 'Bearer ' + authToken
                     },
                     body: JSON.stringify({
-                        review_status: action,
-                        review_comments: comments
+                        doc_id: docId,
+                        status: action,
+                        comments: comments
                     })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(\`Document \${action} successfully!\`, 'success');
+                    showToast('Document ' + action + ' successfully!', 'success');
                     closeModal();
                     loadReviewDocuments();
                 } else {
@@ -1663,33 +1658,27 @@
                 const priority = doc.priority || 'medium';
                 const status = doc.processing_status || 'pending';
                 const docType = doc.document_type || 'general';
-                const department = doc.department || 'general';
                 const reviewStatus = doc.review_status || 'pending';
                 const uploadedBy = doc.uploaded_by || 'Unknown User';
 
-                return `
-                    <tr>
-                        <td>${doc.original_name}</td>
-                        <td>${uploadedBy}</td>
-                        <td><span class="badge doc-type-${docType}">${docType.replace('_', ' ')}</span></td>
-                        <td><span class="badge dept-${department}">${department.toUpperCase()}</span></td>
-                        <td><span class="badge status-${status}">${status}</span></td>
-                        <td><span class="badge priority-${priority}">${priority}</span></td>
-                        <td><span class="badge review-${reviewStatus}">${reviewStatus}</span></td>
-                        <td>${uploadDate}</td>
-                        <td>
-                            <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">View</button>
-                            ${reviewStatus === 'pending' ? `<button class="btn btn-primary" onclick="showReviewModal('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">Review</button>` : ''}
-                        </td>
-                    </tr>
-                `;
+                return '<tr>' +
+                    '<td>' + doc.original_name + '</td>' +
+                    '<td>' + uploadedBy + '</td>' +
+                    '<td><span class="status-badge doc-type-' + docType + '">' + docType.replace('_', ' ') + '</span></td>' +
+                    '<td><span class="priority-' + priority + '">' + priority + '</span></td>' +
+                    '<td><span class="status-badge review-status-' + reviewStatus + '">' + reviewStatus + '</span></td>' +
+                    '<td>' +
+                    '<button class="btn" onclick="viewDocument(\'' + doc.doc_id + '\')" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">View</button>' +
+                    (reviewStatus === 'pending' ? '<button class="btn" onclick="showReviewModal(\'' + doc.doc_id + '\')" style="padding: 5px 10px; font-size: 12px;">Review</button>' : '') +
+                    '</td>' +
+                    '</tr>';
             }).join('');
         }
 
         async function loadReviewDocuments() {
             try {
-                const search = document.getElementById('reviewSearchInput')?.value || '';
-                const reviewStatus = document.getElementById('reviewStatusFilter')?.value || '';
+                const search = document.getElementById('reviewSearchInput') ? document.getElementById('reviewSearchInput').value : '';
+                const reviewStatus = document.getElementById('reviewStatusFilter') ? document.getElementById('reviewStatusFilter').value : '';
 
                 const params = new URLSearchParams({
                     search: search,
@@ -1698,7 +1687,7 @@
 
                 const response = await fetch('/api/review-documents?' + params.toString(), {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': 'Bearer ' + authToken
                     }
                 });
 
@@ -1719,7 +1708,7 @@
             try {
                 const response = await fetch('/api/email-notifications', {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': 'Bearer ' + authToken
                     }
                 });
 
@@ -1740,41 +1729,41 @@
             const container = document.getElementById('emailNotifications');
             const countElement = document.getElementById('emailCount');
 
-            countElement.textContent = \`Total: \${data.total_count} emails\`;
+            countElement.textContent = 'Total: ' + data.total_count + ' emails';
 
             if (data.emails.length === 0) {
                 container.innerHTML = '<div class="notification-item"><h4>📧 No email notifications found</h4></div>';
                 return;
             }
 
-            container.innerHTML = data.emails.map(email => \`
-                <div class="email-item">
-                    <div class="email-header">
-                        <div>
-                            <strong>\${email.subject}</strong>
-                            <span class="email-type-badge \${email.email_type}">\${email.email_type}</span>
-                        </div>
-                        <div>
-                            <span class="priority-badge priority-\${email.priority}">\${email.priority}</span>
-                            <span class="email-status status-\${email.status}">\${email.status}</span>
-                        </div>
-                    </div>
-                    <div><strong>Sent by:</strong> \${email.sent_by_name} (\${email.sent_by})</div>
-                    <div><strong>Received by:</strong> \${email.received_by_name} (\${email.received_by})</div>
-                    <div><strong>File name:</strong> \${email.document_name}</div>
-                    <div><strong>Status:</strong> \${email.status}</div>
-                    <div><strong>Department:</strong> \${email.department}</div>
-                    <div><strong>Sent:</strong> \${new Date(email.sent_at).toLocaleString()}</div>
-                    \${email.body_preview ? \`<div><strong>Preview:</strong> \${email.body_preview}</div>\` : ''}
-                </div>
-            \`).join('');
+            container.innerHTML = data.emails.map(email => 
+                '<div class="email-item">' +
+                '<div class="email-header">' +
+                '<div>' +
+                '<strong>' + email.subject + '</strong>' +
+                '<span class="email-type-badge ' + email.email_type + '">' + email.email_type + '</span>' +
+                '</div>' +
+                '<div>' +
+                '<span class="priority-badge priority-' + email.priority + '">' + email.priority + '</span>' +
+                '<span class="email-status status-' + email.status + '">' + email.status + '</span>' +
+                '</div>' +
+                '</div>' +
+                '<div><strong>Sent by:</strong> ' + email.sent_by_name + ' (' + email.sent_by + ')</div>' +
+                '<div><strong>Received by:</strong> ' + email.received_by_name + ' (' + email.received_by + ')</div>' +
+                '<div><strong>File name:</strong> ' + email.document_name + '</div>' +
+                '<div><strong>Status:</strong> ' + email.status + '</div>' +
+                '<div><strong>Department:</strong> ' + email.department + '</div>' +
+                '<div><strong>Sent:</strong> ' + new Date(email.sent_at).toLocaleString() + '</div>' +
+                (email.body_preview ? '<div><strong>Preview:</strong> ' + email.body_preview + '</div>' : '') +
+                '</div>'
+            ).join('');
         }
 
         async function loadStats() {
             try {
                 const response = await fetch('/api/stats', {
                     headers: {
-                        'Authorization': \`Bearer \${authToken}\`
+                        'Authorization': 'Bearer ' + authToken
                     }
                 });
 
@@ -1815,128 +1804,22 @@
         function displayStats(stats) {
             const statsGrid = document.getElementById('statsGrid');
 
-            statsGrid.innerHTML = \`
-                <div class="stat-card">
-                    <h3>\${stats.total_documents}</h3>
-                    <p>Total Documents</p>
-                </div>
-                <div class="stat-card">                    <h3>\${stats.processed_documents}</h3>
-                    <p>Processed Documents</p>
-                </div>
-                <div class="stat-card">
-                    <h3>\${stats.pending_documents}</h3>
-                    <p>Pending Documents</p>
-                </div>
-                <div class="stat-card">
-                    <h3>\${stats.processing_rate}%</h3>
-                    <p>Processing Rate</p>
-                </div>
-            \`;
-        }
-
-        function createCharts(stats) {
-            // Document Types Chart
-            const docTypesCtx = document.getElementById('docTypesChart');
-            if (docTypesCtx) {
-                new Chart(docTypesCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(stats.document_types),
-                        datasets: [{
-                            data: Object.values(stats.document_types),
-                            backgroundColor: [
-                                '#3182ce', '#38a169', '#e53e3e', '#d69e2e', '#9f7aea',
-                                '#319795', '#dd6b20', '#e53e3e', '#3182ce'
-                            ]
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Departments Chart
-            const deptsCtx = document.getElementById('departmentsChartt');
-            if (deptsCtx) {
-                new Chart(deptsCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: Object.keys(stats.departments),
-                        datasets: [{
-                            label: 'Documents',
-                            data: Object.values(stats.departments),
-                            backgroundColor: '#4299e1'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Priority Chart
-            const priorityCtx = document.getElementById('priorityChart');
-            if (priorityCtx) {
-                new Chart(priorityCtx, {
-                    type: 'pie',
-                    data: {
-                        labels: Object.keys(stats.priorities),
-                        datasets: [{
-                            data: Object.values(stats.priorities),
-                            backgroundColor: ['#e53e3e', '#d69e2e', '#3182ce']
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Trends Chart
-            const trendsCtx = document.getElementById('trendsChart');
-            if (trendsCtx) {
-                new Chart(trendsCtx, {
-                    type: 'line',
-                    data: {
-                        labels: stats.upload_trends.map(t => t.date),
-                        datasets: [{
-                            label: 'Documents Uploaded',
-                            data: stats.upload_trends.map(t => t.count),
-                            borderColor: '#4299e1',
-                            backgroundColor: 'rgba(66, 153, 225, 0.1)',
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            }
+            statsGrid.innerHTML = '<div class="stat-card">' +
+                '<h3>' + stats.total_documents + '</h3>' +
+                '<p>Total Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.processed_documents + '</h3>' +
+                '<p>Processed Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.pending_documents + '</h3>' +
+                '<p>Pending Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.processing_rate + '%</h3>' +
+                '<p>Processing Rate</p>' +
+                '</div>';
         }
 
         function formatFileSize(bytes) {
@@ -1954,12 +1837,16 @@
         function showToast(message, type) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
-            toast.className = `toast ${type}`;
+            toast.className = 'toast ' + type;
             toast.style.display = 'block';
 
-            setTimeout(() => {
+            setTimeout(function() {
                 toast.style.display = 'none';
             }, 3000);
+        }
+
+        function closeModal() {
+            document.getElementById('documentModal').style.display = 'none';
         }
 
         // Close modal when clicking outside
@@ -1968,13 +1855,6 @@
             if (event.target === modal) {
                 closeModal();
             }
-        }
-
-        // Quick login function
-        function quickLogin(email, password) {
-            document.getElementById('loginEmail').value = email;
-            document.getElementById('loginPassword').value = password;
-            loginUser();
         }
     </script>
 </body>
