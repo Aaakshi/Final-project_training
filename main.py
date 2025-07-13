@@ -163,6 +163,44 @@ def init_database():
     # Email to name mapping for uploaded_by field
     email_to_name = {email: name for email, name, _, _, _ in demo_users}
 
+    # Create documents table first (moved up before any inserts)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            doc_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            file_type TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            uploaded_at TEXT NOT NULL,
+            processing_status TEXT DEFAULT 'pending',
+            extracted_text TEXT,
+            ocr_confidence REAL,
+            document_type TEXT,
+            department TEXT,
+            priority TEXT,
+            classification_confidence REAL,
+            page_count INTEGER,
+            language TEXT,
+            tags TEXT,
+            assigned_to TEXT,
+            reviewed_by TEXT,
+            review_status TEXT DEFAULT 'pending',
+            review_comments TEXT,
+            reviewed_at TEXT,
+            uploaded_by TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (user_id)
+        )
+    ''')
+
+    # Check if uploaded_by column exists in documents table, add if missing
+    cursor.execute("PRAGMA table_info(documents)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'uploaded_by' not in columns:
+        cursor.execute(
+            'ALTER TABLE documents ADD COLUMN uploaded_by TEXT DEFAULT "General Employee"')
+
     # Create sample documents for better statistics
 
     # Create sample priority documents first
@@ -254,36 +292,7 @@ def init_database():
             f"Sample content for {original_name} - This is a {doc_type} document for {dept} department.", uploaded_by_name
         ))
 
-    # Create documents table (updated with user info)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS documents (
-            doc_id TEXT PRIMARY KEY,
-            user_id TEXT NOT NULL,
-            original_name TEXT NOT NULL,
-            file_path TEXT NOT NULL,
-            file_size INTEGER NOT NULL,
-            file_type TEXT NOT NULL,
-            mime_type TEXT NOT NULL,
-            uploaded_at TEXT NOT NULL,
-            processing_status TEXT DEFAULT 'pending',
-            extracted_text TEXT,
-            ocr_confidence REAL,
-            document_type TEXT,
-            department TEXT,
-            priority TEXT,
-            classification_confidence REAL,
-            page_count INTEGER,
-            language TEXT,
-            tags TEXT,
-            assigned_to TEXT,
-            reviewed_by TEXT,
-            review_status TEXT DEFAULT 'pending',
-            review_comments TEXT,
-            reviewed_at TEXT,
-            uploaded_by TEXT,
-            FOREIGN KEY (user_id) REFERENCES users (user_id)
-        )
-    ''')
+    
 
     # Create upload batches table (updated)
     cursor.execute('''
@@ -333,19 +342,7 @@ def init_database():
         )
     ''')
 
-    # Check if user_id column exists in documents table, add if missing
-    cursor.execute("PRAGMA table_info(documents)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'user_id' not in columns:
-        cursor.execute(
-            'ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT "system"')
     
-    # Check if uploaded_by column exists in documents table, add if missing
-    cursor.execute("PRAGMA table_info(documents)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if 'uploaded_by' not in columns:
-        cursor.execute(
-            'ALTER TABLE documents ADD COLUMN uploaded_by TEXT DEFAULT "General Employee"')
 
     # Check if user_id column exists in upload_batches table, add if missing
     cursor.execute("PRAGMA table_info(upload_batches)")
