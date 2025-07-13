@@ -1112,8 +1112,13 @@
                 });
 
                 if (response.ok) {
-                    currentUser = await response.json();
-                    showMainContent();
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        currentUser = await response.json();
+                        showMainContent();
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
                     authToken = null;
                     localStorage.removeItem('authToken');
@@ -1149,16 +1154,26 @@
                     body: JSON.stringify({ email, password })
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    authToken = data.access_token;
-                    localStorage.setItem('authToken', authToken);
-                    currentUser = data.user;
-                    showMainContent();
-                    showToast('Login successful!', 'success');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        authToken = data.access_token;
+                        localStorage.setItem('authToken', authToken);
+                        currentUser = data.user;
+                        showMainContent();
+                        showToast('Login successful!', 'success');
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
-                    showToast(data.detail || 'Login failed', 'error');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        showToast(data.detail || 'Login failed', 'error');
+                    } else {
+                        showToast('Login failed - server error', 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Login error:', error);
@@ -1191,13 +1206,23 @@
                     })
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    showToast('Registration successful! Please login.', 'success');
-                    showLoginForm();
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        showToast('Registration successful! Please login.', 'success');
+                        showLoginForm();
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
-                    showToast(data.detail || 'Registration failed', 'error');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        showToast(data.detail || 'Registration failed', 'error');
+                    } else {
+                        showToast('Registration failed - server error', 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Registration error:', error);
@@ -1382,17 +1407,27 @@
                     body: formData
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    showToast(data.total_files + ' files uploaded successfully!', 'success');
-                    selectedFiles = [];
-                    displayFileList();
-                    document.getElementById('batchName').value = '';
-                    document.getElementById('uploadBtn').disabled = true;
-                    loadDocuments();
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        showToast(data.total_files + ' files uploaded successfully!', 'success');
+                        selectedFiles = [];
+                        displayFileList();
+                        document.getElementById('batchName').value = '';
+                        document.getElementById('uploadBtn').disabled = true;
+                        loadDocuments();
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
-                    showToast(data.detail || 'Upload failed', 'error');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        showToast(data.detail || 'Upload failed', 'error');
+                    } else {
+                        showToast('Upload failed - server error', 'error');
+                    }
                 }
             } catch (error) {
                 console.error('Upload error:', error);
@@ -1422,11 +1457,15 @@
                     }
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    displayDocuments(data.documents);
-                    displayPagination(data.total_count, data.page, data.page_size);
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        displayDocuments(data.documents);
+                        displayPagination(data.total_count, data.page, data.page_size);
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
                     showToast('Failed to load documents', 'error');
                 }
@@ -1747,15 +1786,18 @@
                     }
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    displayStats(data);
-                    // Clear any previous error messages
-                    const errorElements = document.querySelectorAll('.error-message');
-                    errorElements.forEach(el => el.remove());
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        displayStats(data);
+                        // Clear any previous error messages
+                        const errorElements = document.querySelectorAll('.error-message');
+                        errorElements.forEach(el => el.remove());
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
                 } else {
-                    console.error('Stats API error:', data);
                     displayStats({
                         total_documents: 0,
                         processed_documents: 0,
