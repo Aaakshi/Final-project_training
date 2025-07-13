@@ -1658,7 +1658,7 @@ async def get_document_details(doc_id: str,
         conn.close()
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Check permissions before getting user info
+    # Check permissions - allow managers to view documents in their department for review
     if current_user['role'] == 'employee' and row[1] != current_user['user_id']:
         conn.close()
         raise HTTPException(status_code=403, detail="Access denied")
@@ -1689,6 +1689,76 @@ async def get_document_details(doc_id: str,
     else:
         doc_dict['uploaded_by'] = 'Unknown User'
         doc_dict['uploaded_by_email'] = ''
+
+    # Extract full content from file if not already extracted or if it's truncated
+    file_path = doc_dict['file_path']
+    full_content = ""
+    
+    if os.path.exists(file_path):
+        try:
+            if doc_dict['mime_type'] == 'application/pdf':
+                # Handle PDF files
+                try:
+                    import PyPDF2
+                    with open(file_path, 'rb') as pdf_file:
+                        pdf_reader = PyPDF2.PdfReader(pdf_file)
+                        text_content = []
+                        for page in pdf_reader.pages:
+                            text_content.append(page.extract_text())
+                        full_content = '\n'.join(text_content)
+                except Exception as pdf_error:
+                    print(f"PDF reading error: {pdf_error}")
+                    full_content = "Error reading PDF content"
+
+            elif doc_dict['mime_type'] == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                # Handle DOCX files
+                try:
+                    import docx
+                    doc = docx.Document(file_path)
+                    paragraphs = []
+                    for para in doc.paragraphs:
+                        if para.text.strip():
+                            paragraphs.append(para.text.strip())
+                    full_content = '\n'.join(paragraphs)
+                except Exception as docx_error:
+                    print(f"DOCX reading error: {docx_error}")
+                    full_content = "Error reading DOCX content"
+
+            elif doc_dict['mime_type'] == 'application/msword':
+                # Handle older DOC files
+                try:
+                    import docx
+                    doc = docx.Document(file_path)
+                    paragraphs = []
+                    for para in doc.paragraphs:
+                        if para.text.strip():
+                            paragraphs.append(para.text.strip())
+                    full_content = '\n'.join(paragraphs)
+                except Exception as doc_error:
+                    print(f"DOC reading error: {doc_error}")
+                    full_content = "Error reading DOC content"
+
+            elif doc_dict['mime_type'].startswith('text/'):
+                # Handle text files
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    full_content = f.read()
+
+            else:
+                # Other file types - try to read as text
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        full_content = f.read()
+                except:
+                    full_content = f"Cannot preview content for file type: {doc_dict['mime_type']}"
+
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}")
+            full_content = "Error reading file content"
+    else:
+        full_content = "File not found on disk"
+
+    # Use full content if available, otherwise fall back to extracted_text
+    doc_dict['full_content'] = full_content if full_content else doc_dict.get('extracted_text', 'No content available')
 
     # Generate summary if not available
     if not doc_dict.get('summary') and doc_dict.get('extracted_text'):

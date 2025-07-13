@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -897,9 +896,9 @@
             // Add global error handler
             window.onerror = function(msg, url, line, col, error) {
                 console.log('Global error caught:', msg, url, line, col, error);
-                return true; // Prevent default error handling
+                return true; // Prevent default errorhandling
             };
-            
+
             const token = localStorage.getItem('authToken');
             if (token) {
                 authToken = token;
@@ -1397,10 +1396,14 @@
                     const fileSize = formatFileSize(doc.file_size);
                     const extractedText = doc.extracted_text || 'No content available';
 
-                    const modal = document.createElement('div');
+                    var modal = document.createElement('div');
                     modal.className = 'modal';
                     modal.style.display = 'block';
-                    modal.innerHTML = '<div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">' +
+
+                    // Use full_content if available, otherwise fallback to extracted_text
+                    var documentContent = doc.full_content || doc.extracted_text || 'No content available';
+
+                    modal.innerHTML = '<div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">' +
                         '<span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>' +
                         '<h2>Review Document: ' + doc.original_name + '</h2>' +
                         '<div style="margin: 20px 0;">' +
@@ -1412,19 +1415,21 @@
                         '<div class="info-item"><label>Priority:</label><span>' + priority + '</span></div>' +
                         '<div class="info-item"><label>Status:</label><span>' + status + '</span></div>' +
                         '<div class="info-item"><label>File Size:</label><span>' + fileSize + '</span></div>' +
+                        '<div class="info-item"><label>File Type:</label><span>' + doc.file_type.toUpperCase() + '</span></div>' +
                         '</div>' +
                         '<div style="margin-top: 20px;">' +
                         '<label><strong>Document Content:</strong></label>' +
-                        '<div style="background: #f7fafc; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; margin-top: 10px;">' + extractedText + '</div>' +
+                        '<div style="border: 1px solid #ddd; padding: 15px; max-height: 400px; overflow-y: auto; background: #f9f9f9; white-space: pre-wrap; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4;">' +
+                        documentContent.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                        '</div>' +
                         '</div>' +
                         '<div style="margin-top: 20px;">' +
-                        '<label><strong>Review Comments:</strong></label>' +
-                        '<textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;"></textarea>' +
-                        '</div>' +
+                        '<label for="reviewComments"><strong>Review Comments:</strong></label><br>' +
+                        '<textarea id="reviewComments" style="width: 100%; height: 80px; margin-top: 5px; padding: 8px; border: 1px solid #ddd;" placeholder="Add your review comments here..."></textarea>' +
                         '</div>' +
                         '<div style="margin-top: 20px; text-align: center;">' +
-                        '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px;">Approve</button>' +
-                        '<button class="btn btn-secondary" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();">Reject</button>' +
+                        '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
+                        '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
                         '</div>' +
                         '</div>';
                     document.body.appendChild(modal);
@@ -1764,12 +1769,12 @@
         function showTextBasedCharts(stats) {
             // Show text-based statistics when Chart.js is not available
             const chartContainers = document.querySelectorAll('.chart-container');
-            
+
             chartContainers.forEach((container, index) => {
                 const canvas = container.querySelector('canvas');
                 if (canvas) {
                     let content = '';
-                    
+
                     if (index === 0 && stats.document_types) {
                         // Document types
                         content = '<div style="padding: 20px;"><h4>Document Types:</h4>';
@@ -1799,7 +1804,7 @@
                         });
                         content += '</div>';
                     }
-                    
+
                     canvas.style.display = 'none';
                     container.innerHTML = container.querySelector('h3').outerHTML + content;
                 }
