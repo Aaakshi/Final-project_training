@@ -14,8 +14,21 @@ import shutil
 from datetime import datetime, timedelta
 import asyncio
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+try:
+    from email.mime.text import MimeText
+    from email.mime.multipart import MimeMultipart
+except ImportError:
+    # Fallback for systems where email modules might not be available
+    class MimeText:
+        def __init__(self, text, subtype='plain'):
+            self.text = text
+            self.subtype = subtype
+    
+    class MimeMultipart:
+        def __init__(self):
+            pass
+        def attach(self, part):
+            pass
 from email_config import EMAIL_CONFIG
 
 # Configuration
