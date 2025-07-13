@@ -1015,24 +1015,20 @@
             deptBadge.className = `department-badge dept-${currentUser.department}`;
 
             // Update UI based on user role
-                        if (currentUser.role === 'manager' || currentUser.role === 'admin') {
-                            document.getElementById('reviewTabBtn').style.display = 'block';
-                        }
+            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
+                document.getElementById('reviewTabBtn').style.display = 'block';
+            }
 
-                        // Email notifications tab is always visible for all users
-                        document.getElementById('notificationsTabBtn').style.display = 'block';
+            // Email notifications tab is always visible for all users
+            document.getElementById('notificationsTabBtn').style.display = 'block';
 
-                        // Show main content
-                        document.getElementById('loginSection').style.display = 'none';
-                        document.getElementById('mainContent').classList.remove('hidden');
+            // Show upload tab by default
+            showTab('upload');
 
-                        // Show upload tab by default
-                        showTab('upload');
-
-                        // Load initial data
-                        loadDocuments();
-                        loadStatistics();
-                        loadEmailNotifications();
+            // Load initial data
+            loadDocuments();
+            loadStatistics();
+            loadEmailNotifications();
         }
 
         function showTab(tabName) {
