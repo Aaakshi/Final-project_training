@@ -33,7 +33,9 @@ services:
       - ./infrastructure/storage/minio_setup.sh:/minio_setup.sh
 
   api_gateway:
-    build: ./microservices/api_gateway
+    build:
+      context: .
+      dockerfile: microservices/api_gateway/Dockerfile
     ports:
       - "8000:8000"
     depends_on:
