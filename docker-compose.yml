@@ -35,13 +35,16 @@ services:
     depends_on:
       - db
       - rabbitmq
-  classification:
-    build: ./microservices/classification
-    ports:
-      - "8001:8001"
-    depends_on:
-      - db
-      - rabbitmq
+      classification:
+      build:
+        context: .  
+        dockerfile: microservices/classification/Dockerfile
+      ports:
+        - "8001:8001"
+      depends_on:
+        - db
+        - rabbitmq
+
   routing_engine:
     build: ./microservices/routing_engine
     ports:
