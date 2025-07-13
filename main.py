@@ -28,11 +28,12 @@ try:
     import pandas as pd
 except ImportError:
     pd = None
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends, status
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends, status, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr
 import httpx
 from datetime import timedelta
@@ -55,6 +56,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "Validation error", "errors": exc.errors()}
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 # Security
 security = HTTPBearer()
@@ -632,6 +647,13 @@ app.mount("/uploads",
 @app.get("/")
 async def serve_frontend():
     """Serve the main frontend application"""
+    return FileResponse("Final-project_training/index.html", media_type="text/html")
+
+@app.exception_handler(404)
+async def custom_404_handler(request, exc):
+    """Custom 404 handler to prevent HTML responses for API calls"""
+    if request.url.path.startswith("/api/"):
+        return {"detail": "Not found"}
     return FileResponse("Final-project_training/index.html", media_type="text/html")
 
 @app.get("/index.html")

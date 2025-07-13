@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDCR - Intelligent Document Classification & Routing</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js" onerror="console.log('Chart.js failed to load')"></script>
     <style>
         * {
             margin: 0;
@@ -1088,6 +1088,12 @@
     <div id="toast" class="toast"></div>
 
     <script>
+        // Add global error handler
+        window.addEventListener('error', function(e) {
+            console.error('Script error:', e.error);
+            return true;
+        });
+
         let currentUser = null;
         let authToken = null;
         let currentPage = 1;
@@ -1117,9 +1123,11 @@
                         currentUser = await response.json();
                         showMainContent();
                     } else {
+                        console.warn('Invalid response format from auth check');
                         throw new Error('Invalid response format');
                     }
                 } else {
+                    console.warn('Auth check failed with status:', response.status);
                     authToken = null;
                     localStorage.removeItem('authToken');
                 }
@@ -1164,20 +1172,26 @@
                         showMainContent();
                         showToast('Login successful!', 'success');
                     } else {
+                        console.error('Invalid response format for login');
                         throw new Error('Invalid response format');
                     }
                 } else {
+                    console.error('Login failed with status:', response.status);
                     const contentType = response.headers.get('content-type');
                     if (contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        showToast(data.detail || 'Login failed', 'error');
+                        try {
+                            const data = await response.json();
+                            showToast(data.detail || 'Login failed', 'error');
+                        } catch (e) {
+                            showToast('Login failed - server error', 'error');
+                        }
                     } else {
                         showToast('Login failed - server error', 'error');
                     }
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showToast('Login failed - server error', 'error');
+                showToast('Login failed - network error', 'error');
             }
         }
 
