@@ -335,7 +335,7 @@ def init_database():
         ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Meeting_Minutes.docx', 
          '<html><body><h2>Document Review Complete</h2><p>Your document Meeting_Minutes.docx has been approved.</p><p><strong>Reviewed by:</strong> HR Manager</p></body></html>',
          None, 'Meeting_Minutes.docx'),
-        
+
         # Finance Department emails
         ('hr.manager@company.com', 'finance@company.com', 'New Financial Document for Review - Invoice_2024_001.pdf', 
          '<html><body><h2>New Document Uploaded for Review</h2><p>Invoice_2024_001.pdf has been uploaded and classified to finance department.</p><p><strong>Priority:</strong> High</p><p><strong>Type:</strong> Financial Document</p></body></html>',
@@ -346,7 +346,7 @@ def init_database():
         ('general.employee@company.com', 'finance@company.com', 'Expense Report Submitted - Expense_Report.pdf', 
          '<html><body><h2>New Expense Report</h2><p>Expense_Report.pdf submitted for processing.</p><p><strong>Priority:</strong> Low</p></body></html>',
          None, 'Expense_Report.pdf'),
-        
+
         # Legal Department emails
         ('legal.manager@company.com', 'legal@company.com', 'High Priority Legal Document - Contract_ABC_Corp.pdf', 
          '<html><body><h2>High Priority Document Alert</h2><p>Contract_ABC_Corp.pdf requires immediate legal review.</p><p><strong>Priority:</strong> High</p></body></html>',
@@ -354,22 +354,22 @@ def init_database():
         ('legal.manager@company.com', 'legal@company.com', 'Legal Compliance Document - Legal_Compliance.pdf', 
          '<html><body><h2>Compliance Review</h2><p>Legal_Compliance.pdf uploaded for compliance review.</p><p><strong>Priority:</strong> High</p></body></html>',
          None, 'Legal_Compliance.pdf'),
-        
+
         # IT Department emails
         ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required - IT_Security_Policy.docx', 
          '<html><body><h2>Security Policy Review</h2><p>IT_Security_Policy.docx uploaded for review and approval.</p><p><strong>Priority:</strong> High</p></body></html>',
          None, 'IT_Security_Policy.docx'),
-        
+
         # Sales Department emails
         ('sales.manager@company.com', 'sales@company.com', 'Q4 Sales Report Available - Sales_Report_Q4.xlsx', 
          '<html><body><h2>Sales Report Ready</h2><p>Sales_Report_Q4.xlsx has been uploaded for review.</p><p><strong>Priority:</strong> Medium</p></body></html>',
          None, 'Sales_Report_Q4.xlsx'),
-        
+
         # Marketing Department emails
         ('finance.manager@company.com', 'marketing@company.com', 'Marketing Campaign Document - Marketing_Campaign.pptx', 
          '<html><body><h2>New Marketing Document</h2><p>Marketing_Campaign.pptx uploaded for marketing team review.</p><p><strong>Priority:</strong> Medium</p></body></html>',
          None, 'Marketing_Campaign.pptx'),
-        
+
         # System notifications
         ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
@@ -397,10 +397,6 @@ def init_database():
     conn.commit()
     conn.close()
     print("✓ Database initialized")
-
-
-# Initialize database on startup
-init_database()
 
 
 # Pydantic models
@@ -528,7 +524,7 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
     """Send email using Outlook SMTP with fallback - DEMO VERSION"""
     # Use provided sender email or default to system email
     from_email = sender_email or EMAIL_USER
-    
+
     # For demo purposes, we'll log the email instead of actually sending it
     print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
     print(f"From: {from_email}")
@@ -733,9 +729,6 @@ async def bulk_upload_documents(
     allowed_types = {
         'application/pdf', 'text/plain',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'image/jpeg', 'image/png', 'image/tiff'
     }
 
     # Validate files
@@ -990,7 +983,7 @@ def classify_document_locally(content: str, filename: str):
     content_to_analyze = content[:5000] if len(content) > 5000 else content
     content_lower = content_to_analyze.lower()
     filename_lower = filename.lower()
-    
+
     # Enhanced file type detection
     file_extension = filename_lower.split('.')[-1] if '.' in filename_lower else ''
 
@@ -1183,7 +1176,7 @@ async def notify_department(doc_id: str, classification_result: dict,
     cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
                    (department, ))
     dept_result = cursor.fetchone()
-    
+
     cursor.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
     doc_result = cursor.fetchone()
     file_name = doc_result[0] if doc_result else "Unknown"
@@ -1368,12 +1361,12 @@ async def get_documents(page: int = 1,
     cursor.execute(count_query, params)
     total_count = cursor.fetchone()[0]
 
-    # Get paginated results
-    offset = (page - 1) * page_size
+    # Update query to include extracted_text
     query = f'''
         SELECT doc_id, original_name, file_size, file_type, uploaded_at, 
                processing_status, document_type, department, priority, 
-               classification_confidence, page_count, tags, review_status, reviewed_by
+               classification_confidence, page_count, tags, review_status, reviewed_by,
+               extracted_text
         FROM documents {where_sql}
         ORDER BY uploaded_at DESC
         LIMIT ? OFFSET ?
@@ -1387,20 +1380,23 @@ async def get_documents(page: int = 1,
     documents = []
     for row in rows:
         tags = json.loads(row[11]) if row[11] else []
-        doc = DocumentInfo(doc_id=row[0],
-                           original_name=row[1],
-                           file_size=row[2],
-                           file_type=row[3],
-                           uploaded_at=row[4],
-                           processing_status=row[5],
-                           document_type=row[6] or "",
-                           department=row[7] or "",
-                           priority=row[8] or "",
-                           classification_confidence=row[9] or 0.0,
-                           page_count=row[10] or 0,
-                           tags=tags,
-                           review_status=row[12] or "",
-                           reviewed_by=row[13] or "")
+        doc = {
+            "doc_id": row[0],
+            "original_name": row[1],
+            "file_size": row[2],
+            "file_type": row[3],
+            "uploaded_at": row[4],
+            "processing_status": row[5],
+            "document_type": row[6] or "",
+            "department": row[7] or "",
+            "priority": row[8] or "",
+            "classification_confidence": row[9] or 0.0,
+            "page_count": row[10] or 0,
+            "tags": tags,
+            "review_status": row[12] or "",
+            "reviewed_by": row[13] or "",
+            "extracted_text": row[14] or ""
+        }
         documents.append(doc)
 
     return DocumentListResponse(documents=documents,
@@ -1454,13 +1450,14 @@ async def get_review_documents(page: int = 1,
         SELECT d.doc_id, d.original_name, d.file_size, d.file_type, d.uploaded_at, 
                d.processing_status, d.document_type, d.department, d.priority, 
                d.classification_confidence, d.page_count, d.tags, d.review_status, 
-               d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email
-        FROM documents d
-        LEFT JOIN users u ON d.user_id = u.user_id
-        {where_sql}
-        ORDER BY d.uploaded_at DESC
-        LIMIT ? OFFSET ?
-    '''
+                   d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email,
+                   d.extracted_text
+            FROM documents d
+            LEFT JOIN users u ON d.user_id = u.user_id
+            {where_sql}
+            ORDER BY d.uploaded_at DESC
+            LIMIT ? OFFSET ?
+        '''
 
     offset = (page - 1) * page_size
     params.extend([page_size, offset])
@@ -1499,7 +1496,8 @@ async def get_review_documents(page: int = 1,
             "review_status": row[12] or "pending",
             "reviewed_by": row[13] or "",
             "user_id": row[14],
-            "uploaded_by": row[15] or "Unknown"
+            "uploaded_by": row[15] or "Unknown",
+            "extracted_text": row[16] or ""
         }
         documents.append(doc)
 
@@ -1583,7 +1581,7 @@ async def get_email_notifications(page: int = 1,
 
     # Get emails based on user role with strict department filtering
     offset = (page - 1) * page_size
-    
+
     if current_user['role'] == 'admin':
         # Admins see all email notifications
         query = '''
@@ -1599,7 +1597,7 @@ async def get_email_notifications(page: int = 1,
             LIMIT ? OFFSET ?
         '''
         cursor.execute(query, [page_size, offset])
-        
+
     elif current_user['role'] == 'employee':
         # Employees see only emails related to them or their uploaded documents
         query = '''
@@ -1616,7 +1614,7 @@ async def get_email_notifications(page: int = 1,
             LIMIT ? OFFSET ?
         '''
         cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
-        
+
     else:  # managers
         # Managers see emails related to their department only
         query = '''
@@ -1635,7 +1633,7 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
 
     emails = cursor.fetchall()
-    
+
     # Get total count with same filtering logic
     if current_user['role'] == 'admin':
         cursor.execute('SELECT COUNT(*) FROM email_notifications')
@@ -1654,7 +1652,7 @@ async def get_email_notifications(page: int = 1,
             WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
         ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
         total_count_result = cursor.fetchone()
-    
+
     total_count = total_count_result[0] if total_count_result else 0
 
     conn.close()
@@ -1663,7 +1661,7 @@ async def get_email_notifications(page: int = 1,
     for email in emails:
         # Determine if email was sent or received by current user or department
         email_type = "sent" if email[1] == current_user['email'] else "received"
-        
+
         email_list.append({
             "email_id": email[0],
             "sent_by": email[1],

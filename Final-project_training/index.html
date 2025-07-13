@@ -651,10 +651,10 @@
                 <div class="upload-area" id="uploadArea">
                     <div>
                         <h3>📁 Drop files here or click to select</h3>
-                        <p>Supported formats: PDF, DOC, DOCX, TXT, XLS, XLSX, JPG, PNG, TIFF</p>
+                        <p>Supported formats: PDF, DOC, DOCX, TXT</p>
                         <p>Maximum 50 files, 10MB per file</p>
                     </div>
-                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.jpg,.jpeg,.png,.tiff" style="display: none;">
+                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
                 </div>
 
                 <div id="fileList" style="margin-top: 20px;"></div>
@@ -706,6 +706,7 @@
                             <th>Document Name</th>
                             <th>Type</th>
                             <th>Department</th>
+                            <th>Summary</th>
                             <th>Status</th>
                             <th>Review Status</th>
                             <th>Priority</th>
@@ -765,6 +766,7 @@
                             <th>Document Name</th>
                             <th>Uploaded By</th>
                             <th>Type</th>
+                            <th>Summary</th>
                             <th>Priority</th>
                             <th>Review Status</th>
                             <th>Actions</th>
@@ -1176,16 +1178,18 @@
 
             documents.forEach(doc => {
                 const row = document.createElement('tr');
+                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 100) + '...' : 'Processing...';
                 row.innerHTML = `
                     <td>${doc.original_name}</td>
                     <td>${doc.document_type || 'Unknown'}</td>
                     <td><span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></td>
+                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
                     <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
                     <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
                     <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
                     <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
                     <td>
-                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">View</button>
+                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">Details</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -1233,10 +1237,12 @@
 
             documents.forEach(doc => {
                 const row = document.createElement('tr');
+                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 80) + '...' : 'Processing...';
                 row.innerHTML = `
                     <td>${doc.original_name}</td>
                     <td>${doc.uploaded_by || 'Unknown'}</td>
                     <td>${doc.document_type || 'Unknown'}</td>
+                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
                     <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
                     <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
                     <td>
