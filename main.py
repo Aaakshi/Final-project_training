@@ -1371,7 +1371,12 @@ def update_document_classification(doc_id: str, classification_result: dict):
 async def review_document(doc_id: str,
                           review: DocumentReview,
                           current_user: dict = Depends(get_current_user)):
-    """Review a document (approve/reject)"""
+    """Review a document (approve/reject) - Only for HR, Legal, Finance managers and admins"""
+    
+    # Check if user has permission to review documents
+    if not (current_user['role'] == 'admin' or 
+            (current_user['role'] == 'manager' and current_user['department'] in ['hr', 'legal', 'finance'])):
+        raise HTTPException(status_code=403, detail="Access denied. Only HR, Legal, and Finance managers can review documents.")
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -1536,14 +1541,14 @@ async def get_review_documents(page: int = 1,
     if current_user['role'] == 'admin':
         # Admin can see all documents
         pass
-    elif current_user['role'] in ('manager', 'hr', 'legal', 'finance'):
-        # Managers can see documents routed to their department (not just uploaded by them)
+    elif current_user['role'] == 'manager' and current_user['department'] in ['hr', 'legal', 'finance']:
+        # Only HR, Legal, Finance managers can review documents routed to their department
         where_clauses.append("d.department = ?")
         params.append(current_user['department'])
     else:
-        # Regular employees can only see their own documents
-        where_clauses.append("d.user_id = ?")
-        params.append(current_user['user_id'])
+        # Regular employees and other department managers cannot access review documents
+        # Return empty result set
+        where_clauses.append("1 = 0")  # This will return no results
 
     if review_status:
         where_clauses.append("d.review_status = ?")

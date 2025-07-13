@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -920,7 +919,7 @@
                     <select id="typeFilter" onchange="loadDocuments()">
                         <option value="">All Types</option>
                         <option value="invoice">Invoice</option>
-                        <option value="contract">Contract</option>
+                        <option value="contract</option>
                         <option value="hr_document">HR Document</option>
                         <option value="it_document">IT Document</option>
                         <option value="general">General</option>
@@ -929,7 +928,7 @@
                         <option value="">All Departments</option>
                         <option value="hr">Human Resources</option>
                         <option value="finance">Finance & Accounting</option>
-                        <option value="legal">Legal</option>
+                        <option value="legal">Legal</legal>
                         <option value="sales">Sales</option>
                         <option value="marketing">Marketing</option>
                         <option value="it">IT</option>
@@ -1225,11 +1224,25 @@
             deptBadge.textContent = currentUser.department.toUpperCase();
             deptBadge.className = 'department-badge dept-' + currentUser.department;
 
-            // Update UI based on user role
-            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
-                document.getElementById('reviewTabBtn').style.display = 'block';
-                document.getElementById('notificationsTabBtn').style.display = 'block';
+             // Update UI based on user role
+             function updateUIForRole(user) {
+            const reviewTab = document.getElementById('reviewTabBtn');
+            const notificationsTab = document.getElementById('notificationsTabBtn');
+
+            // Show review tab only for HR, Legal, Finance managers and admins
+            const canReviewDepartments = ['hr', 'legal', 'finance'];
+            if (user.role === 'admin' || 
+                (user.role === 'manager' && canReviewDepartments.includes(user.department))) {
+                reviewTab.style.display = 'block';
+            } else {
+                reviewTab.style.display = 'none';
             }
+
+            // Show notifications tab for all users
+            notificationsTab.style.display = 'block';
+        }
+
+            updateUIForRole(currentUser);
 
             loadDocuments();
             loadStats();
@@ -1785,7 +1798,7 @@
                 '</div>' +
                 '<div class="stat-card">' +
                 '<h3>' + stats.processing_rate + '%</h3>' +
-                '<p>Processing Rate</p>' +
+                <p>Processing Rate</p>' +
                 '</div>';
         }
 
