@@ -1997,4 +1997,8 @@ if __name__ == "__main__":
     print("🚀 Starting IDCR Demo Server...")
     print("📂 Frontend available at: http://0.0.0.0:5000")
     print("📊 API docs available at: http://0.0.0.0:5000/docs")
+    
+    # Initialize database before starting server
+    init_database()
+    
     uvicorn.run(app, host="0.0.0.0", port=5000)
