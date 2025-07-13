@@ -1480,8 +1480,8 @@
                             '<textarea id="reviewComments" style="width: 100%; height: 80px; margin-top: 5px; padding: 8px; border: 1px solid #ddd;" placeholder="Add your review comments here..."></textarea>' +
                             '</div>' +
                             '<div style="margin-top: 20px; text-align: center;">' +
-                            '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
-                            '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
+                            '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approve\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
+                            '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'reject\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
                             '</div>' +
                             '</div>';
                         document.body.appendChild(modal);
