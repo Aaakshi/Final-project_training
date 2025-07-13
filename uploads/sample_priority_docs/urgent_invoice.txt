@@ -1,0 +1,15 @@
+
+URGENT INVOICE - ACTION REQUIRED
+
+Invoice #12345
+Due Date: By EOD today
+Amount: $50,000
+
+This payment is CRITICAL and requires immediate attention. 
+Please process ASAP as this is escalated from our finance team.
+
+Customer complaint received regarding delayed payment.
+System disruption may occur if not resolved by today.
+
+Action required: Process payment immediately
+Respond by: End of business today

@@ -149,6 +149,44 @@ def init_database():
         user_ids[email] = user_id
 
     # Create sample documents for better statistics
+
+    # Create sample priority documents first
+    sample_priority_docs = [
+        ('urgent_invoice.txt', 'hr.manager@company.com', 'finance', 'financial_document', 'high', 'classified', "urgent invoice payment"),
+        ('reminder_contract.txt', 'hr.manager@company.com', 'legal', 'legal_document', 'medium', 'classified', "reminder contract terms"),
+        ('fyi_report.txt', 'general.employee@company.com', 'general', 'general_document', 'low', 'classified', "fyi report summary"),
+        ('hr_urgent_policy.txt', 'hr.manager@company.com', 'hr', 'hr_document', 'high', 'classified', "hr urgent policy update")
+    ]
+
+    for original_name, user_email, dept, doc_type, priority, status, content in sample_priority_docs:
+        doc_id = str(uuid.uuid4())
+        user_id = user_ids.get(user_email, user_ids['admin@company.com'])
+        file_path = f"uploads/sample/{original_name}"
+        file_size = 150000 + len(original_name) * 1000  # Simulate file size
+        file_type = original_name.split('.')[-1].lower()
+        mime_type = {
+            'pdf': 'application/pdf',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'txt': 'text/plain'
+        }.get(file_type, 'application/octet-stream')
+
+        # Create sample document records
+        cursor.execute('''
+            INSERT OR IGNORE INTO documents (
+                doc_id, user_id, original_name, file_path, file_size, file_type, 
+                mime_type, uploaded_at, processing_status, document_type, department, 
+                priority, classification_confidence, page_count, language, tags, 
+                review_status, extracted_text
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            doc_id, user_id, original_name, file_path, file_size, file_type,
+            mime_type, datetime.datetime.utcnow().isoformat(), status, doc_type, dept,
+            priority, 0.85, 1, 'en', '["' + doc_type + '", "' + dept + '"]',
+            'approved' if status == 'approved' else 'pending', content
+        ))
+
     sample_documents = [
         ('Invoice_2024_001.pdf', 'hr.manager@company.com', 'finance', 'financial_document', 'high', 'classified'),
         ('Employee_Handbook.pdf', 'hr.manager@company.com', 'hr', 'hr_document', 'medium', 'classified'),
@@ -174,7 +212,7 @@ def init_database():
             'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         }.get(file_type, 'application/octet-stream')
-        
+
         # Create sample document records
         cursor.execute('''
             INSERT OR IGNORE INTO documents (
@@ -422,20 +460,20 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
     print(f"Subject: {subject}")
     print(f"Body Preview: {body[:200]}...")
     print(f"✅ Email logged successfully (not actually sent in demo)\n")
-    
+
     # Track email in database
     email_id = str(uuid.uuid4())
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
         INSERT INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (email_id, EMAIL_USER, to_email, subject, body, doc_id, file_name, 'sent', datetime.datetime.utcnow().isoformat()))
-    
+
     conn.commit()
     conn.close()
-    
+
     # Try to actually send email, but don't fail if it doesn't work
     try:
         # Create message with fallback approach
@@ -731,7 +769,7 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
             try:
                 file_path = doc_row[3]
                 content = ""
-                
+
                 if doc_row[6] == 'application/pdf':
                     # Handle PDF files
                     try:
@@ -745,7 +783,7 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                     except Exception as pdf_error:
                         print(f"PDF reading error: {pdf_error}")
                         content = f"PDF document with {len(open(file_path, 'rb').read())} bytes"
-                        
+
                 elif doc_row[6] == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                     # Handle DOCX files
                     try:
@@ -758,16 +796,16 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                     except Exception as docx_error:
                         print(f"DOCX reading error: {docx_error}")
                         content = f"DOCX document: {doc_row[2]}"
-                        
+
                 elif doc_row[6].startswith('text/'):
                     # Handle text files
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                         content = f.read()[:10000]  # Limit to 10KB
-                        
+
                 elif doc_row[6].startswith('image/'):
                     # Handle image files
                     content = f"Image file: {doc_row[2]} - Image content requires OCR processing"
-                    
+
                 else:
                     # Other file types
                     try:
@@ -775,14 +813,14 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                             content = f.read()[:5000]  # Limit to 5KB
                     except:
                         content = f"Binary file: {doc_row[2]}"
-                        
+
             except Exception as e:
                 print(f"File reading error: {e}")
                 content = f"Error reading file: {doc_row[2]}"
 
             # Simple local classification (fallback if microservice not available)
             classification_result = classify_document_locally(content, doc_row[2])
-            
+
             # Try to use microservice if available, otherwise use local classification
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -792,7 +830,7 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
                             CLASSIFICATION_SERVICE_URL + "/classify", 
                             files=files_payload
                         )
-                        
+
                         if response.status_code == 200:
                             classification_result = response.json()
             except Exception as e:
@@ -831,7 +869,24 @@ def classify_document_locally(content: str, filename: str):
     content_to_analyze = content[:5000] if len(content) > 5000 else content
     content_lower = content_to_analyze.lower()
     filename_lower = filename.lower()
-    
+
+    # Define keywords for priority
+    high_priority_keywords = ["EOD", "end of day", "today", "asap", "urgent", "immediate", "24 hours", "deadline today", "due today", "respond by", "reply immediately",
+                              "action required", "requires immediate attention", "please review urgently", "critical issue", "resolve now",
+                              "escalated", "service disruption", "breach", "incident", "system down", "customer complaint", "payment failed",
+                              "today's meeting", "final review", "must attend", "confirmation needed"]
+    medium_priority_keywords = ["reminder", "follow up", "this week", "pending", "awaiting response", "check status", "update needed",
+                                "tomorrow", "due in 2 days", "schedule by", "before Friday", "complete by", "ETA",
+                                "scheduled for", "calendar invite", "tentative", "planned discussion", "agenda",
+                                "work in progress", "assigned", "need update", "submit by", "to be reviewed"]
+
+    # Determine keyword-based priority
+    keyword_priority = "low"  # Default
+    if any(keyword in content_lower for keyword in high_priority_keywords):
+        keyword_priority = "high"
+    elif any(keyword in content_lower for keyword in medium_priority_keywords):
+        keyword_priority = "medium"
+
     # Enhanced classification for all departments with improved keywords
     classification_rules = [
         # Finance & Accounting - High Priority
@@ -841,7 +896,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "financial_document",
             "department": "finance",
             "confidence": 0.95,
-            "priority": "high",
+            "base_priority": "high",
             "tags": ["finance", "accounting", "financial"]
         },
         # Legal - High Priority
@@ -851,7 +906,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "legal_document",
             "department": "legal",
             "confidence": 0.92,
-            "priority": "high",
+            "base_priority": "high",
             "tags": ["legal", "contract", "compliance"]
         },
         # Human Resources - Medium Priority
@@ -861,7 +916,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "hr_document",
             "department": "hr",
             "confidence": 0.88,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["hr", "employee", "personnel"]
         },
         # Sales - High Priority
@@ -871,7 +926,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "sales_document",
             "department": "sales",
             "confidence": 0.90,
-            "priority": "high",
+            "base_priority": "high",
             "tags": ["sales", "customer", "revenue"]
         },
         # Marketing - Medium Priority  
@@ -881,7 +936,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "marketing_document",
             "department": "marketing",
             "confidence": 0.85,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["marketing", "campaign", "brand"]
         },
         # IT - High Priority
@@ -891,7 +946,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "it_document",
             "department": "it",
             "confidence": 0.88,
-            "priority": "high",
+            "base_priority": "high",
             "tags": ["it", "technology", "technical"]
         },
         # Operations
@@ -901,17 +956,17 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "operations_document",
             "department": "operations",
             "confidence": 0.7,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["operations", "process"]
         },
         # Customer Support
         {
             "keywords": ["support", "ticket", "issue", "complaint", "feedback", "resolution"],
-            "filename_keywords": ["support", "ticket", "issue", "complaint"],
+            "filename_keywords": ["support", "ticket", "issue"],
             "doc_type": "support_document",
             "department": "support",
             "confidence": 0.7,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["support", "customer"]
         },
         # Procurement
@@ -921,7 +976,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "procurement_document",
             "department": "procurement",
             "confidence": 0.75,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["procurement", "purchase"]
         },
         # Product / R&D
@@ -931,7 +986,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "product_document",
             "department": "product",
             "confidence": 0.75,
-            "priority": "medium",
+            "base_priority": "medium",
             "tags": ["product", "research"]
         },
         # Administration
@@ -941,7 +996,7 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "admin_document",
             "department": "administration",
             "confidence": 0.6,
-            "priority": "low",
+            "base_priority": "low",
             "tags": ["administration", "office"]
         },
         # Executive / Management
@@ -951,28 +1006,34 @@ def classify_document_locally(content: str, filename: str):
             "doc_type": "executive_document",
             "department": "executive",
             "confidence": 0.8,
-            "priority": "high",
+            "base_priority": "high",
             "tags": ["executive", "management"]
         }
     ]
-    
+
     # Check each classification rule
     for rule in classification_rules:
         content_match = any(word in content_lower for word in rule["keywords"])
         filename_match = any(word in filename_lower for word in rule["filename_keywords"])
-        
+
         if content_match or filename_match:
+            # Priority determination: keyword-based priority takes precedence
+            final_priority = keyword_priority
+            # If keyword priority is medium and base priority is high/low, adjust accordingly
+            if keyword_priority == "medium":
+                final_priority = rule["base_priority"]
+
             return {
                 "doc_type": rule["doc_type"],
                 "department": rule["department"],
                 "confidence": rule["confidence"],
-                "priority": rule["priority"],
+                "priority": final_priority,
                 "extracted_text": content[:1000],  # Increased content length
                 "page_count": 1,
                 "language": "en",
                 "tags": rule["tags"]
             }
-    
+
     # Default classification
     return {
         "doc_type": "general_document",
@@ -1026,7 +1087,7 @@ async def notify_department(doc_id: str, classification_result: dict,
         doc_result = cursor2.fetchone()
         file_name = doc_result[0] if doc_result else "Unknown"
         conn2.close()
-        
+
         send_email(dept_email, subject, body, doc_id, file_name)
 
 
@@ -1270,13 +1331,13 @@ async def get_review_documents(page: int = 1,
         ORDER BY d.uploaded_at DESC
         LIMIT ? OFFSET ?
     '''
-    
+
     offset = (page - 1) * page_size
     params.extend([page_size, offset])
 
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    
+
     # Get total count
     count_query = f'''
         SELECT COUNT(*) 
@@ -1286,7 +1347,7 @@ async def get_review_documents(page: int = 1,
     '''
     cursor.execute(count_query, params[:-2])  # Remove limit and offset params
     total_count = cursor.fetchone()[0]
-    
+
     conn.close()
 
     documents = []
@@ -1384,7 +1445,7 @@ async def get_email_notifications(page: int = 1,
     """Get email notifications for the current user"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
     # Get emails sent to or from the user
     offset = (page - 1) * page_size
     query = '''
@@ -1394,19 +1455,19 @@ async def get_email_notifications(page: int = 1,
         ORDER BY sent_at DESC
         LIMIT ? OFFSET ?
     '''
-    
+
     cursor.execute(query, [current_user['email'], current_user['email'], page_size, offset])
     emails = cursor.fetchall()
-    
+
     # Get total count
     cursor.execute('''
         SELECT COUNT(*) FROM email_notifications 
         WHERE sent_by = ? OR received_by = ?
     ''', [current_user['email'], current_user['email']])
     total_count = cursor.fetchone()[0]
-    
+
     conn.close()
-    
+
     email_list = []
     for email in emails:
         email_list.append({
@@ -1420,7 +1481,7 @@ async def get_email_notifications(page: int = 1,
             "sent_at": email[7],
             "read_at": email[8]
         })
-    
+
     return {
         "emails": email_list,
         "total_count": total_count,
@@ -1563,7 +1624,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "upload_trends": [{"date": row[0], "count": row[1]} for row in daily_uploads],
             "processing_rate": round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 2)
         }
-        
+
     except Exception as e:
         print(f"Error in statistics endpoint: {e}")
         # Return default empty statistics in case of error
@@ -1578,7 +1639,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "upload_trends": [],
             "processing_rate": 0
         }
-        
+
     finally:
         # Ensure connection is always closed
         conn.close()
