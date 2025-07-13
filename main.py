@@ -43,6 +43,7 @@ from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer
 import re
 import dateparser
+import random
 
 app = FastAPI(title="IDCR Enhanced Demo Server")
 

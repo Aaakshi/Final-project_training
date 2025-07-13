@@ -1847,3 +1847,156 @@
                     <h3>${stats.total_documents}</h3>
                     <p>Total Documents</p>
                 </div>
+                <div class="stat-card">
+                    <h3>${stats.processed_documents}</h3>
+                    <p>Processed Documents</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.pending_documents}</h3>
+                    <p>Pending Documents</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.processing_rate}%</h3>
+                    <p>Processing Rate</p>
+                </div>
+            `;
+        }
+
+        function createCharts(stats) {
+            // Document Types Chart
+            const docTypesCtx = document.getElementById('docTypesChart');
+            if (docTypesCtx) {
+                new Chart(docTypesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(stats.document_types),
+                        datasets: [{
+                            data: Object.values(stats.document_types),
+                            backgroundColor: [
+                                '#3182ce', '#38a169', '#e53e3e', '#d69e2e', '#9f7aea',
+                                '#319795', '#dd6b20', '#e53e3e', '#3182ce'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Departments Chart
+            const deptsCtx = document.getElementById('departmentsChart');
+            if (deptsCtx) {
+                new Chart(deptsCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(stats.departments),
+                        datasets: [{
+                            label: 'Documents',
+                            data: Object.values(stats.departments),
+                            backgroundColor: '#4299e1'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Priority Chart
+            const priorityCtx = document.getElementById('priorityChart');
+            if (priorityCtx) {
+                new Chart(priorityCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(stats.priorities),
+                        datasets: [{
+                            data: Object.values(stats.priorities),
+                            backgroundColor: ['#e53e3e', '#d69e2e', '#3182ce']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Trends Chart
+            const trendsCtx = document.getElementById('trendsChart');
+            if (trendsCtx) {
+                new Chart(trendsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: stats.upload_trends.map(t => t.date),
+                        datasets: [{
+                            label: 'Documents Uploaded',
+                            data: stats.upload_trends.map(t => t.count),
+                            borderColor: '#4299e1',
+                            backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('documentModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
