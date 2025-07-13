@@ -339,12 +339,29 @@ def init_database():
          '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
          'doc4', 'IT_Security_Policy.docx'),
         
+        # Legal department specific emails
+        ('noreply@idcr-system.com', 'legal@company.com', 'New Legal Document Classified', 
+         '<html><body><h2>Document Classification Alert</h2><p>A new contract has been automatically classified to the legal department and requires review.</p></body></html>',
+         'doc9', 'Client_Contract_2024.pdf'),
+        ('sales.manager@company.com', 'legal@company.com', 'URGENT: Contract Review Needed by EOD', 
+         '<html><body><h2>URGENT: Contract Review</h2><p>Client contract requires immediate legal review before meeting tomorrow.</p></body></html>',
+         'doc10', 'Urgent_Contract_Review.pdf'),
+        ('legal.manager@company.com', 'hr@company.com', 'Employment Contract Template Updated', 
+         '<html><body><h2>Contract Template Update</h2><p>The employment contract template has been updated with new legal requirements.</p></body></html>',
+         'doc11', 'Employment_Contract_Template.docx'),
+        ('legal@company.com', 'legal.manager@company.com', 'Compliance Document Processing Complete', 
+         '<html><body><h2>Compliance Review</h2><p>All compliance documents for Q4 have been processed and approved.</p></body></html>',
+         'doc12', 'Q4_Compliance_Report.pdf'),
+        
         # System notifications
         ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
          None, None),
         ('noreply@idcr-system.com', 'hr.manager@company.com', 'Weekly Document Processing Report', 
          '<html><body><h2>Weekly Report</h2><p>This week: 15 documents processed, 12 approved, 3 pending review.</p></body></html>',
+         None, None),
+        ('noreply@idcr-system.com', 'legal.manager@company.com', 'Weekly Legal Department Report', 
+         '<html><body><h2>Legal Department Weekly Report</h2><p>This week: 8 legal documents processed, 6 contracts approved, 2 pending review.</p></body></html>',
          None, None),
         
         # Inter-department communications
@@ -357,6 +374,9 @@ def init_database():
         ('finance.employee@company.com', 'hr.employee@company.com', 'Payroll Processing Complete', 
          '<html><body><h2>Payroll Update</h2><p>Monthly payroll has been processed and is ready for review.</p></body></html>',
          None, None),
+        ('hr.manager@company.com', 'legal.manager@company.com', 'New Employee Contract Review', 
+         '<html><body><h2>Employee Contract Review</h2><p>New employee contracts require legal department approval before finalizing.</p></body></html>',
+         'doc13', 'New_Employee_Contracts.pdf'),
         
         # Urgent notifications
         ('admin@company.com', 'it.manager@company.com', 'URGENT: Security Breach Alert', 
@@ -365,6 +385,9 @@ def init_database():
         ('it.manager@company.com', 'admin@company.com', 'System Maintenance Scheduled', 
          '<html><body><h2>Scheduled Maintenance</h2><p>System maintenance scheduled for this weekend. All users will be notified.</p></body></html>',
          None, None),
+        ('admin@company.com', 'legal.manager@company.com', 'System Update: Legal Document Processing', 
+         '<html><body><h2>System Update</h2><p>Legal document processing module has been updated with enhanced compliance checking.</p></body></html>',
+         None, None),
         
         # Document review notifications
         ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Employee Policy Update', 
@@ -372,7 +395,10 @@ def init_database():
          'doc7', 'Policy_Update.docx'),
         ('legal.manager@company.com', 'sales.manager@company.com', 'Contract Review Complete - Terms Accepted', 
          '<html><body><h2>Contract Review Complete</h2><p>Legal review of the ABC client contract is complete. Terms are acceptable.</p></body></html>',
-         'doc8', 'ABC_Contract_Final.pdf')
+         'doc8', 'ABC_Contract_Final.pdf'),
+        ('legal.manager@company.com', 'finance.manager@company.com', 'Legal Review: Finance Agreement Approved', 
+         '<html><body><h2>Legal Review Complete</h2><p>The finance agreement has passed legal review and is approved for execution.</p></body></html>',
+         'doc14', 'Finance_Agreement_2024.pdf')
     ]
 
     for sent_by, received_by, subject, body, doc_id, file_name in sample_emails:
@@ -1582,7 +1608,7 @@ async def get_email_notifications(page: int = 1,
     offset = (page - 1) * page_size
 
     if current_user['role'] == 'employee':
-        # Employees see emails sent to them, by them, or related to their documents
+        # Employees see emails sent to them, by them, or related to their documents, or to their dept
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1608,7 +1634,7 @@ async def get_email_notifications(page: int = 1,
         total_count = cursor.fetchone()[0]
 
     elif current_user['role'] == 'manager':
-        # Managers see all emails for their department plus system emails
+        # Managers see emails for their department, personal emails, and system emails
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1618,7 +1644,8 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users sender_u ON e.sent_by = sender_u.email
             LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR e.sent_by LIKE '%@company.com'
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? 
+               OR e.sent_by LIKE '%noreply%' OR e.sent_by LIKE '%@company.com'
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
@@ -1628,7 +1655,8 @@ async def get_email_notifications(page: int = 1,
         count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR e.sent_by LIKE '%@company.com'
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? 
+               OR e.sent_by LIKE '%noreply%' OR e.sent_by LIKE '%@company.com'
         '''
         cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
         total_count = cursor.fetchone()[0]
@@ -1752,13 +1780,10 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             base_where = "WHERE user_id = ?"
             params.append(current_user['user_id'])
         elif current_user['role'] == 'manager':
-            # Managers see only documents from their department
-            base_where = "WHERE department = ?"
-            params.append(current_user['department'])
-        elif current_user['role'] == 'admin':
-            # Only admins see all documents
-            base_where = ""
-            params = []
+            # Managers see documents from their department OR documents they uploaded
+            base_where = "WHERE (department = ? OR user_id = ?)"
+            params.extend([current_user['department'], current_user['user_id']])
+        # Admins see all documents (no WHERE clause)
 
         # Overall stats
         if base_where:
@@ -1805,8 +1830,16 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             ''')
         doc_types = dict(cursor.fetchall())
 
-        # Department breakdown
-        if base_where:
+        # Department breakdown - for managers, focus on their department
+        if current_user['role'] == 'manager':
+            cursor.execute(
+                '''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                WHERE department = ? AND department IS NOT NULL 
+                GROUP BY department
+            ''', [current_user['department']])
+        elif current_user['role'] == 'employee':
             cursor.execute(
                 f'''
                 SELECT department, COUNT(*) 
