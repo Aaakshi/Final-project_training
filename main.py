@@ -1489,7 +1489,7 @@ async def get_documents(page: int = 1,
                                 page_size=page_size)
 
 
-@app.get("/api/documents/review")
+@app.get("/api/review-documents")
 async def get_review_documents(page: int = 1,
                               page_size: int = 50,
                               search: str = None,
@@ -1765,6 +1765,16 @@ async def get_email_notifications(page: int = 1,
             dept_name = email[2].split('@')[0].replace('.', ' ').title()
             recipient_name = f"{dept_name} Department"
 
+        # Determine email type based on user's involvement
+        email_type = "sent"
+        if email[2] == current_user['email'] or email[2] == user_dept_email:
+            email_type = "received"
+        elif email[1] == current_user['email']:
+            email_type = "sent"
+        else:
+            # For department emails, check if it's incoming to user's department
+            email_type = "received" if email[2] == user_dept_email else "sent"
+
         email_list.append({
             "email_id": email[0],
             "sent_by": email[1],
@@ -1774,15 +1784,15 @@ async def get_email_notifications(page: int = 1,
             "subject": email[3],
             "body_preview": email[4][:200] + "..." if email[4] and len(email[4]) > 200 else email[4],
             "doc_id": email[5],
-            "file_name": email[6] or "N/A",
-            "document_name": email[10] or email[6] or "N/A",
-            "document_type": email[11] or "Unknown",
+            "file_name": email[6] or "No attachment",
+            "document_name": email[10] or email[6] or "No attachment",
+            "document_type": email[11] or "System",
             "priority": email[12] or "Medium",
             "department": email[13] or "General",
             "status": email[7],
             "sent_at": email[8],
             "read_at": email[9],
-            "email_type": "sent" if email[1] == current_user['email'] else "received"
+            "email_type": email_type
         })
 
     return {
