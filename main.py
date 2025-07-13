@@ -11,8 +11,8 @@ import os
 import hashlib
 import jwt
 import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 import PyPDF2
 import docx
@@ -38,7 +38,7 @@ EMAIL_CONFIG = {
 def send_email(to_email, subject, body, cc_email=None, bcc_email=None, reply_to=None):
     """Send email notification"""
     try:
-        msg = MimeMultipart()
+        msg = MIMEMultipart()
         msg['From'] = EMAIL_CONFIG['sender_email']
         msg['To'] = to_email
         msg['Subject'] = subject
@@ -48,7 +48,7 @@ def send_email(to_email, subject, body, cc_email=None, bcc_email=None, reply_to=
         if reply_to:
             msg['Reply-To'] = reply_to
 
-        msg.attach(MimeText(body, 'html'))
+        msg.attach(MIMEText(body, 'html'))
 
         server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
         server.starttls()
