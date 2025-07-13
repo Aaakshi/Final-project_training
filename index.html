@@ -907,10 +907,14 @@
         };
 
         async function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
             try {
                 const response = await fetch('/api/me', {
                     headers: {
-                        'Authorization': 'Bearer ' + authToken
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
                     }
                 });
 
@@ -921,17 +925,18 @@
                         showMainContent();
                     } else {
                         console.warn('Invalid response format from auth check');
-                        throw new Error('Invalid response format');
+                        showToast('Authentication failed - invalid server response', 'error');
+                        logout();
                     }
                 } else {
                     console.warn('Auth check failed with status:', response.status);
-                    authToken = null;
-                    localStorage.removeItem('authToken');
+                    showToast('Authentication failed - please login again', 'error');
+                    logout();
                 }
             } catch (error) {
                 console.error('Auth check failed:', error);
-                authToken = null;
-                localStorage.removeItem('authToken');
+                showToast('Authentication failed - network error', 'error');
+                logout();
             }
         }
 
@@ -970,7 +975,7 @@
                         showToast('Login successful!', 'success');
                     } else {
                         console.error('Invalid response format for login');
-                        throw new Error('Invalid response format');
+                        showToast('Login failed - invalid server response', 'error');
                     }
                 } else {
                     console.error('Login failed with status:', response.status);
@@ -1024,7 +1029,7 @@
                         showToast('Registration successful! Please login.', 'success');
                         showLoginForm();
                     } else {
-                        throw new Error('Invalid response format');
+                        showToast('Registration failed - invalid server response', 'error');
                     }
                 } else {
                     const contentType = response.headers.get('content-type');
@@ -1229,20 +1234,14 @@
                         document.getElementById('uploadBtn').disabled = true;
                         loadDocuments();
                     } else {
-                        throw new Error('Invalid response format');
+                        showToast('Upload failed - invalid server response', 'error');
                     }
                 } else {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        showToast(data.detail || 'Upload failed', 'error');
-                    } else {
-                        showToast('Upload failed - server error', 'error');
-                    }
+                    showToast('Upload failed - server error', 'error');
                 }
             } catch (error) {
                 console.error('Upload error:', error);
-                showToast('Upload failed - server error', 'error');
+                showToast('Upload failed - network error', 'error');
             }
         }
 
@@ -1275,14 +1274,14 @@
                         displayDocuments(data.documents);
                         displayPagination(data.total_count, data.page, data.page_size);
                     } else {
-                        throw new Error('Invalid response format');
+                        showToast('Failed to load documents - invalid server response', 'error');
                     }
                 } else {
                     showToast('Failed to load documents', 'error');
                 }
             } catch (error) {
                 console.error('Load documents error:', error);
-                showToast('Failed to load documents', 'error');
+                showToast('Failed to load documents - network error', 'error');
             }
         }
 
@@ -1295,29 +1294,34 @@
                 });
 
                 if (response.ok) {
-                    const doc = await response.json();
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const doc = await response.json();
 
-                    // Update modal content
-                    document.getElementById('modalTitle').textContent = doc.original_name;
-                    document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
-                    document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
-                    document.getElementById('modalPriority').textContent = doc.priority || 'N/A';
-                    document.getElementById('modalStatus').textContent = doc.processing_status || 'N/A';
-                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size);
-                    document.getElementById('modalUploadDate').textContent = new Date(doc.uploaded_at).toLocaleString();
-                    document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'General Employee';
+                        // Update modal content
+                        document.getElementById('modalTitle').textContent = doc.original_name;
+                        document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
+                        document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
+                        document.getElementById('modalPriority').textContent = doc.priority || 'N/A';
+                        document.getElementById('modalStatus').textContent = doc.processing_status || 'N/A';
+                        document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size);
+                        document.getElementById('modalUploadDate').textContent = new Date(doc.uploaded_at).toLocaleString();
+                        document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'General Employee';
 
-                    // Update extracted text
-                    document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No content available';
+                        // Update extracted text
+                        document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No content available';
 
-                    // Show modal
-                    document.getElementById('documentModal').style.display = 'block';
+                        // Show modal
+                        document.getElementById('documentModal').style.display = 'block';
+                    } else {
+                        showToast('Failed to view document - invalid server response', 'error');
+                    }
                 } else {
-                    throw new Error('Failed to fetch document details');
+                    showToast('Failed to view document', 'error');
                 }
             } catch (error) {
                 console.error('Error fetching document:', error);
-                showToast('Error loading document details', 'error');
+                showToast('Error loading document details - network error', 'error');
             }
         }
 
@@ -1386,59 +1390,64 @@
                 });
 
                 if (response.ok) {
-                    const doc = await response.json();
-                    const uploadedBy = doc.uploaded_by || 'General Employee';
-                    const uploadDate = new Date(doc.uploaded_at).toLocaleString();
-                    const priority = doc.priority || 'medium';
-                    const status = doc.processing_status || 'pending';
-                    const docType = doc.document_type || 'general';
-                    const department = doc.department || 'general';
-                    const fileSize = formatFileSize(doc.file_size);
-                    const extractedText = doc.extracted_text || 'No content available';
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const doc = await response.json();
+                        const uploadedBy = doc.uploaded_by || 'General Employee';
+                        const uploadDate = new Date(doc.uploaded_at).toLocaleString();
+                        const priority = doc.priority || 'medium';
+                        const status = doc.processing_status || 'pending';
+                        const docType = doc.document_type || 'general';
+                        const department = doc.department || 'general';
+                        const fileSize = formatFileSize(doc.file_size);
+                        const extractedText = doc.extracted_text || 'No content available';
 
-                    var modal = document.createElement('div');
-                    modal.className = 'modal';
-                    modal.style.display = 'block';
+                        var modal = document.createElement('div');
+                        modal.className = 'modal';
+                        modal.style.display = 'block';
 
-                    // Use full_content if available, otherwise fallback to extracted_text
-                    var documentContent = doc.full_content || doc.extracted_text || 'No content available';
+                        // Use full_content if available, otherwise fallback to extracted_text
+                        var documentContent = doc.full_content || doc.extracted_text || 'No content available';
 
-                    modal.innerHTML = '<div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">' +
-                        '<span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>' +
-                        '<h2>Review Document: ' + doc.original_name + '</h2>' +
-                        '<div style="margin: 20px 0;">' +
-                        '<div class="info-grid">' +
-                        '<div class="info-item"><label>Uploaded By:</label><span>' + uploadedBy + '</span></div>' +
-                        '<div class="info-item"><label>Upload Date:</label><span>' + uploadDate + '</span></div>' +
-                        '<div class="info-item"><label>Document Type:</label><span>' + docType.replace('_', ' ') + '</span></div>' +
-                        '<div class="info-item"><label>Department:</label><span>' + department.toUpperCase() + '</span></div>' +
-                        '<div class="info-item"><label>Priority:</label><span>' + priority + '</span></div>' +
-                        '<div class="info-item"><label>Status:</label><span>' + status + '</span></div>' +
-                        '<div class="info-item"><label>File Size:</label><span>' + fileSize + '</span></div>' +
-                        '<div class="info-item"><label>File Type:</label><span>' + doc.file_type.toUpperCase() + '</span></div>' +
-                        '</div>' +
-                        '<div style="margin-top: 20px;">' +
-                        '<label><strong>Document Content:</strong></label>' +
-                        '<div style="border: 1px solid #ddd; padding: 15px; max-height: 400px; overflow-y: auto; background: #f9f9f9; white-space: pre-wrap; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4;">' +
-                        documentContent.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-                        '</div>' +
-                        '</div>' +
-                        '<div style="margin-top: 20px;">' +
-                        '<label for="reviewComments"><strong>Review Comments:</strong></label><br>' +
-                        '<textarea id="reviewComments" style="width: 100%; height: 80px; margin-top: 5px; padding: 8px; border: 1px solid #ddd;" placeholder="Add your review comments here..."></textarea>' +
-                        '</div>' +
-                        '<div style="margin-top: 20px; text-align: center;">' +
-                        '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
-                        '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
-                        '</div>' +
-                        '</div>';
-                    document.body.appendChild(modal);
+                        modal.innerHTML = '<div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">' +
+                            '<span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>' +
+                            '<h2>Review Document: ' + doc.original_name + '</h2>' +
+                            '<div style="margin: 20px 0;">' +
+                            '<div class="info-grid">' +
+                            '<div class="info-item"><label>Uploaded By:</label><span>' + uploadedBy + '</span></div>' +
+                            '<div class="info-item"><label>Upload Date:</label><span>' + uploadDate + '</span></div>' +
+                            '<div class="info-item"><label>Document Type:</label><span>' + docType.replace('_', ' ') + '</span></div>' +
+                            '<div class="info-item"><label>Department:</label><span>' + department.toUpperCase() + '</span></div>' +
+                            '<div class="info-item"><label>Priority:</label><span>' + priority + '</span></div>' +
+                            '<div class="info-item"><label>Status:</label><span>' + status + '</span></div>' +
+                            '<div class="info-item"><label>File Size:</label><span>' + fileSize + '</span></div>' +
+                            '<div class="info-item"><label>File Type:</label><span>' + doc.file_type.toUpperCase() + '</span></div>' +
+                            '</div>' +
+                            '<div style="margin-top: 20px;">' +
+                            '<label><strong>Document Content:</strong></label>' +
+                            '<div style="border: 1px solid #ddd; padding: 15px; max-height: 400px; overflow-y: auto; background: #f9f9f9; white-space: pre-wrap; font-family: \'Courier New\', monospace; font-size: 13px; line-height: 1.4;">' +
+                            documentContent.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+                            '</div>' +
+                            '</div>' +
+                            '<div style="margin-top: 20px;">' +
+                            '<label for="reviewComments"><strong>Review Comments:</strong></label><br>' +
+                            '<textarea id="reviewComments" style="width: 100%; height: 80px; margin-top: 5px; padding: 8px; border: 1px solid #ddd;" placeholder="Add your review comments here..."></textarea>' +
+                            '</div>' +
+                            '<div style="margin-top: 20px; text-align: center;">' +
+                            '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approved\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px;">✓ Approve</button>' +
+                            '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'rejected\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px;">✗ Reject</button>' +
+                            '</div>' +
+                            '</div>';
+                        document.body.appendChild(modal);
+                    } else {
+                        showToast('Error loading document details - invalid server response', 'error');
+                    }
                 } else {
                     showToast('Error loading document details', 'error');
                 }
             } catch (error) {
                 console.error('Error fetching document for review:', error);
-                showToast('Error loading document details', 'error');
+                showToast('Error loading document details - network error', 'error');
             }
         }
 
@@ -1458,18 +1467,21 @@
                     })
                 });
 
-                const data = await response.json();
-
+                const contentType = response.headers.get('content-type');
                 if (response.ok) {
                     showToast('Document ' + action + ' successfully!', 'success');
                     closeModal();
                     loadReviewDocuments();
-                } else {
+                } else if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
                     showToast(data.detail || 'Review submission failed', 'error');
+                }
+                 else {
+                    showToast('Review submission failed - server error', 'error');
                 }
             } catch (error) {
                 console.error('Submit review error:', error);
-                showToast('Review submission failed', 'error');
+                showToast('Review submission failed - network error', 'error');
             }
         }
 
@@ -1512,17 +1524,20 @@
                         'Authorization': 'Bearer ' + authToken
                     }
                 });
-
-                const data = await response.json();
-
+                const contentType = response.headers.get('content-type');
                 if (response.ok) {
+                    const data = await response.json();
                     displayReviewDocuments(data.documents);
-                } else {
-                    showToast('Failed to load review documents', 'error');
+                } else if (contentType && contentType.includes('application/json')) {
+                     const data = await response.json();
+                    showToast(data.detail || 'Failed to load review documents', 'error');
+                }
+                else {
+                     showToast('Failed to load review documents', 'error');
                 }
             } catch (error) {
                 console.error('Load review documents error:', error);
-                showToast('Failed to load review documents', 'error');
+                showToast('Failed to load review documents - network error', 'error');
             }
         }
 
@@ -1534,16 +1549,21 @@
                     }
                 });
 
-                const data = await response.json();
+                const contentType = response.headers.get('content-type');
 
                 if (response.ok) {
+                    const data = await response.json();
                     displayEmailNotifications(data);
-                } else {
-                    showToast('Failed to load email notifications', 'error');
+                } else if (contentType && contentType.includes('application/json')) {
+                     const data = await response.json();
+                    showToast(data.detail || 'Failed to load email notifications', 'error');
+                }
+                else {
+                     showToast('Failed to load email notifications - server error', 'error');
                 }
             } catch (error) {
                 console.error('Load email notifications error:', error);
-                showToast('Failed to load email notifications', 'error');
+                showToast('Failed to load email notifications - network error', 'error');
             }
         }
 
@@ -1585,7 +1605,8 @@
             try {
                 const response = await fetch('/api/stats', {
                     headers: {
-                        'Authorization': 'Bearer ' + authToken
+                        'Authorization': 'Bearer ' + authToken,
+                        'Content-Type': 'application/json'
                     }
                 });
 
@@ -1598,32 +1619,43 @@
                         const errorElements = document.querySelectorAll('.error-message');
                         errorElements.forEach(el => el.remove());
                     } else {
-                        throw new Error('Invalid response format');
+                        showToast('Failed to load stats - invalid server response', 'error');
+                        displayFallbackStats();
                     }
                 } else {
-                    displayStats({
-                        total_documents: 0,
-                        processed_documents: 0,
-                        pending_documents: 0,
-                        processing_rate: 0,
-                        document_types: {},
-                        departments: {},
-                        priorities: {}
-                    });
+                    showToast('Failed to load statistics', 'error');
+                    displayFallbackStats();
                 }
             } catch (error) {
                 console.error('Load stats error:', error);
-                // Display fallback stats instead of showing error
-                displayStats({
-                    total_documents: 0,
-                    processed_documents: 0,
-                    pending_documents: 0,
-                    processing_rate: 0,
-                    document_types: {},
-                    departments: {},
-                    priorities: {}
-                });
+                showToast('Failed to load statistics - network error', 'error');
+                displayFallbackStats();
             }
+        }
+
+        function displayFallbackStats() {
+            const statsGrid = document.getElementById('statsGrid');
+
+            statsGrid.innerHTML = '<div class="stat-card">' +
+                '<h3>0</h3>' +
+                '<p>Total Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>0</h3>' +
+                '<p>Processed Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>0</h3>' +
+                '<p>Pending Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>0%</h3>' +
+                '<p>Processing Rate</p>' +
+                '</div>';
+
+            // Display a message indicating that stats could not be loaded.
+            const chartGrid = document.querySelector('.chart-grid');
+            chartGrid.innerHTML = '<p style="color: red; text-align: center;">Failed to load statistics data.</p>';
         }
 
         function displayStats(stats) {
@@ -1844,6 +1876,10 @@
             if (event.target === modal) {
                 closeModal();
             }
+        }
+
+        function getStoredToken() {
+            return localStorage.getItem('authToken');
         }
     </script>
 </body>

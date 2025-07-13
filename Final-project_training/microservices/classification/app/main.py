@@ -23,41 +23,6 @@ async def root():
 
 class ClassificationResponse(BaseModel):
     doc_type: str
-    confidence: float
-
-@app.post("/classify", response_model=ClassificationResponse)
-async def classify_document(file: UploadFile = File(...)):
-    """Classify uploaded document"""
-    try:
-        # Read file content
-        content = await file.read()
-        filename = file.filename.lower()
-        
-        # Simple classification logic
-        if 'invoice' in filename or 'bill' in filename or 'payment' in filename:
-            return ClassificationResponse(doc_type="invoice", confidence=0.9)
-        elif 'contract' in filename or 'agreement' in filename:
-            return ClassificationResponse(doc_type="contract", confidence=0.85)
-        elif 'hr' in filename or 'employee' in filename:
-            return ClassificationResponse(doc_type="hr_document", confidence=0.8)
-        elif 'it' in filename or 'tech' in filename:
-            return ClassificationResponse(doc_type="it_document", confidence=0.8)
-        else:
-            return ClassificationResponse(doc_type="general", confidence=0.5)
-            
-    except Exception as e:
-        logger.error(f"Classification error: {e}")
-        return ClassificationResponse(doc_type="general", confidence=0.3)
-
-@app.get("/ping")
-async def ping():
-    return {"message": "pong from Classification Service"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
-
-class ClassificationResponse(BaseModel):
-    doc_type: str
     department: str
     confidence: float
     priority: str
@@ -68,56 +33,76 @@ class ClassificationResponse(BaseModel):
 
 @app.post("/classify")
 async def classify_document(file: UploadFile = File(...)):
-    # Read file content
-    content = await file.read()
-    text_content = content.decode('utf-8', errors='ignore') if content else ""
+    """Classify uploaded document"""
+    try:
+        # Read file content
+        content = await file.read()
+        filename = file.filename.lower()
+        text_content = content.decode('utf-8', errors='ignore') if content else ""
+        
+        # Enhanced classification logic
+        content_lower = text_content.lower()
+        
+        if ("invoice" in content_lower or "payment" in content_lower or "finance" in content_lower or 
+            "invoice" in filename or "bill" in filename or "payment" in filename):
+            doc_type = "financial_document"
+            department = "finance"
+            confidence = 0.9
+            priority = "high"
+            tags = ["finance", "invoice", "payment"]
+        elif ("contract" in content_lower or "agreement" in content_lower or "legal" in content_lower or
+              "contract" in filename or "agreement" in filename):
+            doc_type = "legal_document"
+            department = "legal"
+            confidence = 0.85
+            priority = "high"
+            tags = ["legal", "contract"]
+        elif ("employee" in content_lower or "hr" in content_lower or 
+              "hr" in filename or "employee" in filename):
+            doc_type = "hr_document"
+            department = "hr"
+            confidence = 0.8
+            priority = "medium"
+            tags = ["hr", "employee"]
+        elif ("it" in content_lower or "technology" in content_lower or
+              "it" in filename or "tech" in filename):
+            doc_type = "it_document"
+            department = "it"
+            confidence = 0.75
+            priority = "medium"
+            tags = ["it", "technology"]
+        else:
+            doc_type = "general_document"
+            department = "general"
+            confidence = 0.6
+            priority = "low"
+            tags = ["general"]
 
-    # Simple classification logic
-    content_lower = text_content.lower()
+        logger.info(f"Classified document {file.filename} as {doc_type}")
 
-    if "invoice" in content_lower or "payment" in content_lower or "finance" in content_lower:
-        doc_type = "invoice"
-        department = "finance"
-        confidence = 0.9
-        priority = "high"
-        tags = ["finance", "invoice"]
-    elif "contract" in content_lower or "agreement" in content_lower or "legal" in content_lower:
-        doc_type = "contract"
-        department = "legal"
-        confidence = 0.85
-        priority = "medium"
-        tags = ["legal", "contract"]
-    elif "employee" in content_lower or "hr" in content_lower:
-        doc_type = "hr_document"
-        department = "hr"
-        confidence = 0.8
-        priority = "medium"
-        tags = ["hr", "employee"]
-    elif "it" in content_lower or "technology" in content_lower:
-        doc_type = "it_document"
-        department = "it"
-        confidence = 0.75
-        priority = "low"
-        tags = ["it", "technology"]
-    else:
-        doc_type = "general"
-        department = "general"
-        confidence = 0.6
-        priority = "low"
-        tags = ["general"]
-
-    logger.info(f"Classified document {file.filename} as {doc_type}")
-
-    return ClassificationResponse(
-        doc_type=doc_type,
-        department=department,
-        confidence=confidence,
-        priority=priority,
-        extracted_text=text_content[:500],  # First 500 chars
-        page_count=1,
-        language="en",
-        tags=tags
-    )
+        return ClassificationResponse(
+            doc_type=doc_type,
+            department=department,
+            confidence=confidence,
+            priority=priority,
+            extracted_text=text_content[:500],
+            page_count=1,
+            language="en",
+            tags=tags
+        )
+            
+    except Exception as e:
+        logger.error(f"Classification error: {e}")
+        return ClassificationResponse(
+            doc_type="general_document",
+            department="general", 
+            confidence=0.3,
+            priority="low",
+            extracted_text="",
+            page_count=1,
+            language="en",
+            tags=["general"]
+        )
 
 @app.get("/ping")
 async def ping():

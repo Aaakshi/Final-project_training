@@ -37,13 +37,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, EmailStr
 import httpx
 from datetime import timedelta
-import fitz  # PyMuPDF
-from docx import Document
-from sumy.parsers.plaintext import PlaintextParser
-from sumy.nlp.tokenizers import Tokenizer
-from sumy.summarizers.lsa import LsaSummarizer
 import re
-import dateparser
 import random
 
 app = FastAPI(title="IDCR Enhanced Demo Server")
@@ -69,6 +63,16 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail}
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    print(f"Unhandled exception: {exc}")
+    import traceback
+    print(f"Full traceback: {traceback.format_exc()}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"}
     )
 
 # Security
@@ -745,7 +749,10 @@ async def login_user(user_data: UserLogin):
 async def get_current_user_info(
         current_user: dict = Depends(get_current_user)):
     """Get current user information"""
-    return current_user
+    return JSONResponse(
+        content=current_user,
+        headers={"Content-Type": "application/json"}
+    )
 
 
 @app.get("/health")
@@ -985,16 +992,27 @@ async def process_batch_async(batch_id: str, files: List[dict], user: dict):
 
             # Try to use microservice if available, otherwise use local classification
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    with open(doc_row[3], 'rb') as f:
-                        files_payload = {"file": (doc_row[2], f, doc_row[6])}
-                        response = await client.post(
-                            CLASSIFICATION_SERVICE_URL + "/classify", 
-                            files=files_payload
-                        )
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    # Test if microservice is available
+                    health_response = await client.get(CLASSIFICATION_SERVICE_URL + "/ping")
+                    if health_response.status_code == 200:
+                        with open(doc_row[3], 'rb') as f:
+                            files_payload = {"file": (doc_row[2], f, doc_row[6])}
+                            response = await client.post(
+                                CLASSIFICATION_SERVICE_URL + "/classify", 
+                                files=files_payload
+                            )
 
-                        if response.status_code == 200:
-                            classification_result = response.json()
+                            if response.status_code == 200:
+                                microservice_result = response.json()
+                                # Merge microservice result with local classification
+                                classification_result.update({
+                                    "doc_type": microservice_result.get("doc_type", classification_result["doc_type"]),
+                                    "confidence": microservice_result.get("confidence", classification_result["confidence"])
+                                })
+                                print(f"Used microservice classification for {doc_row[2]}")
+                    else:
+                        print(f"Classification microservice not responding, using local classification")
             except Exception as e:
                 print(f"Microservice unavailable, using local classification: {e}")
 
@@ -1780,132 +1798,112 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         cursor = conn.cursor()
 
         # Build WHERE clause based on user role
-        where_clause = ""
-        params = []
+        base_params = []
         
         if current_user['role'] == 'admin':
             # Admin can see all documents
-            where_clause = ""
-            params = []
+            where_base = ""
         elif current_user['role'] == 'manager':
             # Department managers see their department's documents
-            where_clause = "WHERE department = ?"
-            params = [current_user['department']]
+            where_base = "WHERE department = ?"
+            base_params = [current_user['department']]
         else:
             # Regular employees see only their own documents
-            where_clause = "WHERE user_id = ?"
-            params = [current_user['user_id']]
+            where_base = "WHERE user_id = ?"
+            base_params = [current_user['user_id']]
 
         # Get total documents
-        if where_clause:
-            query = f'SELECT COUNT(*) FROM documents {where_clause}'
-            cursor.execute(query, params)
-        else:
-            query = 'SELECT COUNT(*) FROM documents'
-            cursor.execute(query)
+        total_query = f'SELECT COUNT(*) FROM documents {where_base}'
+        cursor.execute(total_query, base_params)
         total_documents = cursor.fetchone()[0]
 
         # Get processed documents (classified status)
-        if where_clause:
-            query = f'SELECT COUNT(*) FROM documents {where_clause} AND processing_status = ?'
-            cursor.execute(query, params + ["classified"])
+        processed_query = f'SELECT COUNT(*) FROM documents {where_base}'
+        processed_params = base_params.copy()
+        if where_base:
+            processed_query += " AND processing_status = ?"
         else:
-            query = 'SELECT COUNT(*) FROM documents WHERE processing_status = ?'
-            cursor.execute(query, ["classified"])
+            processed_query += " WHERE processing_status = ?"
+        processed_params.append("classified")
+        cursor.execute(processed_query, processed_params)
         processed_documents = cursor.fetchone()[0]
 
         # Get pending documents
-        if where_clause:
-            query = f'SELECT COUNT(*) FROM documents {where_clause} AND processing_status IN (?, ?)'
-            cursor.execute(query, params + ["uploaded", "processing"])
+        pending_query = f'SELECT COUNT(*) FROM documents {where_base}'
+        pending_params = base_params.copy()
+        if where_base:
+            pending_query += " AND processing_status IN (?, ?)"
         else:
-            query = 'SELECT COUNT(*) FROM documents WHERE processing_status IN (?, ?)'
-            cursor.execute(query, ["uploaded", "processing"])
+            pending_query += " WHERE processing_status IN (?, ?)"
+        pending_params.extend(["uploaded", "processing"])
+        cursor.execute(pending_query, pending_params)
         pending_documents = cursor.fetchone()[0]
 
         # Calculate processing rate
         processing_rate = int((processed_documents / total_documents * 100)) if total_documents > 0 else 0
 
         # Get document types distribution
-        if where_clause:
-            query = f'''
-                SELECT document_type, COUNT(*) 
-                FROM documents 
-                {where_clause} AND document_type IS NOT NULL 
-                GROUP BY document_type
-            '''
-            cursor.execute(query, params)
+        doc_types_query = f'''
+            SELECT document_type, COUNT(*) 
+            FROM documents 
+            {where_base}
+        '''
+        doc_types_params = base_params.copy()
+        if where_base:
+            doc_types_query += " AND document_type IS NOT NULL"
         else:
-            query = '''
-                SELECT document_type, COUNT(*) 
-                FROM documents 
-                WHERE document_type IS NOT NULL 
-                GROUP BY document_type
-            '''
-            cursor.execute(query)
+            doc_types_query += " WHERE document_type IS NOT NULL"
+        doc_types_query += " GROUP BY document_type"
+        cursor.execute(doc_types_query, doc_types_params)
         doc_types = dict(cursor.fetchall())
 
-        # Get department distribution - only show if admin or manager
+        # Get department distribution
         if current_user['role'] in ['admin', 'manager']:
-            if where_clause:
-                query = f'''
-                    SELECT department, COUNT(*) 
-                    FROM documents 
-                    {where_clause} AND department IS NOT NULL 
-                    GROUP BY department
-                '''
-                cursor.execute(query, params)
+            dept_query = f'''
+                SELECT department, COUNT(*) 
+                FROM documents 
+                {where_base}
+            '''
+            dept_params = base_params.copy()
+            if where_base:
+                dept_query += " AND department IS NOT NULL"
             else:
-                query = '''
-                    SELECT department, COUNT(*) 
-                    FROM documents 
-                    WHERE department IS NOT NULL 
-                    GROUP BY department
-                '''
-                cursor.execute(query)
+                dept_query += " WHERE department IS NOT NULL"
+            dept_query += " GROUP BY department"
+            cursor.execute(dept_query, dept_params)
             departments = dict(cursor.fetchall())
         else:
             # For regular employees, only show their own department
-            departments = {current_user['department']: total_documents}
+            departments = {current_user['department']: total_documents} if total_documents > 0 else {}
 
         # Get priority distribution
-        if where_clause:
-            query = f'''
-                SELECT priority, COUNT(*) 
-                FROM documents 
-                {where_clause} AND priority IS NOT NULL 
-                GROUP BY priority
-            '''
-            cursor.execute(query, params)
+        priority_query = f'''
+            SELECT priority, COUNT(*) 
+            FROM documents 
+            {where_base}
+        '''
+        priority_params = base_params.copy()
+        if where_base:
+            priority_query += " AND priority IS NOT NULL"
         else:
-            query = '''
-                SELECT priority, COUNT(*) 
-                FROM documents 
-                WHERE priority IS NOT NULL 
-                GROUP BY priority
-            '''
-            cursor.execute(query)
+            priority_query += " WHERE priority IS NOT NULL"
+        priority_query += " GROUP BY priority"
+        cursor.execute(priority_query, priority_params)
         priorities = dict(cursor.fetchall())
 
         # Get upload trends (last 30 days)
-        if where_clause:
-            query = f'''
-                SELECT DATE(uploaded_at) as date, COUNT(*) as count
-                FROM documents 
-                {where_clause} AND uploaded_at >= datetime('now', '-30 days')
-                GROUP BY DATE(uploaded_at)
-                ORDER BY date
-            '''
-            cursor.execute(query, params)
+        trends_query = f'''
+            SELECT DATE(uploaded_at) as date, COUNT(*) as count
+            FROM documents 
+            {where_base}
+        '''
+        trends_params = base_params.copy()
+        if where_base:
+            trends_query += " AND uploaded_at >= datetime('now', '-30 days')"
         else:
-            query = '''
-                SELECT DATE(uploaded_at) as date, COUNT(*) as count
-                FROM documents 
-                WHERE uploaded_at >= datetime('now', '-30 days')
-                GROUP BY DATE(uploaded_at)
-                ORDER BY date
-            '''
-            cursor.execute(query)
+            trends_query += " WHERE uploaded_at >= datetime('now', '-30 days')"
+        trends_query += " GROUP BY DATE(uploaded_at) ORDER BY date"
+        cursor.execute(trends_query, trends_params)
         upload_trends = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
 
         conn.close()
@@ -1921,15 +1919,14 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "upload_trends": upload_trends
         }
 
-        return JSONResponse(
-            content=stats_response,
-            headers={"Content-Type": "application/json"}
-        )
+        return stats_response
 
     except Exception as e:
         print(f"Stats error: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         # Return empty stats as JSON to prevent script errors
-        empty_stats = {
+        return {
             "total_documents": 0,
             "processed_documents": 0,
             "pending_documents": 0,
@@ -1939,10 +1936,6 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "priorities": {},
             "upload_trends": []
         }
-        return JSONResponse(
-            content=empty_stats,
-            headers={"Content-Type": "application/json"}
-        )
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):
