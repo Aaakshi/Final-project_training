@@ -1,15 +1,17 @@
 version: '3.8'
+
 services:
   db:
     image: postgres:13
     environment:
-      POSTGRES_USER: idcr umbilical
+      POSTGRES_USER: idcr_umbilical
       POSTGRES_PASSWORD: idcr_pass
       POSTGRES_DB: idcr_db
     volumes:
       - ./infrastructure/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+
   rabbitmq:
     image: rabbitmq:3-management
     volumes:
@@ -17,6 +19,7 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+
   minio:
     image: minio/minio
     environment:
@@ -28,6 +31,7 @@ services:
       - "9001:9001"
     volumes:
       - ./infrastructure/storage/minio_setup.sh:/minio_setup.sh
+
   api_gateway:
     build: ./microservices/api_gateway
     ports:
@@ -35,15 +39,16 @@ services:
     depends_on:
       - db
       - rabbitmq
-      classification:
-      build:
-        context: .  
-        dockerfile: microservices/classification/Dockerfile
-      ports:
-        - "8001:8001"
-      depends_on:
-        - db
-        - rabbitmq
+
+  classification:
+    build:
+      context: .
+      dockerfile: microservices/classification/Dockerfile
+    ports:
+      - "8001:8001"
+    depends_on:
+      - db
+      - rabbitmq
 
   routing_engine:
     build: ./microservices/routing_engine
@@ -52,6 +57,7 @@ services:
     depends_on:
       - db
       - rabbitmq
+
   content_analysis:
     build: ./microservices/content_analysis
     ports:
@@ -59,6 +65,7 @@ services:
     depends_on:
       - db
       - rabbitmq
+
   workflow_integration:
     build: ./microservices/workflow_integration
     ports:
