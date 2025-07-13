@@ -1012,7 +1012,7 @@
             document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
             const deptBadge = document.getElementById('userDept');
             deptBadge.textContent = currentUser.department.toUpperCase();
-            deptBadge.className = `department-badge dept-${currentUser.department}`;
+            deptBadge.className = `department-badge dept-${currentUser.department}`;`;
 
             // Update UI based on user role
             if (currentUser.role === 'manager' || currentUser.role === 'admin') {
