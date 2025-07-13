@@ -833,11 +833,18 @@
             }
         };
 
+        // Check authentication on page load
         async function checkAuth() {
             try {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    showLoginForm();
+                    return;
+                }
+
                 const response = await fetch('/api/me', {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
 
@@ -962,7 +969,7 @@
             if (currentUser.role === 'admin' || currentUser.role === 'manager') {
                 document.getElementById('reviewTabBtn').style.display = 'block';
             }
-            
+
             // Show notifications tab for all users - it's always visible now
             document.getElementById('notificationsTabBtn').style.display = 'block';
 
@@ -999,7 +1006,7 @@
             if (tabContent) {
                 tabContent.classList.remove('hidden');
             }
-            
+
             // Activate correct tab button based on tabName
             const tabMapping = {
                 'upload': 'uploadTabBtn',
