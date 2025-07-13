@@ -1587,10 +1587,9 @@ async def get_documents(
         if current_user['role'] == 'employee':
             where_clauses.append("user_id = ?")
             params.append(current_user['user_id'])
-        else:  # department manager
-            where_clauses.append("(user_id = ? OR department = ?)")
-            params.extend(
-                [current_user['user_id'], current_user['department']])
+        else:  # department manager - only show documents from their department
+            where_clauses.append("department = ?")
+            params.append(current_user['department'])
 
     if status:
         where_clauses.append("processing_status = ?")
