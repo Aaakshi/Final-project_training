@@ -16,7 +16,6 @@ import shutil
 import threading
 from pathlib import Path
 import smtplib
-import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Template
@@ -37,6 +36,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 import httpx
 from datetime import timedelta
+import fitz  # PyMuPDF
+from docx import Document
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer
+from sumy.summarizers.lsa import LsaSummarizer
+import re
+import dateparser
 
 app = FastAPI(title="IDCR Enhanced Demo Server")
 
@@ -718,7 +724,7 @@ async def health_check():
     }
 
     status = {}
-    
+
     async with httpx.AsyncClient(timeout=3.0) as client:
         for service, url in services.items():
             try:
@@ -1235,7 +1241,7 @@ async def notify_department(doc_id: str, classification_result: dict,
     cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
                    (department, ))
     dept_result = cursor.fetchone()
-    
+
     cursor.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
     doc_result = cursor.fetchone()
     file_name = doc_result[0] if doc_result else "Unknown"
@@ -1275,7 +1281,7 @@ async def notify_department(doc_id: str, classification_result: dict,
 
         # Send to department
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
-        
+
         # Also send confirmation email to the uploader
         confirmation_subject = f"Document Upload Confirmation - {file_name}"
         confirmation_body = f"""
@@ -1296,7 +1302,7 @@ async def notify_department(doc_id: str, classification_result: dict,
             </body>
         </html>
         """
-        
+
         # Send confirmation to uploader
         send_email(user['email'], confirmation_subject, confirmation_body, doc_id, file_name, "noreply@idcr-system.com")
 
@@ -2001,14 +2007,410 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         # Ensure connection is always closed
         conn.close()
 
+# --- Document Analysis Functions ---
+
+def extract_text_from_pdf(file_path: str) -> str:
+    """Extract text from PDF using PyMuPDF."""
+    text = ""
+    try:
+        pdf_document = fitz.open(file_path)
+        for page_num in range(pdf_document.page_count):
+            page = pdf_document.load_page(page_num)
+            text += page.get_text()
+        pdf_document.close()
+    except Exception as e:
+        logging.error(f"Error extracting text from PDF: {e}")
+        return ""
+    return text
+
+def extract_text_from_docx(file_path: str) -> str:
+    """Extract text from Word document (.docx)."""
+    text = ""
+    try:
+        document = Document(file_path)
+        for paragraph in document.paragraphs:
+            text += paragraph.text + "\n"
+    except Exception as e:
+        logging.error(f"Error extracting text from DOCX: {e}")
+        return ""
+    return text
+
+def extract_text_from_txt(file_path: str) -> str:
+    """Extract text from .txt file."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            text = file.read()
+    except Exception as e:
+        logging.error(f"Error extracting text from TXT: {e}")
+        return ""
+    return text
+
+def summarize_text(text: str, num_sentences: int = 3) -> str:
+    """Summarize text using sumy library."""
+    try:
+        parser = PlaintextParser.from_string(text, Tokenizer("english"))
+        summarizer = LsaSummarizer()
+        summary = summarizer(parser.document, num_sentences)
+        return " ".join(str(s) for s in summary)
+    except Exception as e:
+        logging.error(f"Error summarizing text: {e}")
+        return ""
+
+def calculate_urgency(text: str) -> Dict[str, Any]:
+    """Calculate urgency score, level, and signal based on keywords."""
+    text_lower = text.lower()
+    urgent_keywords = ["urgent", "asap", "immediately", "critical", "high priority", "deadline", "eod", "end of day", "today"]
+    medium_keywords = ["reminder", "follow up", "pending", "awaiting response", "check status", "this week", "soon", "scheduled"]
+    high_score_keywords = ["breach", "security", "incident", "outage"] # These will give a high score boost
+
+    score = 0
+
+    # First, check for high-score keywords to give a significant boost.
+    if any(keyword in text_lower for keyword in high_score_keywords):
+        score += 3  # Add a significant boost for truly urgent items
+    # Next, check for regular urgent keywords.
+    if any(keyword in text_lower for keyword in urgent_keywords):
+        score += 2
+    # Finally, add a smaller score for medium urgency keywords.
+    if any(keyword in text_lower for keyword in medium_keywords):
+        score += 1
+
+    # Ensure the score stays within the valid range of 0-5
+    score = min(max(score, 0), 5)
+
+    if score <= 2:
+        level = "Low"
+        signal = "🟢 Green"
+    elif score == 3:
+        level = "Medium"
+        signal = "🟡 Yellow"
+    else:
+        level = "High"
+        signal = "🔴 Red"
+
+    return {"score": score, "level": level, "signal": signal}
+
+def extract_dates(text: str) -> List[str]:
+    """Extract dates from text and convert to YYYY-MM-DD format."""
+    dates = []
+    try:
+        for match in dateparser.parse(text, return_as_datetime=True, languages=['en']):
+            if match:
+                dates.append(match.strftime("%Y-%m-%d"))
+    except Exception as e:
+        logging.error(f"Error extracting dates: {e}")
+        return []
+    return dates
+
+def extract_completion_date(text: str) -> Optional[str]:
+    """Find due-related phrases and extract the matched date."""
+    try:
+        # Improved regex to capture more variations
+        date_patterns = [
+            r"(submit|complete|due)\s*(by|before|on)\s*([a-zA-Z0-9\s,]+)",  # submit by date
+            r"(by|before|on)\s*([a-zA-Z0-9\s,]+)\s*(submit|complete|due)",  # by date submit
+            r"(submit|complete|due)\s*([a-zA-Z0-9\s,]+)",                   # submit date
+            r"([a-zA-Z0-9\s,]+)\s*(is|are)\s*(due|required)",               # date is due
+            r"(deadline|date)\s*[:=-]\s*([a-zA-Z0-9\s,]+)"                   # deadline: date
+        ]
+
+        for pattern in date_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                date_text = ""
+                # Determine which group contains the date
+                for group_index in range(1, len(match.groups()) + 1):
+                    if not match.group(group_index) in ["submit", "complete", "due", "by", "before", "on", "is", "are", "required", "deadline", "date", ":", "=", "-"]:
+                        date_text = match.group(group_index)
+                        break # Found the date, no need to check other groups
+
+                parsed_date = dateparser.parse(date_text, settings={'RETURN_AS_TIMEZONE_AWARE': False, 'PREFER_DAY_OF_MONTH': 'first'})
+                if parsed_date:
+                    return parsed_date.strftime("%Y-%m-%d")
+    except Exception as e:
+        logging.error(f"Error extracting completion date: {e}")
+        return None
+    return None
+
+def analyze_document_content(file_path: str, original_name: str, mime_type: str) -> Dict[str, Any]:
+    """Analyze document content and extract information."""
+    extracted_text = ""
+
+    # Extract text based on file type
+    if mime_type == 'application/pdf':
+        extracted_text = extract_text_from_pdf(file_path)
+    elif mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' or mime_type == 'application/msword':
+        extracted_text = extract_text_from_docx(file_path)
+    elif mime_type == 'text/plain':
+        extracted_text = extract_text_from_txt(file_path)
+    else:
+        extracted_text = f"Unsupported file type: {mime_type}"
+
+    # Perform analysis
+    summary = summarize_text(extracted_text)
+    urgency = calculate_urgency(extracted_text)
+    dates = extract_dates(extracted_text)
+    completion_date = extract_completion_date(extracted_text)
+
+    return {
+        "extracted_text": extracted_text,
+        "summary": summary,
+        "urgency": urgency,
+        "dates": dates,
+        "completion_date": completion_date
+    }
+
+@app.post("/api/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    priority: Optional[str] = Form("medium"),
+    department: Optional[str] = Form(None),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload and process document with advanced analysis"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    # Validate file type
+    allowed_types = {
+        'application/pdf': 'pdf',
+        'text/plain': 'txt',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        'application/msword': 'doc',
+        'image/jpeg': 'jpg',
+        'image/png': 'png'
+    }
+
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type {file.content_type} not supported"
+        )
+
+    try:
+        # Generate unique document ID and create upload directory
+        doc_id = str(uuid.uuid4())
+        upload_dir = os.path.join("uploads", doc_id)
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Save file
+        file_extension = allowed_types[file.content_type]
+        safe_filename = f"{doc_id}.{file_extension}"
+        file_path = os.path.join(upload_dir, safe_filename)
+
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+
+        # Perform comprehensive document analysis
+        analysis_result = analyze_document_content(file_path, file.filename, file.content_type)
+
+        # Read content for classification
+        text_content = analysis_result.get('extracted_text', '')
+
+        # Classify document
+        classification_result = None
+        try:
+            # Try microservice first
+            with open(file_path, 'rb') as f:
+                files = {'file': (file.filename, f, file.content_type)}
+                response = requests.post(
+                    'http://localhost:8001/classify',
+                    files=files,
+                    timeout=10
+                )
+                if response.status_code == 200:
+                    classification_result = response.json()
+        except Exception as e:
+            print(f"Microservice classification failed: {e}")
+
+        # Use local classification as fallback
+        if not classification_result:
+            classification_result = classify_document_locally(text_content, file.filename)
+
+        # Use urgency score to determine priority if not specified
+        urgency_priority_map = {"Low": "low", "Medium": "medium", "High": "high"}
+        urgency_priority = urgency_priority_map.get(analysis_result['urgency']['level'], 'medium')
+
+        # Use provided department if specified, otherwise use classified department
+        final_department = department if department else classification_result.get('department', 'general')
+        final_priority = priority if priority != "medium" else urgency_priority
+
+        # Store document in database with analysis results
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO documents (
+                doc_id, original_name, file_path, file_size, file_type, mime_type,
+                upload_date, uploaded_by, status, department, priority, doc_type,
+                confidence, extracted_text, tags, classification_date
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            doc_id,
+            file.filename,
+            file_path,
+            len(content),
+            file_extension,
+            file.content_type,
+            datetime.now().isoformat(),
+            current_user['user_id'],
+            'uploaded',
+            final_department,
+            final_priority,
+            classification_result.get('doc_type', 'general'),
+            classification_result.get('confidence', 0.5),
+            analysis_result.get('extracted_text', text_content[:1000]),
+            json.dumps(classification_result.get('tags', [])),
+            datetime.now().isoformat()
+        ))
+
+        conn.commit()
+        conn.close()
+
+        # Add to processing queue
+        processing_queue.append({
+            'doc_id': doc_id,
+            'file_path': file_path,
+            'classification': classification_result,
+            'analysis': analysis_result
+        })
+
+        # Send notification
+        try:
+            await notify_department(doc_id, classification_result, current_user)
+        except Exception as e:
+            print(f"Notification failed: {e}")
+
+        # Combine classification and analysis results
+        result = {
+            "message": "File uploaded successfully",
+            "doc_id": doc_id,
+            "classification": classification_result,
+            "analysis": analysis_result,
+            "department": final_department,
+            "priority": final_priority
+        }
+
+        return result
+
+    except Exception as e:
+        # Clean up file if error occurs
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path)
+        if 'upload_dir' in locals() and os.path.exists(upload_dir):
+            os.rmdir(upload_dir)
+
+        print(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.get("/api/documents/{doc_id}")
+async def get_document_details(doc_id: str,
+                               current_user: dict = Depends(get_current_user)):
+    """Get detailed information about a specific document"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id, ))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Check permissions
+    if current_user['role'] == 'employee' and row[1] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Convert row to dictionary
+    columns = [
+        'doc_id', 'user_id', 'original_name', 'file_path', 'file_size',
+        'file_type', 'mime_type', 'uploaded_at', 'processing_status',
+        'extracted_text', 'ocr_confidence', 'document_type', 'department',
+        'priority', 'classification_confidence', 'page_count', 'language',
+        'tags', 'assigned_to', 'reviewed_by', 'review_status',
+        'review_comments', 'reviewed_at'
+    ]
+
+    doc_dict = dict(zip(columns, row))
+    if doc_dict['tags']:
+        doc_dict['tags'] = json.loads(doc_dict['tags'])
+
+    # Perform fresh analysis if file exists
+    if doc_dict['file_path'] and os.path.exists(doc_dict['file_path']):
+        try:
+            # Get comprehensive analysis
+            analysis_result = analyze_document_content(
+                doc_dict['file_path'], 
+                doc_dict['original_name'], 
+                doc_dict['mime_type']
+            )
+
+            # Add analysis to document data
+            doc_dict['analysis'] = analysis_result
+
+            # Update extracted_text if we got better content
+            if analysis_result.get('extracted_text'):
+                doc_dict['extracted_text'] = analysis_result['extracted_text']
+
+        except Exception as e:
+            logging.error(f"Error analyzing document {doc_id}: {e}")
+            # Fallback to basic file reading
+            if not doc_dict['extracted_text']:
+                try:
+                    if doc_dict['file_type'].lower() in ['txt', 'text']:
+                        with open(doc_dict['file_path'], 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                            doc_dict['extracted_text'] = content[:2000]
+                    elif doc_dict['mime_type'] == 'application/pdf':
+                        doc_dict['extracted_text'] = "[PDF File] - Content extraction not available in preview."
+                    elif doc_dict['mime_type'].startswith('image/'):
+                        doc_dict['extracted_text'] = f"[Image File] - {doc_dict['original_name']}"
+                    else:
+                        doc_dict['extracted_text'] = f"[{doc_dict['file_type'].upper()} File] - Content preview not available."
+                except Exception as read_error:
+                    doc_dict['extracted_text'] = f"[Error] - Could not preview file: {str(read_error)}"
+    else:
+        doc_dict['extracted_text'] = "[Error] - File not found on server."
+
+    return doc_dict
+
+@app.get("/api/documents/{doc_id}/analysis")
+async def get_document_analysis(doc_id: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed document analysis"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT file_path, original_name, mime_type FROM documents WHERE doc_id = ?
+    ''', (doc_id,))
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path, original_name, mime_type = row
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Document file not found")
+
+    # Perform comprehensive analysis
+    analysis_result = analyze_document_content(file_path, original_name, mime_type)
+
+    return {
+        "doc_id": doc_id,
+        "analysis": analysis_result
+    }
 
 # Main startup
 if __name__ == "__main__":
     print("🚀 Starting IDCR Demo Server...")
     print("📂 Frontend available at: http://0.0.0.0:5000")
     print("📊 API docs available at: http://0.0.0.0:5000/docs")
-    
+
     # Initialize database before starting server
     init_database()
-    
+
     uvicorn.run(app, host="0.0.0.0", port=5000)

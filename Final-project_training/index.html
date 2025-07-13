@@ -598,6 +598,106 @@
             padding: 8px 12px;
             margin: 0;
         }
+
+        /* Styles for document analysis features */
+        .analysis-section {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .analysis-item {
+            margin-bottom: 10px;
+        }
+
+        .analysis-item label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #4a5568;
+        }
+
+        .summary-text {
+            background: #f7fafc;
+            padding: 10px;
+            border-radius: 6px;
+            white-space: pre-line;
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #2d3748;
+        }
+
+        .urgency-indicator {
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+
+        .urgency-indicator.urgency-low {
+            background-color: #c6f6d5;
+            color: #2f855a;
+        }
+
+        .urgency-indicator.urgency-medium {
+            background-color: #fefcbf;
+            color: #b7791f;
+        }
+
+        .urgency-indicator.urgency-high {
+            background-color: #fed7d7;
+            color: #c53030;
+        }
+
+        .dates-list,
+        .due-dates-list,
+        .keywords-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .date-tag,
+        .keyword-tag {
+            background-color: #bee3f8;
+            color: #2b6cb0;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8em;
+        }
+
+        .no-data {
+            font-style: italic;
+            color: #718096;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-btn {
+            padding: 10px 15px;
+            border: none;
+            background-color: #f7fafc;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .tab-btn.active {
+            background-color: #3182ce;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -861,6 +961,95 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
             <h2 id="modalTitle">Document Details</h2>
+            
+             <div class="tab-buttons">
+                        <button class="tab-btn active" onclick="showTab('basic-info')">Basic Info</button>
+                        <button class="tab-btn" onclick="showTab('analysis-tab')">Analysis</button>
+                        <button class="tab-btn" onclick="showTab('content-preview')">Content</button>
+                        <button class="tab-btn" onclick="showTab('tags-section')">Tags</button>
+                    </div>
+            
+            
+             <div class="tab-content">
+                        <div id="basic-info" class="tab-pane active">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <label>Document Type:</label>
+                                    <span id="modalDocType"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Department:</label>
+                                    <span id="modalDepartment"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Priority:</label>
+                                    <span id="modalPriority"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Status:</label>
+                                    <span id="modalStatus"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>File Size:</label>
+                                    <span id="modalFileSize"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Upload Date:</label>
+                                    <span id="modalUploadDate"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Uploaded By:</label>
+                                    <span id="modalUploadedBy"></span>
+                                </div>
+                                <div class="info-item">
+                                    <label>Confidence:</label>
+                                    <span id="modalConfidence"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="analysis-tab" class="tab-pane">
+                            <div class="analysis-section">
+                                <h4>Document Analysis</h4>
+                                <div class="analysis-grid">
+                                    <div class="analysis-item">
+                                        <label>Summary:</label>
+                                        <div id="modalSummary" class="summary-text"></div>
+                                    </div>
+                                    <div class="analysis-item">
+                                        <label>Urgency Level:</label>
+                                        <span id="modalUrgency" class="urgency-indicator"></span>
+                                    </div>
+                                    <div class="analysis-item">
+                                        <label>Word Count:</label>
+                                        <span id="modalWordCount"></span>
+                                    </div>
+                                    <div class="analysis-item">
+                                        <label>Detected Dates:</label>
+                                        <div id="modalDetectedDates" class="dates-list"></div>
+                                    </div>
+                                    <div class="analysis-item">
+                                        <label>Due Dates:</label>
+                                        <div id="modalDueDates" class="due-dates-list"></div>
+                                    </div>
+                                    <div class="analysis-item">
+                                        <label>Urgency Keywords:</label>
+                                        <div id="modalUrgencyKeywords" class="keywords-list"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="content-preview" class="tab-pane">
+                            <div class="content-preview">
+                                <h4>Document Content Preview</h4>
+                                <div id="modalExtractedText" class="extracted-text"></div>
+                            </div>
+                        </div>
+                        <div id="tags-section" class="tab-pane">
+                            <h4>Tags</h4>
+                            <div id="modalTags" class="tags-container"></div>
+                        </div>
+                    </div>
+           
             <div id="modalContent">
                 <!-- Document details will be loaded here -->
             </div>
@@ -1041,6 +1230,20 @@
 
             // Add active class to clicked tab
             event.target.classList.add('active');
+
+               // Handle modal tabs
+            if (document.getElementById('documentModal').style.display === 'block') {
+                const modalTabContents = document.querySelectorAll('.modal-content .tab-content');
+                modalTabContents.forEach(content => content.classList.add('hidden'));
+
+                const modalTabs = document.querySelectorAll('.modal-content .tab-buttons .tab-btn');
+                 modalTabs.forEach(tab => tab.classList.remove('active'));
+
+                 document.getElementById(tabName).classList.remove('hidden');
+                 document.querySelector(`.modal-content .tab-buttons .tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
+                  return;
+            }
+            
 
             // Load data based on tab
             if (tabName === 'documents') {
@@ -1258,16 +1461,120 @@
                     }
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    showDocumentModal(data);
+                    const doc = await response.json();
+
+                    // Populate modal fields
+                    document.getElementById('modalDocId').textContent = doc.doc_id;
+                    document.getElementById('modalFilename').textContent = doc.original_name;
+                    document.getElementById('modalDocType').textContent = doc.doc_type || 'N/A';
+                    document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
+
+                    const priorityElement = document.getElementById('modalPriority');
+                    priorityElement.textContent = doc.priority || 'N/A';
+                    priorityElement.className = `priority-${doc.priority}`;
+
+                    document.getElementById('modalStatus').textContent = doc.status || 'N/A';
+                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size);
+                    document.getElementById('modalUploadDate').textContent = formatDate(doc.upload_date);
+                    document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'N/A';
+                    document.getElementById('modalConfidence').textContent = doc.confidence ? `${(doc.confidence * 100).toFixed(1)}%` : 'N/A';
+                    document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No text content available';
+
+                    // Display analysis data if available
+                    if (doc.analysis) {
+                        const analysis = doc.analysis;
+
+                        // Summary
+                        document.getElementById('modalSummary').textContent = analysis.summary || 'No summary available';
+
+                        // Urgency
+                        const urgencyElement = document.getElementById('modalUrgency');
+                        if (analysis.urgency) {
+                            urgencyElement.innerHTML = `${analysis.urgency.signal} ${analysis.urgency.level} (Score: ${analysis.urgency.score})`;
+                            urgencyElement.className = `urgency-indicator urgency-${analysis.urgency.level.toLowerCase()}`;
+                        } else {
+                            urgencyElement.textContent = 'N/A';
+                        }
+
+                        // Word count
+                        document.getElementById('modalWordCount').textContent = analysis.word_count || 'N/A';
+
+                        // Detected dates
+                        const datesContainer = document.getElementById('modalDetectedDates');
+                        datesContainer.innerHTML = '';
+                        if (analysis.detected_dates && analysis.detected_dates.length > 0) {
+                            analysis.detected_dates.forEach(date => {
+                                const dateElement = document.createElement('span');
+                                dateElement.className = 'date-tag';
+                                dateElement.textContent = date;
+                                datesContainer.appendChild(dateElement);
+                            });
+                        } else {
+                            datesContainer.innerHTML = '<span class="no-data">No dates detected</span>';
+                        }
+
+                        // Due dates
+                        const dueDatesContainer = document.getElementById('modalDueDates');
+                        dueDatesContainer.innerHTML = '';
+                        if (analysis.due_dates && analysis.due_dates.length > 0) {
+                            analysis.due_dates.forEach(dueDate => {
+                                const dueDateElement = document.createElement('div');
+                                dueDateElement.className = 'due-date-item';
+                                dueDateElement.innerHTML = `<strong>${dueDate.date}</strong><br><small>${dueDate.original_text}</small>`;
+                                dueDatesContainer.appendChild(dueDateElement);
+                            });
+                        } else {
+                            dueDatesContainer.innerHTML = '<span class="no-data">No due dates found</span>';
+                        }
+
+                        // Urgency keywords
+                        const keywordsContainer = document.getElementById('modalUrgencyKeywords');
+                        keywordsContainer.innerHTML = '';
+                        if (analysis.urgency && analysis.urgency.matched_keywords && analysis.urgency.matched_keywords.length > 0) {
+                            analysis.urgency.matched_keywords.forEach(keyword => {
+                                const keywordElement = document.createElement('span');
+                                keywordElement.className = 'keyword-tag';
+                                keywordElement.textContent = keyword;
+                                keywordsContainer.appendChild(keywordElement);
+                            });
+                        } else {
+                            keywordsContainer.innerHTML = '<span class="no-data">No urgency keywords detected</span>';
+                        }
+                    } else {
+                        // Clear analysis fields if no analysis data
+                        document.getElementById('modalSummary').textContent = 'Analysis not available';
+                        document.getElementById('modalUrgency').textContent = 'N/A';
+                        document.getElementById('modalWordCount').textContent = 'N/A';
+                        document.getElementById('modalDetectedDates').innerHTML = '<span class="no-data">No analysis data</span>';
+                        document.getElementById('modalDueDates').innerHTML = '<span class="no-data">No analysis data</span>';
+                        document.getElementById('modalUrgencyKeywords').innerHTML = '<span class="no-data">No analysis data</span>';
+                    }
+
+                    // Display tags
+                    const tagsContainer = document.getElementById('modalTags');
+                    tagsContainer.innerHTML = '';
+                    if (doc.tags && doc.tags.length > 0) {
+                        doc.tags.forEach(tag => {
+                            const tagElement = document.createElement('span');
+                            tagElement.className = 'tag';
+                            tagElement.textContent = tag;
+                            tagsContainer.appendChild(tagElement);
+                        });
+                    } else {
+                        tagsContainer.innerHTML = '<span class="no-tags">No tags available</span>';
+                    }
+
+                    // Show modal
+                    document.getElementById('documentModal').style.display = 'block';
+                    // Reset to first tab
+                   showTab('basic-info');
                 } else {
-                    showToast('Failed to load document details', 'error');
+                    throw new Error('Failed to fetch document details');
                 }
             } catch (error) {
-                console.error('View document error:', error);
-                showToast('Failed to load document details', 'error');
+                console.error('Error fetching document:', error);
+                showNotification('Error loading document details', 'error');
             }
         }
 
@@ -1540,112 +1847,3 @@
                     <h3>${stats.total_documents}</h3>
                     <p>Total Documents</p>
                 </div>
-                <div class="stat-card">
-                    <h3>${stats.processed_documents}</h3>
-                    <p>Processed</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${stats.pending_documents}</h3>
-                    <p>Pending</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${stats.processing_rate}%</h3>
-                    <p>Processing Rate</p>
-                </div>
-            `;
-        }
-
-        function createCharts(stats) {
-            // Document Types Chart
-            const docTypesCtx = document.getElementById('docTypesChart').getContext('2d');
-            new Chart(docTypesCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(stats.document_types),
-                    datasets: [{
-                        data: Object.values(stats.document_types),
-                        backgroundColor: ['#4299e1', '#38a169', '#e53e3e', '#dd6b20', '#9f7aea']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-
-            // Departments Chart
-            const departmentsCtx = document.getElementById('departmentsChart').getContext('2d');
-            new Chart(departmentsCtx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(stats.departments),
-                    datasets: [{
-                        label: 'Documents',
-                        data: Object.values(stats.departments),
-                        backgroundColor: '#4299e1'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-
-            // Priority Chart
-            const priorityCtx = document.getElementById('priorityChart').getContext('2d');
-            new Chart(priorityCtx, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(stats.priorities),
-                    datasets: [{
-                        data: Object.values(stats.priorities),
-                        backgroundColor: ['#e53e3e', '#dd6b20', '#38a169']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-
-            // Trends Chart
-            const trendsCtx = document.getElementById('trendsChart').getContext('2d');
-            new Chart(trendsCtx, {
-                type: 'line',
-                data: {
-                    labels: stats.upload_trends.map(trend => trend.date),
-                    datasets: [{
-                        label: 'Daily Uploads',
-                        data: stats.upload_trends.map(trend => trend.count),
-                        borderColor: '#4299e1',
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        }
-
-        function showToast(message, type) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast ${type}`;
-            toast.style.display = 'block';
-
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('documentModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-    </script>
-</body>
-</html>
