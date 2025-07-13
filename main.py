@@ -647,7 +647,7 @@
                     <label>Batch Name:</label>
                     <input type="text" id="batchName" placeholder="Enter a name for this batch" required>
                 </div>
-                 <div class="form-group">
+                <div class="form-group">
                     <label>Target Department:</label>
                     <select id="targetDepartment" required>
                         <option value="">Select Department</option>
@@ -663,7 +663,7 @@
                         <option value="product">Product / R&D</option>
                         <option value="administration">Administration</option>
                         <option value="executive">Executive / Management</option>
-                         <option value="general">General</option>
+                        <option value="general">General</option>
                     </select>
                 </div>
 
@@ -826,7 +826,7 @@
     <!-- Document Detail Modal -->
     <div id="documentModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
+            <span class="close" onclick="closeModal()">×</span>
             <h2 id="modalTitle">Document Details</h2>
             <div id="modalContent">
                 <!-- Document details will be loaded here -->
@@ -861,8 +861,7 @@
                     return;
                 }
 
-                const response```text
- = await fetch('/api/me', {
+                const response = await fetch('/api/me', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -1069,11 +1068,6 @@
             }
         }
 
-        // Initialize file upload when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeFileUpload();
-        });
-
         function handleDragOver(e) {
             e.preventDefault();
             e.currentTarget.classList.add('dragover');
@@ -1083,12 +1077,15 @@
             e.preventDefault();
             e.currentTarget.classList.remove('dragover');
             const files = e.dataTransfer.files;
+            document.getElementById('fileInput').files = files; // Ensure fileInput is updated
             displayFiles(files);
+            checkUploadReadiness(); // Added to ensure button state is updated
         }
 
         function handleFileSelect(e) {
             const files = e.target.files;
             displayFiles(files);
+            checkUploadReadiness(); // Added to ensure button state is updated
         }
 
         function displayFiles(files) {
@@ -1421,9 +1418,7 @@
             document.getElementById('documentModal').style.display = 'none';
         }
 
-
-
-async function loadStatistics() {
+        async function loadStatistics() {
             if (!authToken || !currentUser) {
                 console.warn('No auth token or user for statistics');
                 return;
@@ -1519,13 +1514,20 @@ async function loadStatistics() {
         }
 
         function renderCharts(stats) {
+            // Ensure Chart is defined
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not loaded');
+                showToast('Failed to load charts: Chart.js not available', 'error');
+                return;
+            }
+
             // Clear existing charts first
             Chart.helpers.each(Chart.instances, function(instance) {
                 instance.destroy();
             });
 
             // Document Types Chart
-            if (stats.document_types && Object.keys(stats.document_types).length > 0) {
+            if (stats?.document_types && Object.keys(stats.document_types).length > 0) {
                 const docTypesCtx = document.getElementById('docTypesChart');
                 if (docTypesCtx) {
                     docTypesCtx.width = 350;
@@ -1553,7 +1555,7 @@ async function loadStatistics() {
             }
 
             // Departments Chart
-            if (stats.departments && Object.keys(stats.departments).length > 0) {
+            if (stats?.departments && Object.keys(stats.departments).length > 0) {
                 const deptCtx = document.getElementById('departmentsChart');
                 if (deptCtx) {
                     deptCtx.width = 350;
@@ -1587,7 +1589,7 @@ async function loadStatistics() {
             }
 
             // Priority Chart
-            if (stats.priorities && Object.keys(stats.priorities).length > 0) {
+            if (stats?.priorities && Object.keys(stats.priorities).length > 0) {
                 const priorityCtx = document.getElementById('priorityChart');
                 if (priorityCtx) {
                     priorityCtx.width = 350;
@@ -1615,7 +1617,7 @@ async function loadStatistics() {
             }
 
             // Upload Trends Chart
-            if (stats.upload_trends && stats.upload_trends.length > 0) {
+            if (stats?.upload_trends && stats.upload_trends.length > 0) {
                 const trendsCtx = document.getElementById('trendsChart');
                 if (trendsCtx) {
                     trendsCtx.width = 350;
@@ -1763,14 +1765,13 @@ async function loadStatistics() {
             }, 3000);
         }
 
-        ```text
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('documentModal');
             if (event.target === modal) {
                 closeModal();
             }
-        }
+        };
 
         // Check if upload is ready (files + department selected)
         function checkUploadReadiness() {
@@ -1796,11 +1797,11 @@ async function loadStatistics() {
             const fileInput = document.getElementById('fileInput');
             const targetDepartment = document.getElementById('targetDepartment');
 
-            if (uploadArea) {
-                uploadArea.addEventListener('click', () => {
-                    fileInput.click();
-                });
+            // Initialize file upload listeners
+            initializeFileUpload();
 
+            // Additional upload handling with null checks
+            if (uploadArea) {
                 uploadArea.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.currentTarget.style.borderColor = '#007bff';
