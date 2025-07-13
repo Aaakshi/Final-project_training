@@ -1173,7 +1173,7 @@ async def notify_department(doc_id: str, classification_result: dict,
     # Get department email and document details
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?',
+    cursor.execute('SELECT dept_email, manager_email FROM departments WHERE dept_id = ?',
                    (department, ))
     dept_result = cursor.fetchone()
 
@@ -1184,6 +1184,7 @@ async def notify_department(doc_id: str, classification_result: dict,
 
     if dept_result:
         dept_email = dept_result[0]
+        manager_email = dept_result[1]
 
         # Create descriptive subject based on document type
         doc_type_display = doc_type.replace('_', ' ').title()
@@ -1211,7 +1212,10 @@ async def notify_department(doc_id: str, classification_result: dict,
         </html>
         """
 
+        # Send notification to both department email and manager email
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
+        if manager_email and manager_email != dept_email:
+            send_email(manager_email, subject, body, doc_id, file_name, user['email'])
 
 
 def update_document_status(doc_id: str, status: str):
@@ -1427,7 +1431,7 @@ async def get_review_documents(page: int = 1,
         # Admin can see all documents
         pass
     elif current_user['role'] == 'manager':
-        # Managers can see documents routed to their department (not just uploaded by them)
+        # Managers can see ALL documents routed to their department, regardless of who uploaded them
         where_clauses.append("d.department = ?")
         params.append(current_user['department'])
     else:
@@ -1438,9 +1442,6 @@ async def get_review_documents(page: int = 1,
     if review_status:
         where_clauses.append("d.review_status = ?")
         params.append(review_status)
-    else:
-        # Default to pending if no status specified
-        where_clauses.append("(d.review_status IS NULL OR d.review_status = 'pending')")
 
     if search:
         where_clauses.append("(d.original_name LIKE ? OR d.extracted_text LIKE ?)")
@@ -1453,14 +1454,14 @@ async def get_review_documents(page: int = 1,
         SELECT d.doc_id, d.original_name, d.file_size, d.file_type, d.uploaded_at, 
                d.processing_status, d.document_type, d.department, d.priority, 
                d.classification_confidence, d.page_count, d.tags, d.review_status, 
-                   d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email,
-                   d.extracted_text
-            FROM documents d
-            LEFT JOIN users u ON d.user_id = u.user_id
-            {where_sql}
-            ORDER BY d.uploaded_at DESC
-            LIMIT ? OFFSET ?
-        '''
+               d.reviewed_by, d.user_id, u.full_name as uploaded_by_name, u.email as uploaded_by_email,
+               d.extracted_text
+        FROM documents d
+        LEFT JOIN users u ON d.user_id = u.user_id
+        {where_sql}
+        ORDER BY d.uploaded_at DESC
+        LIMIT ? OFFSET ?
+    '''
 
     offset = (page - 1) * page_size
     params.extend([page_size, offset])
@@ -1500,7 +1501,8 @@ async def get_review_documents(page: int = 1,
             "reviewed_by": row[13] or "",
             "user_id": row[14],
             "uploaded_by": row[15] or "Unknown",
-            "extracted_text": row[16] or ""
+            "uploaded_by_email": row[16] or "",
+            "extracted_text": row[17] or ""
         }
         documents.append(doc)
 
@@ -1578,11 +1580,12 @@ async def get_email_notifications(page: int = 1,
     cursor = conn.cursor()
 
     # Get department email for current user
-    cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?', (current_user['department'],))
+    cursor.execute('SELECT dept_email, manager_email FROM departments WHERE dept_id = ?', (current_user['department'],))
     dept_result = cursor.fetchone()
     user_dept_email = dept_result[0] if dept_result else f"{current_user['department']}@company.com"
+    user_manager_email = dept_result[1] if dept_result else f"{current_user['department']}.manager@company.com"
 
-    # Get emails based on user role with strict department filtering
+    # Get emails based on user role with proper filtering
     offset = (page - 1) * page_size
 
     if current_user['role'] == 'admin':
@@ -1602,7 +1605,7 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [page_size, offset])
 
     elif current_user['role'] == 'employee':
-        # Employees see only emails related to them or their uploaded documents
+        # Employees see emails related to them or their uploaded documents
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1619,7 +1622,7 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
 
     else:  # managers
-        # Managers see emails related to their department only
+        # Managers see ALL emails related to their department including documents routed to their department
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1629,11 +1632,11 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
+            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department'], page_size, offset])
 
     emails = cursor.fetchall()
 
@@ -1652,8 +1655,8 @@ async def get_email_notifications(page: int = 1,
         cursor.execute('''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
-        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
+            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
+        ''', [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department']])
         total_count_result = cursor.fetchone()
 
     total_count = total_count_result[0] if total_count_result else 0
