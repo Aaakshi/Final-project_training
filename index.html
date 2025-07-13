@@ -899,7 +899,8 @@
                 return true; // Prevent default errorhandling
             };
 
-            const token = localStorage.getItem('authToken');
+            const token```html
+ = localStorage.getItem('authToken');
             if (token) {
                 authToken = token;
                 checkAuth();

@@ -227,7 +227,13 @@ def init_database():
         ('urgent_invoice.txt', 'hr.manager@company.com', 'finance', 'financial_document', 'high', 'classified', "urgent invoice payment"),
         ('reminder_contract.txt', 'hr.manager@company.com', 'legal', 'legal_document', 'medium', 'classified', "reminder contract terms"),
         ('fyi_report.txt', 'general.employee@company.com', 'general', 'general_document', 'low', 'classified', "fyi report summary"),
-        ('hr_urgent_policy.txt', 'hr.manager@company.com', 'hr', 'hr_document', 'high', 'classified', "hr urgent policy update")
+        ('hr_urgent_policy.txt', 'hr.manager@company.com', 'hr', 'hr_document', 'high', 'classified', "hr urgent policy update"),
+        ('it_security_doc.txt', 'it.manager@company.com', 'it', 'it_document', 'high', 'classified', "it security policy"),
+        ('sales_proposal.txt', 'sales.manager@company.com', 'sales', 'sales_document', 'medium', 'classified', "sales proposal document"),
+        ('marketing_campaign.txt', 'finance.manager@company.com', 'marketing', 'marketing_document', 'low', 'classified', "marketing campaign plan"),
+        ('operations_manual.txt', 'hr.manager@company.com', 'operations', 'operations_document', 'medium', 'classified', "operations manual"),
+        ('support_ticket.txt', 'general.employee@company.com', 'support', 'support_document', 'high', 'classified', "customer support ticket"),
+        ('procurement_order.txt', 'finance.manager@company.com', 'procurement', 'procurement_document', 'medium', 'classified', "procurement purchase order")
     ]
 
     for original_name, user_email, dept, doc_type, priority, status, content in sample_priority_docs:
@@ -1939,34 +1945,41 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
         conn.close()
 
+        # Ensure all values are properly formatted
         stats_response = {
-            "total_documents": total_documents,
-            "processed_documents": processed_documents,
-            "pending_documents": pending_documents,
-            "processing_rate": processing_rate,
-            "document_types": doc_types,
-            "departments": departments,
-            "priorities": priorities,
-            "upload_trends": upload_trends
+            "total_documents": int(total_documents) if total_documents else 0,
+            "processed_documents": int(processed_documents) if processed_documents else 0,
+            "pending_documents": int(pending_documents) if pending_documents else 0,
+            "processing_rate": int(processing_rate) if processing_rate else 0,
+            "document_types": dict(doc_types) if doc_types else {},
+            "departments": dict(departments) if departments else {},
+            "priorities": dict(priorities) if priorities else {},
+            "upload_trends": list(upload_trends) if upload_trends else []
         }
 
-        return stats_response
+        return JSONResponse(
+            content=stats_response,
+            headers={"Content-Type": "application/json"}
+        )
 
     except Exception as e:
         print(f"Stats error: {e}")
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
         # Return empty stats as JSON to prevent script errors
-        return {
-            "total_documents": 0,
-            "processed_documents": 0,
-            "pending_documents": 0,
-            "processing_rate": 0,
-            "document_types": {},
-            "departments": {},
-            "priorities": {},
-            "upload_trends": []
-        }
+        return JSONResponse(
+            content={
+                "total_documents": 0,
+                "processed_documents": 0,
+                "pending_documents": 0,
+                "processing_rate": 0,
+                "document_types": {},
+                "departments": {},
+                "priorities": {},
+                "upload_trends": []
+            },
+            headers={"Content-Type": "application/json"}
+        )
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):
