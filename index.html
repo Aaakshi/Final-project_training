@@ -1720,3 +1720,221 @@
                     '<div style="margin: 8px 0;"><strong>To:</strong> ' + receivedByName + ' (' + email.received_by + ')</div>' +
                     '<div style="margin: 8px 0;"><strong>Document:</strong> ' + documentName + '</div>' +
                     '<div style="margin: 8px 0;"><strong>Department:</strong> <span class="department-badge dept-' + department + '">' + department.toUpperCase() + '</span></div>' +
+                    '<div style="margin: 8px 0;"><strong>Date:</strong> ' + sentDate + '</div>' +
+                    (bodyPreview ? '<div style="margin: 8px 0; color: #666; font-style: italic;">' + bodyPreview + '</div>' : '') +
+                    '</div>';
+            }).join('');
+
+            container.innerHTML = emailsHTML;
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        displayStats(data);
+                        // Clear any previous error messages
+                        const errorElements = document.querySelectorAll('.error-message');
+                        errorElements.forEach(el => el.remove());
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
+                } else {
+                    displayStats({
+                        total_documents: 0,
+                        processed_documents: 0,
+                        pending_documents: 0,
+                        processing_rate: 0,
+                        document_types: {},
+                        departments: {},
+                        priorities: {}
+                    });
+                }
+            } catch (error) {
+                console.error('Load stats error:', error);
+                // Display fallback stats instead of showing error
+                displayStats({
+                    total_documents: 0,
+                    processed_documents: 0,
+                    pending_documents: 0,
+                    processing_rate: 0,
+                    document_types: {},
+                    departments: {},
+                    priorities: {}
+                });
+            }
+        }
+
+        function displayStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+
+            statsGrid.innerHTML = '<div class="stat-card">' +
+                '<h3>' + stats.total_documents + '</h3>' +
+                '<p>Total Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.processed_documents + '</h3>' +
+                '<p>Processed Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.pending_documents + '</h3>' +
+                '<p>Pending Documents</p>' +
+                '</div>' +
+                '<div class="stat-card">' +
+                '<h3>' + stats.processing_rate + '%</h3>' +
+                '<p>Processing Rate</p>' +
+                '</div>';
+
+            // Only create charts if Chart.js is loaded
+            if (typeof Chart !== 'undefined') {
+                createCharts(stats);
+            } else {
+                console.log('Chart.js not loaded, skipping chart creation');
+            }
+        }
+
+        function createCharts(stats) {
+            try {
+                // Create document types chart
+                if (stats.document_types && Object.keys(stats.document_types).length > 0) {
+                    const ctx1 = document.getElementById('docTypesChart');
+                    if (ctx1) {
+                        new Chart(ctx1, {
+                            type: 'pie',
+                            data: {
+                                labels: Object.keys(stats.document_types),
+                                datasets: [{
+                                    data: Object.values(stats.document_types),
+                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+                }
+
+                // Create departments chart
+                if (stats.departments && Object.keys(stats.departments).length > 0) {
+                    const ctx2 = document.getElementById('departmentsChart');
+                    if (ctx2) {
+                        new Chart(ctx2, {
+                            type: 'doughnut',
+                            data: {
+                                labels: Object.keys(stats.departments),
+                                datasets: [{
+                                    data: Object.values(stats.departments),
+                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false
+                            }
+                        });
+                    }
+                }
+
+                // Create priority chart
+                if (stats.priorities && Object.keys(stats.priorities).length > 0) {
+                    const ctx3 = document.getElementById('priorityChart');
+                    if (ctx3) {
+                        new Chart(ctx3, {
+                            type: 'bar',
+                            data: {
+                                labels: Object.keys(stats.priorities),
+                                datasets: [{
+                                    label: 'Documents',
+                                    data: Object.values(stats.priorities),
+                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // Create trends chart
+                if (stats.upload_trends && stats.upload_trends.length > 0) {
+                    const ctx4 = document.getElementById('trendsChart');
+                    if (ctx4) {
+                        new Chart(ctx4, {
+                            type: 'line',
+                            data: {
+                                labels: stats.upload_trends.map(item => item.date),
+                                datasets: [{
+                                    label: 'Uploads',
+                                    data: stats.upload_trends.map(item => item.count),
+                                    borderColor: '#36A2EB',
+                                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                    tension: 0.1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error creating charts:', error);
+            }
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+            toast.style.display = 'block';
+            
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function closeModal() {
+            document.getElementById('documentModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('documentModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
