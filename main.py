@@ -1,3 +1,261 @@
+
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import List, Optional
+import sqlite3
+import uuid
+import datetime
+import os
+import hashlib
+import jwt
+import smtplib
+from email.mime.text import MimeText
+from email.mime.multipart import MimeMultipart
+from pathlib import Path
+import PyPDF2
+import docx
+from werkzeug.utils import secure_filename
+import uvicorn
+
+# Configuration
+SECRET_KEY = "your-secret-key-change-in-production"
+ALGORITHM = "HS256"
+DB_PATH = "idcr_documents.db"
+
+app = FastAPI(title="IDCR System")
+security = HTTPBearer()
+
+# Email configuration
+EMAIL_CONFIG = {
+    'smtp_server': 'smtp-mail.outlook.com',
+    'smtp_port': 587,
+    'sender_email': 'your-email@outlook.com',
+    'sender_password': 'your-app-password'
+}
+
+def send_email(to_email, subject, body, cc_email=None, bcc_email=None, reply_to=None):
+    """Send email notification"""
+    try:
+        msg = MimeMultipart()
+        msg['From'] = EMAIL_CONFIG['sender_email']
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        if cc_email:
+            msg['Cc'] = cc_email
+        if reply_to:
+            msg['Reply-To'] = reply_to
+
+        msg.attach(MimeText(body, 'html'))
+
+        server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
+        server.starttls()
+        server.login(EMAIL_CONFIG['sender_email'], EMAIL_CONFIG['sender_password'])
+        
+        recipients = [to_email]
+        if cc_email:
+            recipients.append(cc_email)
+        if bcc_email:
+            recipients.append(bcc_email)
+            
+        server.sendmail(EMAIL_CONFIG['sender_email'], recipients, msg.as_string())
+        server.quit()
+        
+        print(f"✅ Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_email}: {e}")
+        return False
+
+def init_database():
+    """Initialize the SQLite database with required tables"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            user_id VARCHAR(50) PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            full_name VARCHAR(255) NOT NULL,
+            department VARCHAR(100) NOT NULL,
+            role VARCHAR(50) DEFAULT 'employee' CHECK (role IN ('employee', 'manager', 'admin')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active BOOLEAN DEFAULT TRUE
+        )
+    ''')
+    
+    # Create documents table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS documents (
+            doc_id VARCHAR(36) PRIMARY KEY,
+            user_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
+            original_name VARCHAR(255) NOT NULL,
+            file_path VARCHAR(500) NOT NULL,
+            file_size INTEGER NOT NULL,
+            file_type VARCHAR(50) NOT NULL,
+            mime_type VARCHAR(100),
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            processing_status VARCHAR(50) DEFAULT 'uploaded' CHECK (processing_status IN ('uploaded', 'processing', 'classified', 'routed', 'reviewed', 'archived')),
+            extracted_text TEXT,
+            document_type VARCHAR(100),
+            department VARCHAR(100),
+            priority VARCHAR(50) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+            classification_confidence REAL,
+            page_count INTEGER,
+            language VARCHAR(10) DEFAULT 'en',
+            tags TEXT,
+            review_status VARCHAR(50) DEFAULT 'pending' CHECK (review_status IN ('pending', 'approved', 'rejected', 'needs_revision'))
+        )
+    ''')
+    
+    # Create upload_batches table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS upload_batches (
+            batch_id VARCHAR(36) PRIMARY KEY,
+            user_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
+            batch_name VARCHAR(255) NOT NULL,
+            total_files INTEGER NOT NULL,
+            processed_files INTEGER DEFAULT 0,
+            failed_files INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            completed_at TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'processing' CHECK (status IN ('processing', 'completed', 'failed'))
+        )
+    ''')
+    
+    # Create document_reviews table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS document_reviews (
+            review_id VARCHAR(36) PRIMARY KEY,
+            doc_id VARCHAR(36) NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
+            reviewer_id VARCHAR(50) NOT NULL REFERENCES users(user_id),
+            status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'needs_revision')),
+            comments TEXT,
+            reviewed_at TIMESTAMP,
+            decision VARCHAR(50),
+            metadata TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("Database initialized successfully!")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user from JWT token"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user = cursor.fetchone()
+        conn.close()
+        
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        
+        return {
+            "user_id": user[0],
+            "email": user[1],
+            "full_name": user[3],
+            "department": user[4],
+            "role": user[5]
+        }
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.get("/", response_class=HTMLResponse)
+async def get_frontend():
+    """Serve the main frontend"""
+    try:
+        with open("Final-project_training/index.html", "r") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Frontend file not found</h1>", status_code=404)
+
+@app.post("/api/register")
+async def register(request: Request):
+    """Register a new user"""
+    data = await request.json()
+    email = data.get("email")
+    password = data.get("password")
+    full_name = data.get("full_name")
+    department = data.get("department")
+    
+    if not all([email, password, full_name, department]):
+        raise HTTPException(status_code=400, detail="All fields are required")
+    
+    user_id = str(uuid.uuid4())
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO users (user_id, email, password_hash, full_name, department)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, email, password_hash, full_name, department))
+        conn.commit()
+        conn.close()
+        
+        return {"message": "User registered successfully", "user_id": user_id}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Email already exists")
+
+@app.post("/api/login")
+async def login(request: Request):
+    """Login user and return JWT token"""
+    data = await request.json()
+    email = data.get("email")
+    password = data.get("password")
+    
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email and password required")
+    
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE email = ? AND password_hash = ?", (email, password_hash))
+    user = cursor.fetchone()
+    conn.close()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    token_data = {"sub": user[0]}
+    token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+    
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "user_id": user[0],
+            "email": user[1],
+            "full_name": user[3],
+            "department": user[4],
+            "role": user[5]
+        }
+    }
+
+@app.get("/api/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current user information"""
+    return current_user
+
+@app.post("/api/bulk-upload")
 async def bulk_upload(
     files: List[UploadFile] = File(...),
     batch_name: str = Form(...),
@@ -187,6 +445,106 @@ async def bulk_upload(
         "total_files": len(uploaded_files),
         "failed_files": failed_files if failed_files else None
     }
+
+@app.get("/api/documents")
+async def get_documents(
+    department: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get documents with optional filtering"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    query = "SELECT * FROM documents WHERE 1=1"
+    params = []
+    
+    # Filter by department if user is manager/admin
+    if current_user['role'] in ['manager', 'admin']:
+        if department:
+            query += " AND department = ?"
+            params.append(department)
+        elif current_user['role'] == 'manager':
+            query += " AND department = ?"
+            params.append(current_user['department'])
+    else:
+        # Regular employees see only their documents
+        query += " AND user_id = ?"
+        params.append(current_user['user_id'])
+    
+    if status:
+        query += " AND processing_status = ?"
+        params.append(status)
+    
+    query += " ORDER BY uploaded_at DESC"
+    
+    cursor.execute(query, params)
+    documents = cursor.fetchall()
+    conn.close()
+    
+    return {"documents": [dict(zip([col[0] for col in cursor.description], doc)) for doc in documents]}
+
+@app.get("/api/stats")
+async def get_stats(current_user: dict = Depends(get_current_user)):
+    """Get dashboard statistics"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Total documents
+    cursor.execute("SELECT COUNT(*) FROM documents")
+    total_docs = cursor.fetchone()[0]
+    
+    # Pending reviews
+    cursor.execute("SELECT COUNT(*) FROM documents WHERE review_status = 'pending'")
+    pending_reviews = cursor.fetchone()[0]
+    
+    # Documents by department
+    cursor.execute("SELECT department, COUNT(*) FROM documents GROUP BY department")
+    dept_stats = cursor.fetchall()
+    
+    conn.close()
+    
+    return {
+        "total_documents": total_docs,
+        "pending_reviews": pending_reviews,
+        "department_stats": dict(dept_stats)
+    }
+
+@app.post("/api/documents/{doc_id}/review")
+async def review_document(
+    doc_id: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    """Review a document (approve/reject)"""
+    data = await request.json()
+    status = data.get("status")
+    comments = data.get("comments", "")
+    
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Update document review status
+    cursor.execute('''
+        UPDATE documents 
+        SET review_status = ?, processing_status = ?
+        WHERE doc_id = ?
+    ''', (status, "reviewed", doc_id))
+    
+    # Create review record
+    review_id = str(uuid.uuid4())
+    cursor.execute('''
+        INSERT INTO document_reviews (review_id, doc_id, reviewer_id, status, comments, reviewed_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (review_id, doc_id, current_user['user_id'], status, comments, datetime.datetime.utcnow().isoformat()))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": f"Document {status} successfully"}
 
 if __name__ == "__main__":
     init_database()

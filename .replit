@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Start Complete Demo"
+runButton = "Run IDCR Frontend"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -93,6 +93,15 @@ args = "python Final-project_training/microservices/content_analysis/app/main.py
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python Final-project_training/microservices/workflow_integration/app/main.py"
+
+[[workflows.workflow]]
+name = "Run IDCR Frontend"
+author = 44313974
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
 
 [[ports]]
 localPort = 3000
