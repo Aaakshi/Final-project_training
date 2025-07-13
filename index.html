@@ -1500,15 +1500,14 @@
         async function reviewDocument(docId, action, comments) {
             comments = comments || '';
             try {
-                const response = await fetch('/api/documents/' + docId + '/review', {
+                const response = await fetch('/api/review-document/' + docId, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + authToken
                     },
                     body: JSON.stringify({
-                        doc_id: docId,
-                        status: action,
+                        action: action,
                         comments: comments
                     })
                 });
