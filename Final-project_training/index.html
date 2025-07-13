@@ -1789,32 +1789,46 @@ async function loadStatistics() {
             }
         }
 
-        // File upload handling
-        document.getElementById('uploadArea').addEventListener('click', () => {
-            document.getElementById('fileInput').click();
+        // Initialize event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // File upload handling
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const targetDepartment = document.getElementById('targetDepartment');
+
+            if (uploadArea) {
+                uploadArea.addEventListener('click', () => {
+                    fileInput.click();
+                });
+
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#007bff';
+                });
+
+                uploadArea.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = '#ddd';
+
+                    const files = e.dataTransfer.files;
+                    fileInput.files = files;
+                    checkUploadReadiness();
+                });
+            }
+
+            if (fileInput) {
+                fileInput.addEventListener('change', checkUploadReadiness);
+            }
+
+            if (targetDepartment) {
+                targetDepartment.addEventListener('change', checkUploadReadiness);
+            }
         });
-
-        document.getElementById('uploadArea').addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.currentTarget.style.borderColor = '#007bff';
-        });
-
-        document.getElementById('uploadArea').addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            e.currentTarget.style.borderColor = '#ddd';
-        });
-
-        document.getElementById('uploadArea').addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.currentTarget.style.borderColor = '#ddd';
-
-            const files = e.dataTransfer.files;
-            document.getElementById('fileInput').files = files;
-            checkUploadReadiness();
-        });
-
-        document.getElementById('fileInput').addEventListener('change', checkUploadReadiness);
-        document.getElementById('targetDepartment').addEventListener('change', checkUploadReadiness);
     </script>
 </body>
 </html>
