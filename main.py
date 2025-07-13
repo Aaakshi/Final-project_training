@@ -494,21 +494,163 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     cursor.execute("SELECT COUNT(*) FROM documents")
     total_docs = cursor.fetchone()[0]
     
-    # Pending reviews
+    # Processed documents
+    cursor.execute("SELECT COUNT(*) FROM documents WHERE processing_status = 'classified'")
+    processed_docs = cursor.fetchone()[0]
+    
+    # Pending documents
     cursor.execute("SELECT COUNT(*) FROM documents WHERE review_status = 'pending'")
-    pending_reviews = cursor.fetchone()[0]
+    pending_docs = cursor.fetchone()[0]
+    
+    # Error documents
+    cursor.execute("SELECT COUNT(*) FROM documents WHERE processing_status = 'failed'")
+    error_docs = cursor.fetchone()[0]
+    
+    # Processing rate
+    processing_rate = (processed_docs / total_docs * 100) if total_docs > 0 else 0
     
     # Documents by department
     cursor.execute("SELECT department, COUNT(*) FROM documents GROUP BY department")
-    dept_stats = cursor.fetchall()
+    dept_stats = dict(cursor.fetchall())
+    
+    # Document types
+    cursor.execute("SELECT document_type, COUNT(*) FROM documents GROUP BY document_type")
+    doc_types = dict(cursor.fetchall())
+    
+    # Priorities
+    cursor.execute("SELECT priority, COUNT(*) FROM documents GROUP BY priority")
+    priorities = dict(cursor.fetchall())
+    
+    # Upload trends (last 30 days)
+    cursor.execute("""
+        SELECT DATE(uploaded_at) as date, COUNT(*) as count 
+        FROM documents 
+        WHERE uploaded_at >= datetime('now', '-30 days')
+        GROUP BY DATE(uploaded_at)
+        ORDER BY date
+    """)
+    upload_trends = [{"date": row[0], "count": row[1]} for row in cursor.fetchall()]
     
     conn.close()
     
     return {
         "total_documents": total_docs,
-        "pending_reviews": pending_reviews,
-        "department_stats": dict(dept_stats)
+        "processed_documents": processed_docs,
+        "pending_documents": pending_docs,
+        "error_documents": error_docs,
+        "processing_rate": round(processing_rate, 1),
+        "department_stats": dept_stats,
+        "document_types": doc_types,
+        "departments": dept_stats,
+        "priorities": priorities,
+        "upload_trends": upload_trends
     }
+
+@app.get("/api/documents/{doc_id}")
+async def get_document_details(
+    doc_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed information about a document"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,))
+    doc = cursor.fetchone()
+    
+    if not doc:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Get column names
+    column_names = [description[0] for description in cursor.description]
+    doc_dict = dict(zip(column_names, doc))
+    
+    # Get review information if available
+    cursor.execute("""
+        SELECT dr.*, u.full_name as reviewer_name 
+        FROM document_reviews dr
+        LEFT JOIN users u ON dr.reviewer_id = u.user_id
+        WHERE dr.doc_id = ?
+        ORDER BY dr.reviewed_at DESC
+        LIMIT 1
+    """, (doc_id,))
+    review = cursor.fetchone()
+    
+    if review:
+        doc_dict['reviewed_by'] = review[8]  # reviewer_name
+        doc_dict['reviewed_at'] = review[6]  # reviewed_at
+        doc_dict['review_comments'] = review[4]  # comments
+    
+    conn.close()
+    return doc_dict
+
+@app.get("/api/email-notifications")
+async def get_email_notifications(
+    page: int = 1,
+    page_size: int = 10,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get email notifications (simulated)"""
+    # This is a demo endpoint that simulates email notifications
+    # In a real system, this would fetch from an email logs table
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Get recent documents for email simulation
+    cursor.execute("""
+        SELECT d.*, u.full_name as uploader_name, u.email as uploader_email
+        FROM documents d
+        LEFT JOIN users u ON d.user_id = u.user_id
+        WHERE d.department = ? OR d.user_id = ?
+        ORDER BY d.uploaded_at DESC
+        LIMIT ?
+    """, (current_user['department'], current_user['user_id'], page_size))
+    
+    documents = cursor.fetchall()
+    conn.close()
+    
+    # Simulate email notifications
+    emails = []
+    for doc in documents:
+        # Notification to department manager
+        if current_user['role'] in ['manager', 'admin']:
+            emails.append({
+                "subject": f"New Document Uploaded: {doc[2]}",
+                "sent_by": "noreply@idcr-system.com",
+                "sent_by_name": "IDCR System",
+                "received_by": f"{current_user['department']}.manager@company.com",
+                "received_by_name": f"{current_user['department'].title()} Manager",
+                "sent_at": doc[7],
+                "email_type": "received",
+                "status": "delivered",
+                "document_name": doc[2],
+                "document_type": doc[10] or "General",
+                "department": doc[11] or "General",
+                "priority": doc[12] or "Medium",
+                "body_preview": f"A new document has been uploaded and requires review..."
+            })
+        
+        # Confirmation to uploader
+        if doc[1] == current_user['user_id']:
+            emails.append({
+                "subject": f"Document Upload Confirmation: {doc[2]}",
+                "sent_by": "noreply@idcr-system.com", 
+                "sent_by_name": "IDCR System",
+                "received_by": current_user['email'],
+                "received_by_name": current_user['full_name'],
+                "sent_at": doc[7],
+                "email_type": "received",
+                "status": "delivered",
+                "document_name": doc[2],
+                "document_type": doc[10] or "General",
+                "department": doc[11] or "General",
+                "priority": doc[12] or "Medium",
+                "body_preview": f"Your document has been successfully uploaded and sent for review..."
+            })
+    
+    return {"emails": emails[:page_size]}
 
 @app.post("/api/documents/{doc_id}/review")
 async def review_document(
@@ -527,6 +669,14 @@ async def review_document(
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # Get document details for notification
+    cursor.execute("SELECT * FROM documents WHERE doc_id = ?", (doc_id,))
+    doc = cursor.fetchone()
+    
+    if not doc:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Document not found")
+    
     # Update document review status
     cursor.execute('''
         UPDATE documents 
@@ -541,8 +691,39 @@ async def review_document(
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (review_id, doc_id, current_user['user_id'], status, comments, datetime.datetime.utcnow().isoformat()))
     
+    # Get uploader details for notification
+    cursor.execute("SELECT email, full_name FROM users WHERE user_id = ?", (doc[1],))
+    uploader = cursor.fetchone()
+    
     conn.commit()
     conn.close()
+    
+    # Send notification email to document uploader
+    if uploader:
+        subject = f"Document Review Complete: {doc[2]} - {status.upper()}"
+        body = f"""
+        <html>
+            <body>
+                <h2>Document Review Update</h2>
+                <p>Dear {uploader[1]},</p>
+                <p>Your document <strong>{doc[2]}</strong> has been <strong>{status}</strong> by {current_user['full_name']}.</p>
+                
+                <h3>Review Details:</h3>
+                <ul>
+                    <li><strong>Document:</strong> {doc[2]}</li>
+                    <li><strong>Status:</strong> {status.upper()}</li>
+                    <li><strong>Reviewed by:</strong> {current_user['full_name']} ({current_user['department'].upper()} Department)</li>
+                    <li><strong>Date:</strong> {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}</li>
+                    {f'<li><strong>Comments:</strong> {comments}</li>' if comments else ''}
+                </ul>
+                
+                <p>You can view the full details in the IDCR system.</p>
+                <p>Best regards,<br>IDCR System</p>
+            </body>
+        </html>
+        """
+        
+        send_email(uploader[0], subject, body, None, None, current_user['email'])
     
     return {"message": f"Document {status} successfully"}
 
