@@ -1614,11 +1614,13 @@ async def get_document_details(doc_id: str,
 
     # Check permissions
     if current_user['role'] == 'employee' and row[1] != current_user['user_id']:
+        conn.close()
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Get user information
     cursor.execute('SELECT full_name, email FROM users WHERE user_id = ?', (row[1],))
     user_info = cursor.fetchone()
+    conn.close()
 
     # Convert row to dictionary
     columns = [
