@@ -675,74 +675,105 @@ async def favicon():
 @app.post("/api/register")
 async def register_user(user_data: UserRegistration):
     """Register a new user"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
 
-    # Check if user already exists
-    cursor.execute('SELECT user_id FROM users WHERE email = ?',
-                   (user_data.email, ))
-    if cursor.fetchone():
+        # Check if user already exists
+        cursor.execute('SELECT user_id FROM users WHERE email = ?',
+                       (user_data.email, ))
+        if cursor.fetchone():
+            conn.close()
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Email already registered"},
+                headers={"Content-Type": "application/json"}
+            )
+
+        # Create new user
+        user_id = str(uuid.uuid4())
+        password_hash = hash_password(user_data.password)
+
+        cursor.execute(
+            '''
+            INSERT INTO users (user_id, email, password_hash, full_name, department, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, user_data.email, password_hash, user_data.full_name,
+              user_data.department or 'general', datetime.datetime.utcnow().isoformat()))
+
+        conn.commit()
         conn.close()
-        raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create new user
-    user_id = str(uuid.uuid4())
-    password_hash = hash_password(user_data.password)
+        # Send welcome email
+        welcome_body = f"""
+        <html>
+            <body>
+                <h2>Welcome to IDCR System!</h2>
+                <p>Dear {user_data.full_name},</p>
+                <p>Your account has been successfully created. You can now upload and manage your documents.</p>
+                <p>Best regards,<br>IDCR Team</p>
+            </body>
+        </html>
+        """
+        send_email(user_data.email, "Welcome to IDCR System", welcome_body, None, None, "noreply@idcr-system.com")
 
-    cursor.execute(
-        '''
-        INSERT INTO users (user_id, email, password_hash, full_name, department, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (user_id, user_data.email, password_hash, user_data.full_name,
-          user_data.department or 'general', datetime.datetime.utcnow().isoformat()))
+        return JSONResponse(
+            content={"message": "User registered successfully", "user_id": user_id},
+            headers={"Content-Type": "application/json"}
+        )
 
-    conn.commit()
-    conn.close()
-
-    # Send welcome email
-    welcome_body = f"""
-    <html>
-        <body>
-            <h2>Welcome to IDCR System!</h2>
-            <p>Dear {user_data.full_name},</p>
-            <p>Your account has been successfully created. You can now upload and manage your documents.</p>
-            <p>Best regards,<br>IDCR Team</p>
-        </body>
-    </html>
-    """
-    send_email(user_data.email, "Welcome to IDCR System", welcome_body, None, None, "noreply@idcr-system.com")
-
-    return {"message": "User registered successfully", "user_id": user_id}
+    except Exception as e:
+        print(f"Registration error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Registration failed - server error"},
+            headers={"Content-Type": "application/json"}
+        )
 
 
 @app.post("/api/login")
 async def login_user(user_data: UserLogin):
     """Login user"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
 
-    cursor.execute('SELECT * FROM users WHERE email = ? AND is_active = 1',
-                   (user_data.email, ))
-    user = cursor.fetchone()
-    conn.close()
+        cursor.execute('SELECT * FROM users WHERE email = ? AND is_active = 1',
+                       (user_data.email, ))
+        user = cursor.fetchone()
+        conn.close()
 
-    if not user or not verify_password(user_data.password, user[2]):
-        raise HTTPException(status_code=401,
-                            detail="Invalid email or password")
+        if not user or not verify_password(user_data.password, user[2]):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid email or password"},
+                headers={"Content-Type": "application/json"}
+            )
 
-    access_token = create_access_token(data={"sub": user[0]})
+        access_token = create_access_token(data={"sub": user[0]})
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "user_id": user[0],
-            "email": user[1],
-            "full_name": user[3],
-            "department": user[4],
-            "role": user[5]
-        }
-    }
+        return JSONResponse(
+            content={
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "user_id": user[0],
+                    "email": user[1],
+                    "full_name": user[3],
+                    "department": user[4],
+                    "role": user[5]
+                }
+            },
+            headers={"Content-Type": "application/json"}
+        )
+
+    except Exception as e:
+        print(f"Login error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Login failed - server error"},
+            headers={"Content-Type": "application/json"}
+        )
 
 
 @app.get("/api/me")
