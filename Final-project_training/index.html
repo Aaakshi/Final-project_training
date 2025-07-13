@@ -705,13 +705,15 @@
         }
 
         function createCharts(stats) {
+            // Ensure stats object exists
+            if (!stats) stats = {};
+            
             // Document Types Chart
             if (stats.document_types && Object.keys(stats.document_types).length > 0) {
                 const typesCtx = document.getElementById('typesChart');
                 if (typesCtx) {
-                    typesCtx.width = 350;
-                    typesCtx.height = 300;
-                    new Chart(typesCtx, {
+                    const ctx = typesCtx.getContext('2d');
+                    new Chart(ctx, {
                         type: 'doughnut',
                         data: {
                             labels: Object.keys(stats.document_types),
@@ -721,7 +723,7 @@
                             }]
                         },
                         options: {
-                            responsive: false,
+                            responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: {
@@ -737,9 +739,8 @@
             if (stats.departments && Object.keys(stats.departments).length > 0) {
                 const deptCtx = document.getElementById('departmentsChart');
                 if (deptCtx) {
-                    deptCtx.width = 350;
-                    deptCtx.height = 300;
-                    new Chart(deptCtx, {
+                    const ctx = deptCtx.getContext('2d');
+                    new Chart(ctx, {
                         type: 'bar',
                         data: {
                             labels: Object.keys(stats.departments),
@@ -749,7 +750,7 @@
                             }]
                         },
                         options: {
-                            responsive: false,
+                            responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: {
@@ -765,9 +766,8 @@
             if (stats.priorities && Object.keys(stats.priorities).length > 0) {
                 const priorityCtx = document.getElementById('prioritiesChart');
                 if (priorityCtx) {
-                    priorityCtx.width = 350;
-                    priorityCtx.height = 300;
-                    new Chart(priorityCtx, {
+                    const ctx = priorityCtx.getContext('2d');
+                    new Chart(ctx, {
                         type: 'pie',
                         data: {
                             labels: Object.keys(stats.priorities),
@@ -777,7 +777,7 @@
                             }]
                         },
                         options: {
-                            responsive: false,
+                            responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
                                 legend: {
@@ -793,22 +793,21 @@
             if (stats.upload_trends && stats.upload_trends.length > 0) {
                 const trendsCtx = document.getElementById('trendsChart');
                 if (trendsCtx) {
-                    trendsCtx.width = 350;
-                    trendsCtx.height = 300;
-                    new Chart(trendsCtx, {
+                    const ctx = trendsCtx.getContext('2d');
+                    new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: stats.upload_trends.map(item => item.date),
+                            labels: stats.upload_trends.map(function(item) { return item.date; }),
                             datasets: [{
                                 label: 'Documents Uploaded',
-                                data: stats.upload_trends.map(item => item.count),
+                                data: stats.upload_trends.map(function(item) { return item.count; }),
                                 borderColor: '#4299e1',
                                 backgroundColor: 'rgba(66, 153, 225, 0.1)',
                                 fill: true
                             }]
                         },
                         options: {
-                            responsive: false,
+                            responsive: true,
                             maintainAspectRatio: false,
                             scales: {
                                 y: {
