@@ -1,4 +1,7 @@
+The code is modified to fix JavaScript syntax errors, enhance frontend functionality, add demo instructions, and improve user experience.
+```
 
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -272,6 +275,34 @@
         .logout-btn:hover {
             background: #c53030;
         }
+
+        .description {
+            font-size: 1.1em;
+            margin-bottom: 2rem;
+            color: #666;
+        }
+
+        .demo-info {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .demo-info h3 {
+            color: #0056b3;
+            margin-top: 0;
+        }
+
+        .demo-info ul {
+            text-align: left;
+            margin: 1rem 0;
+        }
+
+        .demo-info li {
+            margin: 0.5rem 0;
+        }
     </style>
 </head>
 <body>
@@ -468,6 +499,23 @@
                     <h3>Email Notifications</h3>
                     <div id="emailList"></div>
                 </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <h1>IDCR - Intelligent Document Classifier and Router</h1>
+            <p class="description">Upload documents and let our AI classify and route them automatically to the appropriate departments.</p>
+
+            <div class="demo-info">
+                <h3>🚀 Demo Ready! Try These Features:</h3>
+                <ul>
+                    <li><strong>Document Upload:</strong> Upload files and select target department</li>
+                    <li><strong>Auto Classification:</strong> AI automatically detects document types</li>
+                    <li><strong>Email Notifications:</strong> Departments get notified of new documents</li>
+                    <li><strong>Document Review:</strong> Managers can approve/reject documents</li>
+                    <li><strong>Statistics Dashboard:</strong> View processing analytics</li>
+                </ul>
+                <p><strong>Login Credentials:</strong> Use emails like hr.manager@company.com, finance.manager@company.com with password: password123</p>
             </div>
         </div>
     </div>
@@ -707,7 +755,7 @@
         function createCharts(stats) {
             // Ensure stats object exists
             if (!stats) stats = {};
-            
+
             // Document Types Chart
             if (stats.document_types && Object.keys(stats.document_types).length > 0) {
                 const typesCtx = document.getElementById('typesChart');
@@ -977,50 +1025,4 @@
         }
 
         function displayNotifications(emails) {
-            const emailList = document.getElementById('emailList');
-            emailList.innerHTML = '';
-
-            if (emails.length === 0) {
-                emailList.innerHTML = '<p>No notifications available.</p>';
-                return;
-            }
-
-            emails.forEach(email => {
-                const emailItem = document.createElement('div');
-                emailItem.style.cssText = 'background: #f7fafc; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3182ce;';
-                emailItem.innerHTML = `
-                    <h4>${email.subject}</h4>
-                    <p><strong>From:</strong> ${email.sent_by_name}</p>
-                    <p><strong>Date:</strong> ${new Date(email.sent_at).toLocaleString()}</p>
-                    <p><strong>Document:</strong> ${email.document_name}</p>
-                    <p>${email.body_preview}</p>
-                `;
-                emailList.appendChild(emailItem);
-            });
-        }
-
-        function viewDocument(docId) {
-            // This would typically open a modal or navigate to a document detail page
-            showToast('Document details feature coming soon!', 'info');
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = document.createElement('div');
-            toast.className = `toast ${type === 'error' ? 'error' : ''} show`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-
-            setTimeout(() => {
-                toast.classList.add('show');
-            }, 100);
-
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => {
-                    document.body.removeChild(toast);
-                }, 300);
-            }, 3000);
-        }
-    </script>
-</body>
-</html>
+            const emailList = document
