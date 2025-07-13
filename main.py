@@ -642,24 +642,24 @@ app.mount("/uploads",
 @app.get("/")
 async def serve_frontend():
     """Serve the main frontend application"""
-    return FileResponse("Final-project_training/index.html", media_type="text/html")
+    return FileResponse("index.html", media_type="text/html")
 
 @app.exception_handler(404)
 async def custom_404_handler(request, exc):
     """Custom 404 handler to prevent HTML responses for API calls"""
     if request.url.path.startswith("/api/"):
         return JSONResponse(status_code=404, content={"detail": "Not found"})
-    return FileResponse("Final-project_training/index.html", media_type="text/html")
+    return FileResponse("index.html", media_type="text/html")
 
 @app.get("/index.html")
 async def serve_index():
     """Alternative path to serve frontend"""
-    return FileResponse("Final-project_training/index.html", media_type="text/html")
+    return FileResponse("index.html", media_type="text/html")
 
 @app.get("/app")
 async def serve_app():
     """Another path to serve frontend"""
-    return FileResponse("Final-project_training/index.html", media_type="text/html")
+    return FileResponse("index.html", media_type="text/html")
 
 
 @app.get("/favicon.ico")
