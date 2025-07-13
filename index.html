@@ -1694,7 +1694,7 @@
             // Sort emails by date (newest first)
             const sortedEmails = data.emails.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
 
-            container.innerHTML = sortedEmails.map(email => {
+            const emailsHTML = sortedEmails.map(email => {
                 const sentByName = email.sent_by_name || email.sent_by || 'System';
                 const receivedByName = email.received_by_name || email.received_by || 'Unknown';
                 const documentName = email.document_name || email.file_name || 'N/A';
