@@ -1351,54 +1351,42 @@
             document.getElementById('documentModal').style.display = 'none';
         }
 
-        async function loadStatistics() {
-            try {
-                const response = await fetch('/api/stats', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const stats = await response.json();
-
-                if (response.ok) {
-                    displayStatistics(stats);
-                    renderCharts(stats);
-                } else {
-                    console.error('Failed to load statistics:', stats);
-                    document.getElementById('statsGrid').innerHTML = '<p>Error loading statistics. Please try again.</p>';
-                }
-            } catch (error) {
-                console.error('Failed to load statistics:', error);
-                document.getElementById('statsGrid').innerHTML = '<p>Error loading statistics. Please check your connection.</p>';
-            }
-        }
-
+        
         function displayStatistics(stats) {
             const statsGrid = document.getElementById('statsGrid');
             if (!statsGrid) {
                 console.error('Stats grid element not found');
                 return;
             }
+
+            // Ensure stats object exists and has default values
+            const safeStats = {
+                total_documents: stats?.total_documents || 0,
+                processed_documents: stats?.processed_documents || 0,
+                pending_documents: stats?.pending_documents || 0,
+                error_documents: stats?.error_documents || 0,
+                processing_rate: stats?.processing_rate || 0
+            };
+
             statsGrid.innerHTML = `
                 <div class="stat-card">
-                    <h3>${stats.total_documents || 0}</h3>
+                    <h3>${safeStats.total_documents}</h3>
                     <p>Total Documents</p>
                 </div>
                 <div class="stat-card">
-                    <h3>${stats.processed_documents || 0}</h3>
+                    <h3>${safeStats.processed_documents}</h3>
                     <p>Processed</p>
                 </div>
                 <div class="stat-card">
-                    <h3>${stats.pending_documents || 0}</h3>
+                    <h3>${safeStats.pending_documents}</h3>
                     <p>Pending</p>
                 </div>
                 <div class="stat-card">
-                    <h3>${stats.error_documents || 0}</h3>
+                    <h3>${safeStats.error_documents}</h3>
                     <p>Errors</p>
                 </div>
-                <div class="stat-card" style="background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);">
-                    <h3>${stats.processing_rate || 0}%</h3>
+                <div class="stat-card">
+                    <h3>${safeStats.processing_rate}%</h3>
                     <p>Processing Rate</p>
                 </div>
             `;

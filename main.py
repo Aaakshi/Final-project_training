@@ -1392,39 +1392,34 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         # Build base query based on user role
         base_where = ""
         params = []
-        additional_where = ""
 
+        # Allow all managers and admins to see all statistics
         if current_user['role'] == 'employee':
             base_where = "WHERE user_id = ?"
             params.append(current_user['user_id'])
-            additional_where = "AND"
-        elif current_user['role'] != 'admin':
-            base_where = "WHERE (user_id = ? OR department = ?)"
-            params.extend([current_user['user_id'], current_user['department']])
-            additional_where = "AND"
+        elif current_user['role'] in ['manager', 'admin']:
+            # Managers and admins can see all documents for better oversight
+            base_where = ""
+            params = []
 
         # Overall stats
-        cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
-        total_docs = cursor.fetchone()[0]
-
-        # For queries with additional conditions, handle WHERE clause properly
         if base_where:
-            cursor.execute(
-                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
-                params + ["completed"])
+            cursor.execute(f'SELECT COUNT(*) FROM documents {base_where}', params)
+            total_docs = cursor.fetchone()[0]
+
+            cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?', params + ["classified"])
             processed_docs = cursor.fetchone()[0]
 
-            cursor.execute(
-                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
-                params + ["processing"])
+            cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?', params + ["processing"])
             pending_docs = cursor.fetchone()[0]
 
-            cursor.execute(
-                f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?',
-                params + ["failed"])
+            cursor.execute(f'SELECT COUNT(*) FROM documents {base_where} AND processing_status = ?', params + ["failed"])
             error_docs = cursor.fetchone()[0]
         else:
-            cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["completed"])
+            cursor.execute('SELECT COUNT(*) FROM documents')
+            total_docs = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["classified"])
             processed_docs = cursor.fetchone()[0]
 
             cursor.execute('SELECT COUNT(*) FROM documents WHERE processing_status = ?', ["processing"])
@@ -1521,6 +1516,21 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "priorities": priorities,
             "upload_trends": [{"date": row[0], "count": row[1]} for row in daily_uploads],
             "processing_rate": round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 2)
+        }
+        
+    except Exception as e:
+        print(f"Error in statistics endpoint: {e}")
+        # Return default empty statistics in case of error
+        return {
+            "total_documents": 0,
+            "processed_documents": 0,
+            "pending_documents": 0,
+            "error_documents": 0,
+            "document_types": {},
+            "departments": {},
+            "priorities": {},
+            "upload_trends": [],
+            "processing_rate": 0
         }
         
     finally:
