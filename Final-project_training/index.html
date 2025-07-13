@@ -920,7 +920,8 @@
                         <option value="">All Types</option>
                         <option value="invoice">Invoice</option>
                         <option value="contract">Contract</option>
-                        <option value="hr_document">HR Document</option>
+                        ```python
+        <option value="hr_document">HR Document</option>
                         <option value="it_document">IT Document</option>
                         <option value="general">General</option>
                     </select>
@@ -945,7 +946,6 @@
                     <thead>
                         <tr>
                             <th>Document Name</th>
-                            <th>Summary</th>
                             <th>Type</th>
                             <th>Department</th>
                             <th>Status</th>
@@ -1090,7 +1090,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="analysis-tab" class="tab-pane hidden">
                 <div class="analysis-section">
                     <h4>Document Analysis</h4>
@@ -1118,14 +1118,14 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="content-preview" class="tab-pane hidden">
                 <div class="content-preview">
                     <h4>Document Content Preview</h4>
                     <div id="modalExtractedText" class="extracted-text"></div>
                 </div>
             </div>
-            
+
             <div id="tags-section" class="tab-pane hidden">
                 <h4>Tags</h4>
                 <div id="modalTags" class="tags-container"></div>
@@ -1476,32 +1476,80 @@
             }
         }
 
+        async function viewDocument(docId) {
+            try {
+                const response = await fetch('/api/documents/' + docId, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const doc = await response.json();
+
+                    // Update modal content
+                    document.getElementById('modalTitle').textContent = doc.original_name;
+                    document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
+                    document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
+                    document.getElementById('modalPriority').textContent = doc.priority || 'N/A';
+                    document.getElementById('modalStatus').textContent = doc.processing_status || 'N/A';
+                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size);
+                    document.getElementById('modalUploadDate').textContent = new Date(doc.uploaded_at).toLocaleString();
+                    document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'Unknown';
+                    document.getElementById('modalConfidence').textContent = doc.classification_confidence ? 
+                        (doc.classification_confidence * 100).toFixed(1) + '%' : 'N/A';
+
+                    // Update extracted text
+                    document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No content available';
+
+                    // Update tags
+                    const tagsContainer = document.getElementById('modalTags');
+                    if (doc.tags && doc.tags.length > 0) {
+                        tagsContainer.innerHTML = doc.tags.map(tag => 
+                            '<span class="badge">' + tag + '</span>'
+                        ).join(' ');
+                    } else {
+                        tagsContainer.innerHTML = '<span class="no-tags">No tags available</span>';
+                    }
+
+                    // Add review section for authorized users
+                    const canReview = ['admin', 'manager'].includes(currentUser.role) || 
+                                    ['hr', 'legal', 'finance'].includes(currentUser.department);
+
+                    if (canReview) {
+                        addReviewSection(doc);
+                    }
+
+                    // Show modal
+                    document.getElementById('documentModal').style.display = 'block';
+                    // Reset to first tab
+                    showTab('basic-info');
+                } else {
+                    throw new Error('Failed to fetch document details');
+                }
+            } catch (error) {
+                console.error('Error fetching document:', error);
+                showNotification('Error loading document details', 'error');
+            }
+        }
+
         function displayDocuments(documents) {
             const tbody = document.getElementById('documentsTableBody');
-
-            if (documents.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No documents found</td></tr>';
-                return;
-            }
-
             tbody.innerHTML = documents.map(doc => {
-                const uploadedDate = new Date(doc.uploaded_at).toLocaleDateString();
-                const fileName = doc.original_name || doc.file_name || 'Document';
-                const summary = doc.summary || generateSummary(doc.extracted_text) || 'N/A';
-                const docType = doc.document_type || 'Unknown';
-                const department = doc.department || 'general';
-                const status = doc.processing_status || 'unknown';
+                const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
                 const priority = doc.priority || 'medium';
+                const status = doc.processing_status || 'pending';
+                const docType = doc.document_type || 'general';
+                const department = doc.department || 'general';
 
                 return `
                     <tr>
-                        <td>${fileName}</td>
-                        <td>${summary.substring(0, 100)}${summary.length > 100 ? '...' : ''}</td>
-                        <td>${docType}</td>
-                        <td><span class="department-badge dept-${department}">${department.toUpperCase()}</span></td>
-                        <td><span class="status-badge status-${status}">${status}</span></td>
-                        <td><span class="priority-${priority}">${priority}</span></td>
-                        <td>${uploadedDate}</td>
+                        <td>${doc.original_name}</td>
+                        <td><span class="badge doc-type-${docType}">${docType.replace('_', ' ')}</span></td>
+                        <td><span class="badge dept-${department}">${department.toUpperCase()}</span></td>
+                        <td><span class="badge status-${status}">${status}</span></td>
+                        <td><span class="badge priority-${priority}">${priority}</span></td>
+                        <td>${uploadDate}</td>
                         <td>
                             <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">View</button>
                         </td>
@@ -1542,238 +1590,62 @@
             loadDocuments();
         }
 
-        async function viewDocument(docId) {
-            try {
-                const response = await fetch('/api/documents/' + docId, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                if (response.ok) {
-                    const doc = await response.json();
-
-                    // Set modal title
-                    document.getElementById('modalTitle').textContent = doc.original_name || doc.file_name || 'Unknown Document';
-
-                    // Populate modal fields
-                    document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
-                    document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
-
-                    const priorityElement = document.getElementById('modalPriority');
-                    priorityElement.textContent = doc.priority || 'N/A';
-                    priorityElement.className = `priority-${doc.priority || 'medium'}`;
-
-                    document.getElementById('modalStatus').textContent = doc.processing_status || doc.status || 'N/A';
-                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size || 0);
-                    document.getElementById('modalUploadDate').textContent = formatDate(doc.uploaded_at || doc.upload_date);
-                    document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'N/A';
-                    document.getElementById('modalConfidence').textContent = doc.classification_confidence ? `${(doc.classification_confidence * 100).toFixed(1)}%` : 'N/A';
-
-                    // Document summary and content
-                    const summaryText = doc.summary || generateSummary(doc.extracted_text) || 'No summary available';
-                    document.getElementById('modalSummary').textContent = summaryText;
-                    document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No text content available';
-
-                    // Display analysis data if available
-                    if (doc.analysis) {
-                        const analysis = doc.analysis;
-
-                        // Summary
-                        document.getElementById('modalSummary').textContent = analysis.summary || 'No summary available';
-
-                        // Urgency
-                        const urgencyElement = document.getElementById('modalUrgency');
-                        if (analysis.urgency) {
-                            urgencyElement.innerHTML = `${analysis.urgency.signal} ${analysis.urgency.level} (Score: ${analysis.urgency.score})`;
-                            urgencyElement.className = `urgency-indicator urgency-${analysis.urgency.level.toLowerCase()}`;
-                        } else {
-                            urgencyElement.textContent = 'N/A';
-                        }
-
-                        // Word count
-                        document.getElementById('modalWordCount').textContent = analysis.word_count || 'N/A';
-
-                        // Detected dates
-                        const datesContainer = document.getElementById('modalDetectedDates');
-                        datesContainer.innerHTML = '';
-                        if (analysis.detected_dates && analysis.detected_dates.length > 0) {
-                            analysis.detected_dates.forEach(date => {
-                                const dateElement = document.createElement('span');
-                                dateElement.className = 'date-tag';
-                                dateElement.textContent = date;
-                                datesContainer.appendChild(dateElement);
-                            });
-                        } else {
-                            datesContainer.innerHTML = '<span class="no-data">No dates detected</span>';
-                        }
-
-                        // Due dates
-                        const dueDatesContainer = document.getElementById('modalDueDates');
-                        dueDatesContainer.innerHTML = '';
-                        if (analysis.due_dates && analysis.due_dates.length > 0) {
-                            analysis.due_dates.forEach(dueDate => {
-                                const dueDateElement = document.createElement('div');
-                                dueDateElement.className = 'due-date-item';
-                                dueDateElement.innerHTML = `<strong>${dueDate.date}</strong><br><small>${dueDate.original_text}</small>`;
-                                dueDatesContainer.appendChild(dueDateElement);
-                            });
-                        } else {
-                            dueDatesContainer.innerHTML = '<span class="no-data">No due dates found</span>';
-                        }
-
-                        // Urgency keywords
-                        const keywordsContainer = document.getElementById('modalUrgencyKeywords');
-                        keywordsContainer.innerHTML = '';
-                        if (analysis.urgency && analysis.urgency.matched_keywords && analysis.urgency.matched_keywords.length > 0) {
-                            analysis.urgency.matched_keywords.forEach(keyword => {
-                                const keywordElement = document.createElement('span');
-                                keywordElement.className = 'keyword-tag';
-                                keywordElement.textContent = keyword;
-                                keywordsContainer.appendChild(keywordElement);
-                            });
-                        } else {
-                            keywordsContainer.innerHTML = '<span class="no-data">No urgency keywords detected</span>';
-                        }
-                    } else {
-                        // Clear analysis fields if no analysis data
-                        document.getElementById('modalSummary').textContent = 'Analysis not available';
-                        document.getElementById('modalUrgency').textContent = 'N/A';
-                        document.getElementById('modalWordCount').textContent = 'N/A';
-                        document.getElementById('modalDetectedDates').innerHTML = '<span class="no-data">No analysis data</span>';
-                        document.getElementById('modalDueDates').innerHTML = '<span class="no-data">No analysis data</span>';
-                        document.getElementById('modalUrgencyKeywords').innerHTML = '<span class="no-data">No analysis data</span>';
-                    }
-
-                    // Display tags
-                    const tagsContainer = document.getElementById('modalTags');
-                    tagsContainer.innerHTML = '';
-                    if (doc.tags && doc.tags.length > 0) {
-                        doc.tags.forEach(tag => {
-                            const tagElement = document.createElement('span');
-                            tagElement.className = 'tag';
-                            tagElement.textContent = tag;
-                            tagsContainer.appendChild(tagElement);
-                        });
-                    } else {
-                        tagsContainer.innerHTML = '<span class="no-tags">No tags available</span>';
-                    }
-
-                    // Add review section for authorized users
-                    const canReview = ['admin', 'manager'].includes(currentUser.role) || 
-                                    ['hr', 'legal', 'finance'].includes(currentUser.department);
-
-                    if (canReview) {
-                        addReviewSection(doc);
-                    }
-
-                    // Show modal
-                    document.getElementById('documentModal').style.display = 'block';
-                    // Reset to first tab
-                    showTab('basic-info');
-                } else {
-                    throw new Error('Failed to fetch document details');
-                }
-            } catch (error) {
-                console.error('Error fetching document:', error);
-                showNotification('Error loading document details', 'error');
-            }
-        }
-
-        function showDocumentModal(document) {
-            const modal = document.getElementById('documentModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalContent = document.getElementById('modalContent');
-
-            modalTitle.textContent = document.file_name;
-
-            let contentHtml = `
-                <div><strong>Document ID:</strong> ${document.doc_id}</div>
-                <div><strong>Type:</strong> ${document.document_type}</div>
-                <div><strong>Department:</strong> ${document.department}</div>
-                <div><strong>Priority:</strong> ${document.priority}</div>
-                <div><strong>Status:</strong> ${document.processing_status}</div>
-                <div><strong>Uploaded:</strong> ${new Date(document.uploaded_at).toLocaleString()}</div>
-            `;
-
-            if (document.summary) {
-                contentHtml += `<div><strong>Summary:</strong> ${document.summary}</div>`;
-            }
-
-            if (document.extracted_text) {
-                contentHtml += `
-                    <div><strong>Extracted Text:</strong></div>
-                    <div class="file-content">${document.extracted_text}</div>
-                `;
-            }
-
-            modalContent.innerHTML = contentHtml;
-            modal.style.display = 'block';
-        }
-
-        function generateSummary(text) {
-            if (!text || text.length < 100) return text;
-
-            // Simple extractive summary - first 2 sentences
-            const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
-            if (sentences.length <= 2) return text;
-
-            return sentences.slice(0, 2).join('. ') + '.';
-        }
-
         function addReviewSection(doc) {
             const modalContent = document.getElementById('modalContent');
-
-            // Add review section after basic info
-            const reviewSection = document.createElement('div');
-            reviewSection.className = 'review-section';
-            reviewSection.innerHTML = `
-                <h4>Document Review</h4>
-                <div class="form-group">
-                    <label>Review Status:</label>
-                    <span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'pending'}</span>
-                </div>
-                <div class="form-group">
-                    <label>Additional Comments:</label>
-                    <textarea id="reviewComments" placeholder="Enter review comments..." 
-                        style="width: 100%; height: 80px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;"></textarea>
-                </div>
-                <div class="review-buttons">
-                        <button class="btn btn-success" onclick="submitDocumentReview(\'' + doc.doc_id + '\', \'approved\')">
-                            ✅ Approve Document
-                        </button>
-                        <button class="btn btn-secondary" onclick="submitDocumentReview(\'' + doc.doc_id + '\', \'rejected\')">
-                            ❌ Reject Document
-                        </button>
+            if (doc.review_status === 'pending') {
+                modalContent.innerHTML += `
+                    <div class="review-section" style="margin-top: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+                        <h3>Review Document</h3>
+                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin: 10px 0;"></textarea>
+                        <div>
+                            <button class="btn btn-success" onclick="reviewDocument('${doc.doc_id}', 'approved', document.getElementById('reviewComments').value)" style="margin-right: 10px;">Approve</button>
+                            <button class="btn btn-danger" onclick="reviewDocument('${doc.doc_id}', 'rejected', document.getElementById('reviewComments').value)">Reject</button>
+                        </div>
                     </div>
-            `;
-
-            modalContent.appendChild(reviewSection);
+                `;
+            }
         }
 
-        async function submitDocumentReview(docId, decision) {
-            const comments = document.getElementById('reviewComments').value;
+        function showReviewModal(docId) {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                    <h2>Review Document</h2>
+                    <div style="margin: 20px 0;">
+                        <label>Comments (optional):</label>
+                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 100px; margin-top: 10px;"></textarea>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <button class="btn btn-success" onclick="reviewDocument('${docId}', 'approved', document.getElementById('reviewComments').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px;">Approve</button>
+                        <button class="btn btn-danger" onclick="reviewDocument('${docId}', 'rejected', document.getElementById('reviewComments').value); this.parentElement.parentElement.parentElement.remove();">Reject</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
 
+        async function reviewDocument(docId, action, comments = '') {
             try {
-                const response = await fetch(`/api/documents/${docId}/review`, {
+                const response = await fetch(\`/api/documents/\${docId}/review\`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': \`Bearer \${authToken}\`
                     },
                     body: JSON.stringify({
-                        doc_id: docId,
-                        status: decision,
-                        comments: comments
+                        review_status: action,
+                        review_comments: comments
                     })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(`Document ${decision} successfully! Notifications sent.`, 'success');
+                    showToast(\`Document \${action} successfully!\`, 'success');
                     closeModal();
-                    loadDocuments();
                     loadReviewDocuments();
                 } else {
                     showToast(data.detail || 'Review submission failed', 'error');
@@ -1784,11 +1656,34 @@
             }
         }
 
-        function closeModal() {
-            document.getElementById('documentModal').style.display = 'none';
-            // Clear any dynamic content
-            const reviewSections = document.querySelectorAll('.review-section');
-            reviewSections.forEach(section => section.remove());
+        function displayReviewDocuments(documents) {
+            const tbody = document.getElementById('reviewDocumentsTableBody');
+            tbody.innerHTML = documents.map(doc => {
+                const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
+                const priority = doc.priority || 'medium';
+                const status = doc.processing_status || 'pending';
+                const docType = doc.document_type || 'general';
+                const department = doc.department || 'general';
+                const reviewStatus = doc.review_status || 'pending';
+                const uploadedBy = doc.uploaded_by || 'Unknown User';
+
+                return `
+                    <tr>
+                        <td>${doc.original_name}</td>
+                        <td>${uploadedBy}</td>
+                        <td><span class="badge doc-type-${docType}">${docType.replace('_', ' ')}</span></td>
+                        <td><span class="badge dept-${department}">${department.toUpperCase()}</span></td>
+                        <td><span class="badge status-${status}">${status}</span></td>
+                        <td><span class="badge priority-${priority}">${priority}</span></td>
+                        <td><span class="badge review-${reviewStatus}">${reviewStatus}</span></td>
+                        <td>${uploadDate}</td>
+                        <td>
+                            <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px; margin-right: 5px;">View</button>
+                            ${reviewStatus === 'pending' ? `<button class="btn btn-primary" onclick="showReviewModal('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">Review</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         async function loadReviewDocuments() {
@@ -1801,7 +1696,7 @@
                     review_status: reviewStatus
                 });
 
-                const response = await fetch(`/api/review-documents?${params}`, {
+                const response = await fetch('/api/review-documents?' + params.toString(), {
                     headers: {
                         'Authorization': `Bearer ${authToken}`
                     }
@@ -1817,126 +1712,6 @@
             } catch (error) {
                 console.error('Load review documents error:', error);
                 showToast('Failed to load review documents', 'error');
-            }
-        }
-
-        function displayReviewDocuments(documents) {
-            const tbody = document.getElementById('reviewDocumentsTableBody');
-
-            if (documents.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No documents for review</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = documents.map(doc => `
-                <tr>
-                    <td>${doc.file_name || doc.original_name || 'Unknown'}</td>
-                    <td>${doc.uploaded_by_name || doc.uploaded_by || 'Unknown'}</td>
-                    <td>${doc.document_type || 'Unknown'}</td>
-                    <td><span class="priority-${doc.priority || 'medium'}">${doc.priority || 'medium'}</span></td>
-                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'pending'}</span></td>
-                    <td>
-                        <button class="btn" onclick="reviewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">Review</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        async function reviewDocument(docId) {
-            try {
-                const response = await fetch('/api/documents/' + docId, {
-                    headers: {
-                        'Authorization': 'Bearer ' + authToken
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showReviewModal(data);
-                } else {
-                    showToast('Failed to load document for review', 'error');
-                }
-            } catch (error) {
-                console.error('Review document error:', error);
-                showToast('Failed to load document for review', 'error');
-            }
-        }
-
-        function showReviewModal(document) {
-            const modal = document.getElementById('documentModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalContent = document.getElementById('modalContent');
-
-            modalTitle.textContent = `Review: ${document.file_name}`;
-
-            let contentHtml = `
-                <div><strong>Document ID:</strong> ${document.doc_id}</div>
-                <div><strong>Type:</strong> ${document.document_type}</div>
-                <div><strong>Department:</strong> ${document.department}</div>
-                <div><strong>Priority:</strong> ${document.priority}</div>
-                <div><strong>Status:</strong> ${document.processing_status}</div>
-                <div><strong>Uploaded By:</strong> ${document.uploaded_by_name}</div>
-                <div><strong>Uploaded:</strong> ${new Date(document.uploaded_at).toLocaleString()}</div>
-            `;
-
-            if (document.summary) {
-                contentHtml += `<div><strong>Summary:</strong> ${document.summary}</div>`;
-            }
-
-            if (document.extracted_text) {
-                contentHtml += `
-                    <div><strong>Extracted Text:</strong></div>
-                    <div class="file-content">${document.extracted_text}</div>
-                `;
-            }
-
-            contentHtml += `
-                <div class="review-form">
-                    <h4>Review Decision</h4>
-                    <div class="form-group">
-                        <label>Comments:</label>
-                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 80px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;"></textarea>
-                    </div>
-                    <div class="review-buttons">
-                        <button class="btn btn-success" onclick="submitReview('${document.doc_id}', 'approved')">Approve</button>
-                        <button class="btn btn-secondary" onclick="submitReview('${document.doc_id}', 'rejected')">Reject</button>
-                    </div>
-                </div>
-            `;
-
-            modalContent.innerHTML = contentHtml;
-            modal.style.display = 'block';
-        }
-
-        async function submitReview(docId, decision) {
-            const comments = document.getElementById('reviewComments').value;
-
-            try {
-                const response = await fetch(`/api/documents/${docId}/review`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({
-                        review_status: decision,
-                        review_comments: comments
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast(`Document ${decision} successfully!`, 'success');
-                    closeModal();
-                    loadReviewDocuments();
-                } else {
-                    showToast(data.detail || 'Review submission failed', 'error');
-                }
-            } catch (error) {
-                console.error('Submit review error:', error);
-                showToast('Review submission failed', 'error');
             }
         }
 
@@ -1965,41 +1740,41 @@
             const container = document.getElementById('emailNotifications');
             const countElement = document.getElementById('emailCount');
 
-            countElement.textContent = `Total: ${data.total_count} emails`;
+            countElement.textContent = \`Total: \${data.total_count} emails\`;
 
             if (data.emails.length === 0) {
                 container.innerHTML = '<div class="notification-item"><h4>📧 No email notifications found</h4></div>';
                 return;
             }
 
-            container.innerHTML = data.emails.map(email => `
+            container.innerHTML = data.emails.map(email => \`
                 <div class="email-item">
                     <div class="email-header">
                         <div>
-                            <strong>${email.subject}</strong>
-                            <span class="email-type-badge ${email.email_type}">${email.email_type}</span>
+                            <strong>\${email.subject}</strong>
+                            <span class="email-type-badge \${email.email_type}">\${email.email_type}</span>
                         </div>
                         <div>
-                            <span class="priority-badge priority-${email.priority}">${email.priority}</span>
-                            <span class="email-status status-${email.status}">${email.status}</span>
+                            <span class="priority-badge priority-\${email.priority}">\${email.priority}</span>
+                            <span class="email-status status-\${email.status}">\${email.status}</span>
                         </div>
                     </div>
-                    <div><strong>Sent by:</strong> ${email.sent_by_name} (${email.sent_by})</div>
-                    <div><strong>Received by:</strong> ${email.received_by_name} (${email.received_by})</div>
-                    <div><strong>File name:</strong> ${email.document_name}</div>
-                    <div><strong>Status:</strong> ${email.status}</div>
-                    <div><strong>Department:</strong> ${email.department}</div>
-                    <div><strong>Sent:</strong> ${new Date(email.sent_at).toLocaleString()}</div>
-                    ${email.body_preview ? `<div><strong>Preview:</strong> ${email.body_preview}</div>` : ''}
+                    <div><strong>Sent by:</strong> \${email.sent_by_name} (\${email.sent_by})</div>
+                    <div><strong>Received by:</strong> \${email.received_by_name} (\${email.received_by})</div>
+                    <div><strong>File name:</strong> \${email.document_name}</div>
+                    <div><strong>Status:</strong> \${email.status}</div>
+                    <div><strong>Department:</strong> \${email.department}</div>
+                    <div><strong>Sent:</strong> \${new Date(email.sent_at).toLocaleString()}</div>
+                    \${email.body_preview ? \`<div><strong>Preview:</strong> \${email.body_preview}</div>\` : ''}
                 </div>
-            `).join('');
+            \`).join('');
         }
 
         async function loadStats() {
             try {
                 const response = await fetch('/api/stats', {
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'Authorization': \`Bearer \${authToken}\`
                     }
                 });
 
@@ -2040,23 +1815,23 @@
         function displayStats(stats) {
             const statsGrid = document.getElementById('statsGrid');
 
-            statsGrid.innerHTML = `
+            statsGrid.innerHTML = \`
                 <div class="stat-card">
-                    <h3>${stats.total_documents}</h3>
+                    <h3>\${stats.total_documents}</h3>
                     <p>Total Documents</p>
                 </div>
-                <div class="stat-card">                    <h3>${stats.processed_documents}</h3>
+                <div class="stat-card">                    <h3>\${stats.processed_documents}</h3>
                     <p>Processed Documents</p>
                 </div>
                 <div class="stat-card">
-                    <h3>${stats.pending_documents}</h3>
+                    <h3>\${stats.pending_documents}</h3>
                     <p>Pending Documents</p>
                 </div>
                 <div class="stat-card">
-                    <h3>${stats.processing_rate}%</h3>
+                    <h3>\${stats.processing_rate}%</h3>
                     <p>Processing Rate</p>
                 </div>
-            `;
+            \`;
         }
 
         function createCharts(stats) {
@@ -2088,7 +1863,7 @@
             }
 
             // Departments Chart
-            const deptsCtx = document.getElementById('departmentsChart');
+            const deptsCtx = document.getElementById('departmentsChartt');
             if (deptsCtx) {
                 new Chart(deptsCtx, {
                     type: 'bar',
