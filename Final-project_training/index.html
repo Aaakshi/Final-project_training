@@ -647,6 +647,25 @@
                     <label>Batch Name:</label>
                     <input type="text" id="batchName" placeholder="Enter a name for this batch" required>
                 </div>
+                 <div class="form-group">
+                    <label>Target Department:</label>
+                    <select id="targetDepartment" required>
+                        <option value="">Select Department</option>
+                        <option value="hr">Human Resources (HR)</option>
+                        <option value="finance">Finance & Accounting</option>
+                        <option value="legal">Legal</option>
+                        <option value="sales">Sales</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="it">IT (Information Technology)</option>
+                        <option value="operations">Operations</option>
+                        <option value="support">Customer Support</option>
+                        <option value="procurement">Procurement / Purchase</option>
+                        <option value="product">Product / R&D</option>
+                        <option value="administration">Administration</option>
+                        <option value="executive">Executive / Management</option>
+                         <option value="general">General</option>
+                    </select>
+                </div>
 
                 <div class="upload-area" id="uploadArea">
                     <div>
@@ -842,7 +861,8 @@
                     return;
                 }
 
-                const response = await fetch('/api/me', {
+                const response```text
+ = await fetch('/api/me', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -1093,23 +1113,26 @@
         }
 
         async function uploadFiles() {
-            const batchName = document.getElementById('batchName').value;
-            const fileInput = document.getElementById('fileInput');
-            const files = fileInput.files;
+            const files = document.getElementById('fileInput').files;
+            const targetDepartment = document.getElementById('targetDepartment').value;
 
-            if (!batchName || files.length === 0) {
-                showToast('Please enter batch name and select files', 'error');
+            if (files.length === 0) return;
+
+            if (!targetDepartment) {
+                showToast('Please select a target department', 'error');
                 return;
             }
 
             const formData = new FormData();
-            formData.append('batch_name', batchName);
+            formData.append('batch_name', `Upload_${new Date().toISOString().split('T')[0]}`);
+            formData.append('target_department', targetDepartment);
 
             Array.from(files).forEach(file => {
                 formData.append('files', file);
             });
 
             try {
+                showToast('Uploading files...', 'info');
                 const response = await fetch('/api/bulk-upload', {
                     method: 'POST',
                     headers: {
@@ -1121,9 +1144,10 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast(`Successfully uploaded ${data.total_files} files!`, 'success');
+                    showToast(`Successfully uploaded ${data.total_files} files to ${targetDepartment.toUpperCase()} department`, 'success');
                     document.getElementById('batchName').value = '';
-                    fileInput.value = '';
+                    document.getElementById('fileInput').value = '';
+                    document.getElementById('targetDepartment').value = '';
                     document.getElementById('fileList').innerHTML = '';
                     document.getElementById('uploadBtn').disabled = true;
                     loadStatistics();
@@ -1739,6 +1763,7 @@ async function loadStatistics() {
             }, 3000);
         }
 
+        ```text
         // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('documentModal');
@@ -1746,6 +1771,50 @@ async function loadStatistics() {
                 closeModal();
             }
         }
+
+        // Check if upload is ready (files + department selected)
+        function checkUploadReadiness() {
+            const files = document.getElementById('fileInput').files;
+            const department = document.getElementById('targetDepartment').value;
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            if (files.length > 0 && department) {
+                uploadBtn.disabled = false;
+                displayFiles(files);
+            } else {
+                uploadBtn.disabled = true;
+                if (files.length === 0) {
+                    document.getElementById('fileList').innerHTML = '';
+                }
+            }
+        }
+
+        // File upload handling
+        document.getElementById('uploadArea').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('uploadArea').addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.currentTarget.style.borderColor = '#007bff';
+        });
+
+        document.getElementById('uploadArea').addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.currentTarget.style.borderColor = '#ddd';
+        });
+
+        document.getElementById('uploadArea').addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.currentTarget.style.borderColor = '#ddd';
+
+            const files = e.dataTransfer.files;
+            document.getElementById('fileInput').files = files;
+            checkUploadReadiness();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', checkUploadReadiness);
+        document.getElementById('targetDepartment').addEventListener('change', checkUploadReadiness);
     </script>
 </body>
 </html>
