@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Complete IDCR Demo"
+runButton = "IDCR Frontend Server"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -139,6 +139,15 @@ args = "python main.py"
 
 [[workflows.workflow]]
 name = "Start IDCR System"
+author = 44313974
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow]]
+name = "IDCR Frontend Server"
 author = 44313974
 mode = "sequential"
 

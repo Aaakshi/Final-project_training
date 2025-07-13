@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IDCR - Intelligent Document Classification & Routing</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.min.js" onerror="console.log('Chart.js failed to load from CDN')"></script>
     <style>
         * {
             margin: 0;
@@ -894,6 +894,12 @@
 
         // Check for existing auth token on page load
         window.onload = function() {
+            // Add global error handler
+            window.onerror = function(msg, url, line, col, error) {
+                console.log('Global error caught:', msg, url, line, col, error);
+                return true; // Prevent default error handling
+            };
+            
             const token = localStorage.getItem('authToken');
             if (token) {
                 authToken = token;
@@ -1644,6 +1650,13 @@
         }
 
         function createCharts(stats) {
+            // Check if Chart.js is available
+            if (typeof Chart === 'undefined') {
+                console.log('Chart.js not available, showing text-based stats instead');
+                showTextBasedCharts(stats);
+                return;
+            }
+
             try {
                 // Create document types chart
                 if (stats.document_types && Object.keys(stats.document_types).length > 0) {
@@ -1744,7 +1757,53 @@
                 }
             } catch (error) {
                 console.error('Error creating charts:', error);
+                showTextBasedCharts(stats);
             }
+        }
+
+        function showTextBasedCharts(stats) {
+            // Show text-based statistics when Chart.js is not available
+            const chartContainers = document.querySelectorAll('.chart-container');
+            
+            chartContainers.forEach((container, index) => {
+                const canvas = container.querySelector('canvas');
+                if (canvas) {
+                    let content = '';
+                    
+                    if (index === 0 && stats.document_types) {
+                        // Document types
+                        content = '<div style="padding: 20px;"><h4>Document Types:</h4>';
+                        Object.entries(stats.document_types).forEach(([type, count]) => {
+                            content += `<div style="margin: 5px 0;">${type}: ${count}</div>`;
+                        });
+                        content += '</div>';
+                    } else if (index === 1 && stats.departments) {
+                        // Departments
+                        content = '<div style="padding: 20px;"><h4>Departments:</h4>';
+                        Object.entries(stats.departments).forEach(([dept, count]) => {
+                            content += `<div style="margin: 5px 0;">${dept}: ${count}</div>`;
+                        });
+                        content += '</div>';
+                    } else if (index === 2 && stats.priorities) {
+                        // Priorities
+                        content = '<div style="padding: 20px;"><h4>Priorities:</h4>';
+                        Object.entries(stats.priorities).forEach(([priority, count]) => {
+                            content += `<div style="margin: 5px 0;">${priority}: ${count}</div>`;
+                        });
+                        content += '</div>';
+                    } else if (index === 3 && stats.upload_trends) {
+                        // Upload trends
+                        content = '<div style="padding: 20px;"><h4>Recent Uploads:</h4>';
+                        stats.upload_trends.slice(-7).forEach(item => {
+                            content += `<div style="margin: 5px 0;">${item.date}: ${item.count} uploads</div>`;
+                        });
+                        content += '</div>';
+                    }
+                    
+                    canvas.style.display = 'none';
+                    container.innerHTML = container.querySelector('h3').outerHTML + content;
+                }
+            });
         }
 
         function formatFileSize(bytes) {
