@@ -136,6 +136,8 @@ def init_database():
         ('admin@company.com', 'System Admin', 'administration', 'admin', 'admin123')
     ]
 
+    # Insert demo users and get their IDs
+    user_ids = {}
     for email, name, dept, role, password in demo_users:
         user_id = str(uuid.uuid4())
         password_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -144,6 +146,50 @@ def init_database():
             INSERT OR IGNORE INTO users (user_id, email, password_hash, full_name, department, role, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (user_id, email, password_hash, name, dept, role, datetime.datetime.utcnow().isoformat()))
+        user_ids[email] = user_id
+
+    # Create sample documents for better statistics
+    sample_documents = [
+        ('Invoice_2024_001.pdf', 'hr.manager@company.com', 'finance', 'financial_document', 'high', 'classified'),
+        ('Employee_Handbook.pdf', 'hr.manager@company.com', 'hr', 'hr_document', 'medium', 'classified'),
+        ('Contract_ABC_Corp.pdf', 'legal.manager@company.com', 'legal', 'legal_document', 'high', 'classified'),
+        ('IT_Security_Policy.docx', 'it.manager@company.com', 'it', 'it_document', 'high', 'classified'),
+        ('Sales_Report_Q4.xlsx', 'sales.manager@company.com', 'sales', 'sales_document', 'medium', 'classified'),
+        ('Marketing_Campaign.pptx', 'finance.manager@company.com', 'marketing', 'marketing_document', 'medium', 'classified'),
+        ('Expense_Report.pdf', 'general.employee@company.com', 'finance', 'financial_document', 'low', 'processing'),
+        ('Meeting_Minutes.docx', 'hr.employee@company.com', 'hr', 'hr_document', 'low', 'classified'),
+        ('Budget_Proposal.xlsx', 'finance.manager@company.com', 'finance', 'financial_document', 'high', 'classified'),
+        ('Legal_Compliance.pdf', 'legal.manager@company.com', 'legal', 'legal_document', 'high', 'approved'),
+    ]
+
+    for original_name, user_email, dept, doc_type, priority, status in sample_documents:
+        doc_id = str(uuid.uuid4())
+        user_id = user_ids.get(user_email, user_ids['admin@company.com'])
+        file_path = f"uploads/sample/{original_name}"
+        file_size = 150000 + len(original_name) * 1000  # Simulate file size
+        file_type = original_name.split('.')[-1].lower()
+        mime_type = {
+            'pdf': 'application/pdf',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        }.get(file_type, 'application/octet-stream')
+        
+        # Create sample document records
+        cursor.execute('''
+            INSERT OR IGNORE INTO documents (
+                doc_id, user_id, original_name, file_path, file_size, file_type, 
+                mime_type, uploaded_at, processing_status, document_type, department, 
+                priority, classification_confidence, page_count, language, tags, 
+                review_status, extracted_text
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            doc_id, user_id, original_name, file_path, file_size, file_type,
+            mime_type, datetime.datetime.utcnow().isoformat(), status, doc_type, dept,
+            priority, 0.85, 1, 'en', '["' + doc_type + '", "' + dept + '"]',
+            'approved' if status == 'approved' else 'pending',
+            f"Sample content for {original_name} - This is a {doc_type} document for {dept} department."
+        ))
 
     # Create documents table (updated with user info)
     cursor.execute('''

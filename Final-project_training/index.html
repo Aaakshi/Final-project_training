@@ -1351,7 +1351,63 @@
             document.getElementById('documentModal').style.display = 'none';
         }
 
+
         
+async function loadStatistics() {
+            if (!authToken || !currentUser) {
+                console.warn('No auth token or user for statistics');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayStatistics(stats);
+                    renderCharts(stats);
+                } else {
+                    console.error('Statistics API error:', response.status, response.statusText);
+                    const errorData = await response.text();
+                    console.error('Error response:', errorData);
+                    showToast('Failed to load statistics: ' + response.status, 'error');
+
+                    // Show default empty statistics
+                    displayStatistics({
+                        total_documents: 0,
+                        processed_documents: 0,
+                        pending_documents: 0,
+                        error_documents: 0,
+                        processing_rate: 0,
+                        document_types: {},
+                        departments: {},
+                        priorities: {},
+                        upload_trends: []
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                showToast('Network error loading statistics', 'error');
+
+                // Show default empty statistics
+                displayStatistics({
+                    total_documents: 0,
+                    processed_documents: 0,
+                    pending_documents: 0,
+                    error_documents: 0,
+                    processing_rate: 0,
+                    document_types: {},
+                    departments: {},
+                    priorities: {},
+                    upload_trends: []
+                });
+            }
+        }
+
         function displayStatistics(stats) {
             const statsGrid = document.getElementById('statsGrid');
             if (!statsGrid) {
