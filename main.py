@@ -323,82 +323,86 @@ def init_database():
             'ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"'
         )
 
-    # Add sample email notifications for demo
+    # Add comprehensive sample email notifications for demo
     sample_emails = [
-        # Document upload notifications
-        ('hr.manager@company.com', 'finance@company.com', 'New Financial Document for Review - Invoice_2024_001.pdf', 
-         '<html><body><h2>New Document Uploaded for Review</h2><p>A new financial document has been uploaded and classified to your department.</p></body></html>',
-         'doc1', 'Invoice_2024_001.pdf'),
-        ('finance.manager@company.com', 'hr@company.com', 'Document Review Complete - Employee_Handbook.pdf', 
-         '<html><body><h2>Document Review Complete</h2><p>Your document Employee_Handbook.pdf has been approved.</p></body></html>',
-         'doc2', 'Employee_Handbook.pdf'),
+        # HR Department emails
+        ('hr.manager@company.com', 'hr@company.com', 'New Employee Onboarding Document - Employee_Handbook.pdf', 
+         '<html><body><h2>New HR Document Uploaded</h2><p>A new employee handbook has been uploaded and classified to HR department.</p><p><strong>Priority:</strong> Medium</p></body></html>',
+         'doc1', 'Employee_Handbook.pdf'),
+        ('noreply@idcr-system.com', 'hr.employee@company.com', 'Document Processing Complete - Policy_Update.pdf', 
+         '<html><body><h2>Document Processed Successfully</h2><p>Your policy update document has been processed and approved.</p></body></html>',
+         'doc2', 'Policy_Update.pdf'),
+        ('hr.employee@company.com', 'hr@company.com', 'URGENT: Employee Contract Review Required', 
+         '<html><body><h2>URGENT: Contract Review</h2><p>New employee contract requires immediate HR review before deadline today.</p><p><strong>Priority:</strong> High</p></body></html>',
+         'doc3', 'Urgent_Employee_Contract.pdf'),
+        
+        # Finance Department emails
+        ('finance.manager@company.com', 'finance@company.com', 'New Financial Document - Invoice_2024_001.pdf', 
+         '<html><body><h2>New Invoice Processed</h2><p>A new invoice has been uploaded and classified to finance department.</p><p><strong>Priority:</strong> High</p></body></html>',
+         'doc4', 'Invoice_2024_001.pdf'),
+        ('noreply@idcr-system.com', 'finance.employee@company.com', 'Payment Processing Complete', 
+         '<html><body><h2>Payment Processed</h2><p>Your expense report has been approved and payment is being processed.</p></body></html>',
+         'doc5', 'Expense_Report.pdf'),
+        ('finance.employee@company.com', 'finance@company.com', 'Budget Review Document Uploaded', 
+         '<html><body><h2>Budget Review</h2><p>Quarterly budget review document has been uploaded for approval.</p></body></html>',
+         'doc6', 'Q4_Budget_Review.xlsx'),
+        
+        # Legal Department emails  
         ('legal.manager@company.com', 'legal@company.com', 'High Priority Legal Document - Contract_ABC_Corp.pdf', 
-         '<html><body><h2>High Priority Document Alert</h2><p>A high priority legal document requires immediate attention.</p></body></html>',
-         'doc3', 'Contract_ABC_Corp.pdf'),
+         '<html><body><h2>URGENT: Legal Review Required</h2><p>A high priority contract document requires immediate legal attention by EOD.</p><p><strong>Priority:</strong> High</p></body></html>',
+         'doc7', 'Contract_ABC_Corp.pdf'),
+        ('noreply@idcr-system.com', 'legal.manager@company.com', 'New Contract Classified', 
+         '<html><body><h2>Document Classification Alert</h2><p>A new contract has been automatically classified to the legal department and requires review.</p></body></html>',
+         'doc8', 'Client_Contract_2024.pdf'),
+        ('legal.manager@company.com', 'legal@company.com', 'Compliance Document Processing Complete', 
+         '<html><body><h2>Compliance Review Complete</h2><p>All compliance documents for Q4 have been processed and approved.</p></body></html>',
+         'doc9', 'Q4_Compliance_Report.pdf'),
+        ('sales.manager@company.com', 'legal@company.com', 'Contract Review Required - ABC Client', 
+         '<html><body><h2>Contract Review Request</h2><p>New client contract requires legal review before signing tomorrow.</p></body></html>',
+         'doc10', 'ABC_Client_Contract.pdf'),
+        
+        # IT Department emails
         ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required', 
          '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
-         'doc4', 'IT_Security_Policy.docx'),
+         'doc11', 'IT_Security_Policy.docx'),
+        ('noreply@idcr-system.com', 'it.manager@company.com', 'System Update Documentation', 
+         '<html><body><h2>System Documentation</h2><p>New system documentation has been uploaded to IT department.</p></body></html>',
+         'doc12', 'System_Update_Docs.pdf'),
         
-        # Legal department specific emails
-        ('noreply@idcr-system.com', 'legal@company.com', 'New Legal Document Classified', 
-         '<html><body><h2>Document Classification Alert</h2><p>A new contract has been automatically classified to the legal department and requires review.</p></body></html>',
-         'doc9', 'Client_Contract_2024.pdf'),
-        ('sales.manager@company.com', 'legal@company.com', 'URGENT: Contract Review Needed by EOD', 
-         '<html><body><h2>URGENT: Contract Review</h2><p>Client contract requires immediate legal review before meeting tomorrow.</p></body></html>',
-         'doc10', 'Urgent_Contract_Review.pdf'),
-        ('legal.manager@company.com', 'hr@company.com', 'Employment Contract Template Updated', 
-         '<html><body><h2>Contract Template Update</h2><p>The employment contract template has been updated with new legal requirements.</p></body></html>',
-         'doc11', 'Employment_Contract_Template.docx'),
-        ('legal@company.com', 'legal.manager@company.com', 'Compliance Document Processing Complete', 
-         '<html><body><h2>Compliance Review</h2><p>All compliance documents for Q4 have been processed and approved.</p></body></html>',
-         'doc12', 'Q4_Compliance_Report.pdf'),
+        # Sales Department emails
+        ('sales.manager@company.com', 'sales@company.com', 'New Sales Proposal Uploaded', 
+         '<html><body><h2>Sales Proposal</h2><p>New client proposal document has been uploaded for review.</p></body></html>',
+         'doc13', 'Client_Proposal_2024.pdf'),
         
-        # System notifications
-        ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
+        # General/Admin emails
+        ('admin@company.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
          None, None),
-        ('noreply@idcr-system.com', 'hr.manager@company.com', 'Weekly Document Processing Report', 
-         '<html><body><h2>Weekly Report</h2><p>This week: 15 documents processed, 12 approved, 3 pending review.</p></body></html>',
-         None, None),
-        ('noreply@idcr-system.com', 'legal.manager@company.com', 'Weekly Legal Department Report', 
-         '<html><body><h2>Legal Department Weekly Report</h2><p>This week: 8 legal documents processed, 6 contracts approved, 2 pending review.</p></body></html>',
+        ('noreply@idcr-system.com', 'admin@company.com', 'System Status Report', 
+         '<html><body><h2>Weekly System Report</h2><p>This week: 25 documents processed, 20 approved, 5 pending review.</p></body></html>',
          None, None),
         
         # Inter-department communications
-        ('hr.employee@company.com', 'finance.manager@company.com', 'Employee Expense Reimbursement Request', 
-         '<html><body><h2>Expense Reimbursement</h2><p>Please review and process the attached expense report for employee travel.</p></body></html>',
-         'doc5', 'Expense_Report.pdf'),
-        ('sales.manager@company.com', 'legal.manager@company.com', 'Contract Review Required - ABC Client', 
-         '<html><body><h2>Contract Review Request</h2><p>New client contract requires legal review before signing.</p></body></html>',
-         'doc6', 'Contract_ABC_Client.pdf'),
-        ('finance.employee@company.com', 'hr.employee@company.com', 'Payroll Processing Complete', 
-         '<html><body><h2>Payroll Update</h2><p>Monthly payroll has been processed and is ready for review.</p></body></html>',
-         None, None),
-        ('hr.manager@company.com', 'legal.manager@company.com', 'New Employee Contract Review', 
-         '<html><body><h2>Employee Contract Review</h2><p>New employee contracts require legal department approval before finalizing.</p></body></html>',
-         'doc13', 'New_Employee_Contracts.pdf'),
+        ('hr.manager@company.com', 'finance@company.com', 'Payroll Document Review Required', 
+         '<html><body><h2>Payroll Review</h2><p>Monthly payroll document requires finance department approval.</p></body></html>',
+         'doc14', 'Monthly_Payroll.xlsx'),
+        ('finance.manager@company.com', 'legal@company.com', 'Financial Agreement Legal Review', 
+         '<html><body><h2>Legal Review Request</h2><p>New financial agreement requires legal department review before execution.</p></body></html>',
+         'doc15', 'Financial_Agreement_2024.pdf'),
+        ('legal.manager@company.com', 'hr@company.com', 'Employment Contract Template Updated', 
+         '<html><body><h2>Contract Template Update</h2><p>The employment contract template has been updated with new legal requirements.</p></body></html>',
+         'doc16', 'Employment_Contract_Template.docx'),
         
-        # Urgent notifications
-        ('admin@company.com', 'it.manager@company.com', 'URGENT: Security Breach Alert', 
-         '<html><body><h2>URGENT: Security Alert</h2><p>Potential security breach detected. Immediate action required.</p></body></html>',
-         None, None),
-        ('it.manager@company.com', 'admin@company.com', 'System Maintenance Scheduled', 
-         '<html><body><h2>Scheduled Maintenance</h2><p>System maintenance scheduled for this weekend. All users will be notified.</p></body></html>',
-         None, None),
-        ('admin@company.com', 'legal.manager@company.com', 'System Update: Legal Document Processing', 
-         '<html><body><h2>System Update</h2><p>Legal document processing module has been updated with enhanced compliance checking.</p></body></html>',
-         None, None),
-        
-        # Document review notifications
+        # Document status notifications
         ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Employee Policy Update', 
          '<html><body><h2>Document Approved</h2><p>Your submitted policy update document has been approved and is now active.</p></body></html>',
-         'doc7', 'Policy_Update.docx'),
+         'doc17', 'Policy_Update.docx'),
         ('legal.manager@company.com', 'sales.manager@company.com', 'Contract Review Complete - Terms Accepted', 
          '<html><body><h2>Contract Review Complete</h2><p>Legal review of the ABC client contract is complete. Terms are acceptable.</p></body></html>',
-         'doc8', 'ABC_Contract_Final.pdf'),
-        ('legal.manager@company.com', 'finance.manager@company.com', 'Legal Review: Finance Agreement Approved', 
-         '<html><body><h2>Legal Review Complete</h2><p>The finance agreement has passed legal review and is approved for execution.</p></body></html>',
-         'doc14', 'Finance_Agreement_2024.pdf')
+         'doc18', 'ABC_Contract_Final.pdf'),
+        ('finance.manager@company.com', 'hr.manager@company.com', 'Budget Approval Complete', 
+         '<html><body><h2>Budget Approved</h2><p>The HR department budget for Q1 has been approved by finance.</p></body></html>',
+         'doc19', 'HR_Q1_Budget.xlsx')
     ]
 
     for sent_by, received_by, subject, body, doc_id, file_name in sample_emails:
@@ -1608,7 +1612,7 @@ async def get_email_notifications(page: int = 1,
     offset = (page - 1) * page_size
 
     if current_user['role'] == 'employee':
-        # Employees see emails sent to them, by them, or related to their documents, or to their dept
+        # Employees see emails sent to them, by them, related to their documents, or to their department
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1618,19 +1622,23 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users sender_u ON e.sent_by = sender_u.email
             LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ? 
+               OR (e.received_by LIKE '%' || ? || '%' AND e.received_by LIKE '%@company.com')
+               OR e.sent_by = 'noreply@idcr-system.com'
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], current_user['department'], page_size, offset])
 
         # Get total count for employees
         count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
+               OR (e.received_by LIKE '%' || ? || '%' AND e.received_by LIKE '%@company.com')
+               OR e.sent_by = 'noreply@idcr-system.com'
         '''
-        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id']])
+        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], current_user['department']])
         total_count = cursor.fetchone()[0]
 
     elif current_user['role'] == 'manager':
@@ -1645,20 +1653,24 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN users sender_u ON e.sent_by = sender_u.email
             LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
             WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? 
-               OR e.sent_by LIKE '%noreply%' OR e.sent_by LIKE '%@company.com'
+               OR (e.received_by LIKE '%' || ? || '%' AND e.received_by LIKE '%@company.com')
+               OR (e.sent_by LIKE '%' || ? || '%' AND e.sent_by LIKE '%@company.com')
+               OR e.sent_by = 'noreply@idcr-system.com' OR e.sent_by = 'admin@company.com'
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], current_user['department'], current_user['department'], page_size, offset])
 
         # Get total count for managers
         count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? 
-               OR e.sent_by LIKE '%noreply%' OR e.sent_by LIKE '%@company.com'
+               OR (e.received_by LIKE '%' || ? || '%' AND e.received_by LIKE '%@company.com')
+               OR (e.sent_by LIKE '%' || ? || '%' AND e.sent_by LIKE '%@company.com')
+               OR e.sent_by = 'noreply@idcr-system.com' OR e.sent_by = 'admin@company.com'
         '''
-        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
+        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], current_user['department'], current_user['department']])
         total_count = cursor.fetchone()[0]
 
     else:

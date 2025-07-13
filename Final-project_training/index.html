@@ -988,13 +988,21 @@
         }
 
         function showTab(tabName) {
-            // Hide all tabs
+            // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
 
-            // Show selected tab
-            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
-            event.target.classList.add('active');
+            // Show selected tab content
+            const targetTabContent = document.getElementById(`${tabName}Tab`);
+            if (targetTabContent) {
+                targetTabContent.classList.remove('hidden');
+            }
+
+            // Update active tab button
+            const clickedTab = document.querySelector(`[onclick="showTab('${tabName}')"]`);
+            if (clickedTab) {
+                clickedTab.classList.add('active');
+            }
 
             // Load data for specific tabs
             if (tabName === 'documents') {
