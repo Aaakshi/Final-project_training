@@ -516,8 +516,12 @@ def get_current_user(
             'department': user[4],
             'role': user[5]
         }
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as e:
+        print(f"JWT validation error: {e}")
         raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        print(f"Authentication error: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 
 def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_name: str = None, sender_email: str = None):
@@ -1180,42 +1184,61 @@ async def notify_department(doc_id: str, classification_result: dict,
     cursor.execute('SELECT original_name FROM documents WHERE doc_id = ?', (doc_id,))
     doc_result = cursor.fetchone()
     file_name = doc_result[0] if doc_result else "Unknown"
+    
+    # Also get all manager users for this department
+    cursor.execute('SELECT email, full_name FROM users WHERE department = ? AND role = ?', 
+                   (department, 'manager'))
+    manager_users = cursor.fetchall()
+    
     conn.close()
 
+    # Create descriptive subject based on document type
+    doc_type_display = doc_type.replace('_', ' ').title()
+    if doc_type == 'receipt':
+        subject = f"New Receipt Uploaded by {user['full_name']} - {file_name}"
+    else:
+        subject = f"New {doc_type_display} Uploaded - {file_name}"
+
+    body = f"""
+    <html>
+        <body>
+            <h2>📄 New Document Uploaded for Review</h2>
+            <p><strong>📋 Document:</strong> {file_name}</p>
+            <p><strong>👤 Uploaded by:</strong> {user['full_name']} ({user['email']})</p>
+            <p><strong>📂 Document Type:</strong> {doc_type_display}</p>
+            <p><strong>🏢 Department:</strong> {department.title()}</p>
+            <p><strong>⚡ Priority:</strong> {classification_result.get('priority', 'Medium').title()}</p>
+            <p><strong>🎯 Confidence:</strong> {classification_result.get('confidence', 0):.1%}</p>
+            <p><strong>🆔 Document ID:</strong> {doc_id}</p>
+            <hr style="margin: 20px 0;">
+            <p>Please log into the IDCR system to review this document.</p>
+            <p><em>This notification was sent to the {department.title()} department.</em></p>
+            <p>Best regards,<br>IDCR System</p>
+        </body>
+    </html>
+    """
+
+    # Send notifications to department infrastructure emails
     if dept_result:
         dept_email = dept_result[0]
         manager_email = dept_result[1]
-
-        # Create descriptive subject based on document type
-        doc_type_display = doc_type.replace('_', ' ').title()
-        if doc_type == 'receipt':
-            subject = f"New Receipt Uploaded by {user['full_name']} - {file_name}"
-        else:
-            subject = f"New {doc_type_display} Uploaded - {file_name}"
-
-        body = f"""
-        <html>
-            <body>
-                <h2>📄 New Document Uploaded for Review</h2>
-                <p><strong>📋 Document:</strong> {file_name}</p>
-                <p><strong>👤 Uploaded by:</strong> {user['full_name']} ({user['email']})</p>
-                <p><strong>📂 Document Type:</strong> {doc_type_display}</p>
-                <p><strong>🏢 Department:</strong> {department.title()}</p>
-                <p><strong>⚡ Priority:</strong> {classification_result.get('priority', 'Medium').title()}</p>
-                <p><strong>🎯 Confidence:</strong> {classification_result.get('confidence', 0):.1%}</p>
-                <p><strong>🆔 Document ID:</strong> {doc_id}</p>
-                <hr style="margin: 20px 0;">
-                <p>Please log into the IDCR system to review this document.</p>
-                <p><em>This notification was sent to the {department.title()} department.</em></p>
-                <p>Best regards,<br>IDCR System</p>
-            </body>
-        </html>
-        """
-
-        # Send notification to both department email and manager email
+        
+        print(f"📧 Sending notification to department: {dept_email}")
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
+        
         if manager_email and manager_email != dept_email:
+            print(f"📧 Sending notification to manager: {manager_email}")
             send_email(manager_email, subject, body, doc_id, file_name, user['email'])
+    
+    # Send notifications to actual manager users in the system
+    for manager_email, manager_name in manager_users:
+        print(f"📧 Sending notification to manager user: {manager_email}")
+        send_email(manager_email, subject, body, doc_id, file_name, user['email'])
+    
+    # If no specific department found, send to general department
+    if not dept_result and not manager_users:
+        print(f"📧 No specific department found, sending to general@company.com")
+        send_email("general@company.com", subject, body, doc_id, file_name, user['email'])
 
 
 def update_document_status(doc_id: str, status: str):
@@ -1432,12 +1455,16 @@ async def get_review_documents(page: int = 1,
         pass
     elif current_user['role'] == 'manager':
         # Managers can see ALL documents routed to their department, regardless of who uploaded them
-        where_clauses.append("d.department = ?")
+        # This includes documents from ANY user that got classified to their department
+        where_clauses.append("(d.department = ? OR d.department IS NULL)")
         params.append(current_user['department'])
     else:
-        # Regular employees can only see their own documents
-        where_clauses.append("d.user_id = ?")
-        params.append(current_user['user_id'])
+        # Regular employees can see their own documents AND documents routed to their department
+        where_clauses.append("(d.user_id = ? OR d.department = ?)")
+        params.extend([current_user['user_id'], current_user['department']])
+
+    # Always show documents that have been processed (not just uploaded)
+    where_clauses.append("d.processing_status IN ('classified', 'approved', 'failed')")
 
     if review_status:
         where_clauses.append("d.review_status = ?")
@@ -1459,7 +1486,14 @@ async def get_review_documents(page: int = 1,
         FROM documents d
         LEFT JOIN users u ON d.user_id = u.user_id
         {where_sql}
-        ORDER BY d.uploaded_at DESC
+        ORDER BY 
+            CASE d.priority 
+                WHEN 'high' THEN 1 
+                WHEN 'medium' THEN 2 
+                WHEN 'low' THEN 3 
+                ELSE 4 
+            END,
+            d.uploaded_at DESC
         LIMIT ? OFFSET ?
     '''
 
@@ -1622,7 +1656,10 @@ async def get_email_notifications(page: int = 1,
         cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
 
     else:  # managers
-        # Managers see ALL emails related to their department including documents routed to their department
+        # Managers see ALL emails related to their department including:
+        # 1. Emails sent to department email
+        # 2. Emails about documents routed to their department
+        # 3. Their own emails
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1632,11 +1669,18 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
+            WHERE (
+                e.sent_by = ? OR 
+                e.received_by = ? OR 
+                e.received_by = ? OR 
+                e.received_by = ? OR 
+                d.department = ? OR
+                (d.doc_id IS NOT NULL AND d.department = ?)
+            )
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department'], page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department'], current_user['department'], page_size, offset])
 
     emails = cursor.fetchall()
 
@@ -1655,8 +1699,15 @@ async def get_email_notifications(page: int = 1,
         cursor.execute('''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE (e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?)
-        ''', [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department']])
+            WHERE (
+                e.sent_by = ? OR 
+                e.received_by = ? OR 
+                e.received_by = ? OR 
+                e.received_by = ? OR 
+                d.department = ? OR
+                (d.doc_id IS NOT NULL AND d.department = ?)
+            )
+        ''', [current_user['email'], current_user['email'], user_dept_email, user_manager_email, current_user['department'], current_user['department']])
         total_count_result = cursor.fetchone()
 
     total_count = total_count_result[0] if total_count_result else 0
