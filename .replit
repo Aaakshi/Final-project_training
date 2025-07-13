@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Start Frontend Only"
+runButton = "Start IDCR System"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -130,6 +130,15 @@ args = "python Final-project_training/microservices/workflow_integration/app/mai
 
 [[workflows.workflow]]
 name = "Start Frontend Only"
+author = 44313974
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow]]
+name = "Start IDCR System"
 author = 44313974
 mode = "sequential"
 

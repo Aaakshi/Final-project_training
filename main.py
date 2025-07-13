@@ -12,10 +12,6 @@ import os
 import shutil
 from datetime import datetime, timedelta
 import asyncio
-import smtplib
-from email.mime.text import MimeText
-from email.mime.multipart import MimeMultipart
-from email_config import EMAIL_CONFIG
 
 # Configuration
 SECRET_KEY = "your-very-secure-secret-key-change-this-in-production"
@@ -154,7 +150,7 @@ async def send_email_demo(to_email: str, subject: str, body: str, notification_t
     try:
         # Demo mode - just log the email
         print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
-        print(f"From: general.employee@company.com")
+        print(f"From: system@company.com")
         print(f"To: {to_email}")
         print(f"Subject: {subject}")
         print(f"Body Preview: {body[:200]}...")
@@ -169,10 +165,12 @@ async def send_email_demo(to_email: str, subject: str, body: str, notification_t
         conn.commit()
         conn.close()
 
-        print(f"✅ Email logged successfully (not actually sent in demo)")
+        print(f"✅ Email logged successfully (demo mode)")
+        return True
 
     except Exception as e:
-        print(f"📧 Email sending failed (expected in demo): {e}")
+        print(f"📧 Email demo logging failed: {e}")
+        return False
 
 # API Routes
 @app.post("/api/register")
