@@ -1394,7 +1394,8 @@ async def notify_department(doc_id: str, classification_result: dict,
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
 
         # Also send confirmation email to the uploader
-        confirmation_subject = f"Document Upload Confirmation - {file_name}"confirmation_body = f"""
+        confirmation_subject = f"Document Upload Confirmation - {file_name}"
+        confirmation_body = f"""
         <html>
             <body>
                 <h2>✅ Document Upload Successful</h2>

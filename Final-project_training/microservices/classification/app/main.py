@@ -93,7 +93,8 @@ async def classify_document(file: UploadFile = File(...)):
             priority = "high"
             tags = ["finance", "invoice", "payment"]
         # Check Legal keywords  
-        elif any(keyword in content_lower for keyword in legal_keywords) or any(keyword in filename for keyword in ["legal", "contract", "agreement", "compliance", "policy", "nda"])
+        elif (any(keyword in content_lower for keyword in legal_keywords) or 
+              any(keyword in filename for keyword in ["legal", "contract", "agreement", "compliance", "policy", "nda"]) or
               "contract" in filename or "agreement" in filename or "legal" in filename or "nda" in filename or
               "policy" in filename or "compliance" in filename):
             doc_type = "legal_document"
