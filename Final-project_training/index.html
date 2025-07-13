@@ -600,6 +600,8 @@
                             • hr.manager@company.com<br>
                             • finance.manager@company.com<br>
                             • legal.manager@company.com<br><br>
+                            <strong>Employee:</strong><br>
+                            • general.employee@company.com<br><br>
                             <strong>Password:</strong> password123
                         </div>
                     </div>
@@ -669,17 +671,8 @@
                     <button onclick="showTab('review')" id="reviewTab">
                         ⚖️ Review Queue <span id="reviewBadge" class="notification-badge hidden">0</span>
                     </button>
-                    <button onclick="showTab('workflow')" id="workflowTab">
-                        🔄 Workflow
-                    </button>
-                    <button onclick="showTab('analytics')" id="analyticsTab">
-                        📈 Analytics
-                    </button>
                     <button onclick="showTab('notifications')" id="notificationsTab">
                         📧 Notifications
-                    </button>
-                    <button onclick="showTab('audit')" id="auditTab">
-                        🔍 Audit Trail
                     </button>
                 </nav>
 
@@ -702,25 +695,6 @@
                         <div class="stat-card">
                             <h3>0%</h3>
                             <p>Processing Rate</p>
-                        </div>
-                    </div>
-
-                    <div class="charts-container">
-                        <div class="chart-card">
-                            <h4>Document Types Distribution</h4>
-                            <canvas id="typesChart" height="200"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h4>Department Workload</h4>
-                            <canvas id="departmentsChart" height="200"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h4>Priority Distribution</h4>
-                            <canvas id="prioritiesChart" height="200"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h4>Processing Trends</h4>
-                            <canvas id="trendsChart" height="200"></canvas>
                         </div>
                     </div>
                 </div>
@@ -808,42 +782,10 @@
                     <div id="reviewQueue"></div>
                 </div>
 
-                <!-- Workflow Tab -->
-                <div id="workflow" class="tab-content hidden">
-                    <h3 style="margin-bottom: 30px; color: #475569;">Workflow Management</h3>
-                    <div id="workflowContent">
-                        <div class="workflow-status-overview">
-                            <h4>Current Workflows</h4>
-                            <div id="activeWorkflows"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Analytics Tab -->
-                <div id="analytics" class="tab-content hidden">
-                    <h3 style="margin-bottom: 30px; color: #475569;">Advanced Analytics</h3>
-                    <div class="charts-container">
-                        <div class="chart-card">
-                            <h4>Processing Performance</h4>
-                            <canvas id="performanceChart" height="200"></canvas>
-                        </div>
-                        <div class="chart-card">
-                            <h4>User Activity</h4>
-                            <canvas id="activityChart" height="200"></canvas>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Notifications Tab -->
                 <div id="notifications" class="tab-content hidden">
                     <h3 style="margin-bottom: 30px; color: #475569;">Notification Center</h3>
                     <div id="notificationsList"></div>
-                </div>
-
-                <!-- Audit Trail Tab -->
-                <div id="audit" class="tab-content hidden">
-                    <h3 style="margin-bottom: 30px; color: #475569;">Audit Trail</h3>
-                    <div id="auditLogs"></div>
                 </div>
             </div>
         </div>
@@ -874,14 +816,6 @@
         });
 
         function setupEventListeners() {
-            // Keyboard shortcuts
-            document.addEventListener('keydown', function(e) {
-                if (e.ctrlKey && e.key === 'u') {
-                    e.preventDefault();
-                    showTab('upload');
-                }
-            });
-
             // Real-time search
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
@@ -1008,9 +942,11 @@
                     currentUser = await response.json();
                     showMainSection();
                 } else {
+                    console.log('Auth check failed:', await response.json());
                     logout();
                 }
             } catch (error) {
+                console.log('Auth check failed:', error);
                 logout();
             }
         }
@@ -1036,7 +972,7 @@
 
         // Tab Management
         function showTab(tabName) {
-            const tabs = ['dashboard', 'upload', 'documents', 'review', 'workflow', 'analytics', 'notifications', 'audit'];
+            const tabs = ['dashboard', 'upload', 'documents', 'review', 'notifications'];
             tabs.forEach(tab => {
                 document.getElementById(tab).classList.add('hidden');
                 const tabBtn = document.getElementById(tab + 'Tab');
@@ -1058,17 +994,8 @@
                 case 'review':
                     loadReviewQueue();
                     break;
-                case 'workflow':
-                    loadWorkflow();
-                    break;
-                case 'analytics':
-                    loadAnalytics();
-                    break;
                 case 'notifications':
                     loadNotifications();
-                    break;
-                case 'audit':
-                    loadAuditTrail();
                     break;
             }
         }
@@ -1094,10 +1021,7 @@
                     total_documents: 0,
                     processed_documents: 0,
                     pending_documents: 0,
-                    processing_rate: 0,
-                    document_types: {},
-                    departments: {},
-                    priorities: {}
+                    processing_rate: 0
                 });
             }
         }
@@ -1131,38 +1055,6 @@
                     <p>Processing Rate</p>
                 </div>
             `;
-
-            createCharts(stats);
-        }
-
-        function createCharts(stats) {
-            if (!stats) stats = {};
-
-            // Document Types Chart
-            if (stats.document_types && Object.keys(stats.document_types).length > 0) {
-                const typesCtx = document.getElementById('typesChart');
-                if (typesCtx) {
-                    new Chart(typesCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: Object.keys(stats.document_types),
-                            datasets: [{
-                                data: Object.values(stats.document_types),
-                                backgroundColor: ['#64748b', '#94a3b8', '#cbd5e0', '#e2e8f0']
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { position: 'bottom' }
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Other charts with similar styling...
         }
 
         // File Upload Functions
@@ -1194,6 +1086,18 @@
 
         function handleFileSelect(event) {
             const files = Array.from(event.target.files);
+            
+            // Validate file types
+            const allowedTypes = ['.pdf', '.doc', '.docx', '.txt'];
+            const invalidFiles = files.filter(file => 
+                !allowedTypes.some(type => file.name.toLowerCase().endsWith(type))
+            );
+            
+            if (invalidFiles.length > 0) {
+                showToast(`Invalid file types detected. Only PDF, DOC, DOCX, TXT files are allowed.`, 'error');
+                return;
+            }
+            
             selectedFiles = files.slice(0, 50); // Limit to 50 files
             displayFileList();
             updateUploadButton();
@@ -1300,6 +1204,7 @@
                     allDocuments = data.documents || [];
                     displayDocuments(allDocuments);
                 } else {
+                    console.log('Failed to load documents:', await response.json());
                     showToast('Failed to load documents', 'error');
                 }
             } catch (error) {
@@ -1376,19 +1281,6 @@
         async function loadReviewQueue() {
             const reviewQueue = document.getElementById('reviewQueue');
             reviewQueue.innerHTML = '<p>Loading review queue...</p>';
-            
-            // Implement review queue loading
-        }
-
-        async function loadWorkflow() {
-            const workflowContent = document.getElementById('activeWorkflows');
-            workflowContent.innerHTML = '<p>Loading workflow information...</p>';
-            
-            // Implement workflow loading
-        }
-
-        async function loadAnalytics() {
-            // Implement advanced analytics
         }
 
         async function loadNotifications() {
@@ -1439,15 +1331,7 @@
             });
         }
 
-        async function loadAuditTrail() {
-            const auditLogs = document.getElementById('auditLogs');
-            auditLogs.innerHTML = '<p>Loading audit trail...</p>';
-            
-            // Implement audit trail loading
-        }
-
         function viewDocument(docId) {
-            // Implement document viewing
             showToast('Document viewer coming soon!', 'warning');
         }
 

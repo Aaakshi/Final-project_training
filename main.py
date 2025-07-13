@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -14,21 +13,8 @@ import shutil
 from datetime import datetime, timedelta
 import asyncio
 import smtplib
-try:
-    from email.mime.text import MimeText
-    from email.mime.multipart import MimeMultipart
-except ImportError:
-    # Fallback for systems where email modules might not be available
-    class MimeText:
-        def __init__(self, text, subtype='plain'):
-            self.text = text
-            self.subtype = subtype
-    
-    class MimeMultipart:
-        def __init__(self):
-            pass
-        def attach(self, part):
-            pass
+from email.mime.text import MimeText
+from email.mime.multipart import MimeMultipart
 from email_config import EMAIL_CONFIG
 
 # Configuration
@@ -43,7 +29,7 @@ security = HTTPBearer()
 def init_database():
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     # Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -56,7 +42,7 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     # Documents table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS documents (
@@ -79,7 +65,7 @@ def init_database():
             FOREIGN KEY (reviewed_by) REFERENCES users (id)
         )
     ''')
-    
+
     # Email notifications table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS email_notifications (
@@ -91,67 +77,24 @@ def init_database():
             notification_type TEXT NOT NULL
         )
     ''')
-    
-    # Document versions table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS document_versions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            doc_id TEXT NOT NULL,
-            version_number INTEGER NOT NULL,
-            file_path TEXT NOT NULL,
-            uploaded_by INTEGER NOT NULL,
-            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            changes_description TEXT,
-            FOREIGN KEY (uploaded_by) REFERENCES users (id)
-        )
-    ''')
-    
-    # Audit logs table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            action TEXT NOT NULL,
-            resource_type TEXT NOT NULL,
-            resource_id TEXT,
-            details TEXT,
-            ip_address TEXT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    # Workflow states table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS workflow_states (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            doc_id TEXT NOT NULL,
-            state TEXT NOT NULL,
-            assigned_to INTEGER,
-            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP,
-            notes TEXT,
-            FOREIGN KEY (assigned_to) REFERENCES users (id)
-        )
-    ''')
-    
-    # Insert default users
+
+    # Insert default users if they don't exist
     default_users = [
         ('HR Manager', 'hr.manager@company.com', 'password123', 'hr', 'manager'),
         ('Finance Manager', 'finance.manager@company.com', 'password123', 'finance', 'manager'),
         ('Legal Manager', 'legal.manager@company.com', 'password123', 'legal', 'manager'),
-        ('John Employee', 'john.employee@company.com', 'password123', 'general', 'employee'),
+        ('General Employee', 'general.employee@company.com', 'password123', 'general', 'employee'),
         ('Jane Smith', 'jane.smith@company.com', 'password123', 'hr', 'employee'),
         ('Admin User', 'admin@company.com', 'admin123', 'administration', 'admin')
     ]
-    
+
     for name, email, password, dept, role in default_users:
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         cursor.execute('''
             INSERT OR IGNORE INTO users (full_name, email, password_hash, department, role)
             VALUES (?, ?, ?, ?, ?)
         ''', (name, email, password_hash, dept, role))
-    
+
     conn.commit()
     conn.close()
     print("✓ Database initialized")
@@ -186,16 +129,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
+
         conn = sqlite3.connect('idcr_documents.db')
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
         user = cursor.fetchone()
         conn.close()
-        
+
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
-        
+
         return {
             "id": user[0],
             "full_name": user[1],
@@ -206,35 +149,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-# Audit logging function
-async def log_audit(user_id: int, action: str, resource_type: str, resource_id: str = None, details: str = None, ip_address: str = None):
+# Email sending function (demo mode)
+async def send_email_demo(to_email: str, subject: str, body: str, notification_type: str):
     try:
-        conn = sqlite3.connect('idcr_documents.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_id, action, resource_type, resource_id, details, ip_address))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        print(f"✗ Failed to log audit: {e}")
+        # Demo mode - just log the email
+        print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
+        print(f"From: general.employee@company.com")
+        print(f"To: {to_email}")
+        print(f"Subject: {subject}")
+        print(f"Body Preview: {body[:200]}...")
 
-# Email sending function
-async def send_email(to_email: str, subject: str, body: str, notification_type: str):
-    try:
-        msg = MimeMultipart()
-        msg['From'] = EMAIL_CONFIG['smtp_username']
-        msg['To'] = to_email
-        msg['Subject'] = subject
-        msg.attach(MimeText(body, 'html'))
-        
-        server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
-        server.starttls()
-        server.login(EMAIL_CONFIG['smtp_username'], EMAIL_CONFIG['smtp_password'])
-        server.send_message(msg)
-        server.quit()
-        
         # Log email to database
         conn = sqlite3.connect('idcr_documents.db')
         cursor = conn.cursor()
@@ -244,59 +168,52 @@ async def send_email(to_email: str, subject: str, body: str, notification_type: 
         ''', (to_email, subject, body, notification_type))
         conn.commit()
         conn.close()
-        
-        print(f"✓ Email sent to {to_email}")
+
+        print(f"✅ Email logged successfully (not actually sent in demo)")
+
     except Exception as e:
-        print(f"✗ Failed to send email to {to_email}: {e}")
+        print(f"📧 Email sending failed (expected in demo): {e}")
 
 # API Routes
 @app.post("/api/register")
 async def register_user(user: UserRegister):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     # Check if user exists
     cursor.execute('SELECT email FROM users WHERE email = ?', (user.email,))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Hash password and create user
     password_hash = hashlib.sha256(user.password.encode()).hexdigest()
     cursor.execute('''
         INSERT INTO users (full_name, email, password_hash, department, role)
         VALUES (?, ?, ?, ?, ?)
     ''', (user.full_name, user.email, password_hash, user.department, 'employee'))
-    
+
     conn.commit()
     conn.close()
-    
-    # Send welcome email
-    await send_email(
-        user.email,
-        "Welcome to IDCR System",
-        f"<h2>Welcome {user.full_name}!</h2><p>Your account has been created successfully.</p>",
-        "welcome"
-    )
-    
+
     return {"message": "User registered successfully"}
 
 @app.post("/api/login", response_model=Token)
 async def login_user(user: UserLogin):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     password_hash = hashlib.sha256(user.password.encode()).hexdigest()
     cursor.execute('''
         SELECT * FROM users WHERE email = ? AND password_hash = ?
     ''', (user.email, password_hash))
-    
+
     db_user = cursor.fetchone()
     conn.close()
-    
+
     if not db_user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     access_token = create_access_token(data={"sub": str(db_user[0])})
     user_data = {
         "id": db_user[0],
@@ -305,7 +222,7 @@ async def login_user(user: UserLogin):
         "department": db_user[4],
         "role": db_user[5]
     }
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -325,30 +242,36 @@ async def bulk_upload(
 ):
     if len(files) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 files allowed")
-    
+
+    # Validate file types
+    allowed_extensions = {'.pdf', '.doc', '.docx', '.txt'}
+    for file in files:
+        if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+            raise HTTPException(status_code=400, detail=f"File {file.filename} has unsupported format. Only PDF, DOC, DOCX, TXT files are allowed.")
+
     batch_id = str(uuid.uuid4())
     upload_dir = f"uploads/{batch_id}"
     os.makedirs(upload_dir, exist_ok=True)
-    
+
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     uploaded_files = []
-    
+
     for file in files:
         if file.size > 10 * 1024 * 1024:  # 10MB limit
             continue
-        
+
         # Save file
         file_path = os.path.join(upload_dir, file.filename)
         content = await file.read()
         with open(file_path, "wb") as f:
             f.write(content)
-        
+
         # Classify document (simple classification)
         document_type = classify_document(file.filename, content)
         priority = determine_priority(file.filename, content)
-        
+
         # Insert into database
         doc_id = str(uuid.uuid4())
         cursor.execute('''
@@ -358,43 +281,20 @@ async def bulk_upload(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (doc_id, batch_id, batch_name, file.filename, file_path, file.size,
               current_user['id'], target_department, document_type, priority))
-        
-        # Create initial document version
-        cursor.execute('''
-            INSERT INTO document_versions 
-            (doc_id, version_number, file_path, uploaded_by, changes_description)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (doc_id, 1, file_path, current_user['id'], 'Initial upload'))
-        
-        # Create initial workflow state
-        cursor.execute('''
-            INSERT INTO workflow_states 
-            (doc_id, state, notes)
-            VALUES (?, ?, ?)
-        ''', (doc_id, 'uploaded', f'Document uploaded to {target_department} department'))
-        
+
         uploaded_files.append({
             "filename": file.filename,
             "doc_id": doc_id,
             "type": document_type,
             "priority": priority
         })
-    
+
     conn.commit()
     conn.close()
-    
-    # Log audit trail
-    await log_audit(
-        current_user['id'], 
-        'BULK_UPLOAD', 
-        'documents', 
-        batch_id, 
-        f'Uploaded {len(uploaded_files)} files to {target_department}'
-    )
-    
-    # Send notification to department managers
+
+    # Send notifications to ALL department managers AND direct department emails
     await notify_department_managers(target_department, batch_name, current_user, uploaded_files)
-    
+
     return {
         "message": f"Successfully uploaded {len(uploaded_files)} files",
         "batch_id": batch_id,
@@ -407,7 +307,7 @@ def classify_document(filename: str, content: bytes) -> str:
         text_content = content.decode('utf-8', errors='ignore').lower()
     except:
         text_content = ""
-    
+
     # Classification logic
     if any(word in filename_lower or word in text_content for word in ['hr', 'employee', 'hiring', 'payroll']):
         return 'hr'
@@ -426,7 +326,7 @@ def determine_priority(filename: str, content: bytes) -> str:
         text_content = content.decode('utf-8', errors='ignore').lower()
     except:
         text_content = ""
-    
+
     if any(word in filename_lower or word in text_content for word in ['urgent', 'critical', 'asap', 'emergency']):
         return 'high'
     elif any(word in filename_lower or word in text_content for word in ['fyi', 'info', 'reference']):
@@ -437,51 +337,92 @@ def determine_priority(filename: str, content: bytes) -> str:
 async def notify_department_managers(department: str, batch_name: str, uploader: dict, files: list):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
-    # Get department managers
+
+    # Get ALL managers for the target department
     cursor.execute('''
         SELECT email, full_name FROM users 
         WHERE department = ? AND (role = 'manager' OR role = 'admin')
     ''', (department,))
-    
+
     managers = cursor.fetchall()
+
+    # Also get general admins
+    cursor.execute('''
+        SELECT email, full_name FROM users 
+        WHERE role = 'admin'
+    ''')
+
+    admins = cursor.fetchall()
     conn.close()
-    
-    for manager_email, manager_name in managers:
-        subject = f"New Documents for Review - {batch_name}"
+
+    # Combine managers and admins
+    all_recipients = list(set(managers + admins))
+
+    # Department email mapping
+    department_emails = {
+        'hr': 'hr@company.com',
+        'finance': 'finance@company.com', 
+        'legal': 'legal@company.com',
+        'it': 'it@company.com',
+        'operations': 'operations@company.com',
+        'general': 'general@company.com'
+    }
+
+    # Add department email to recipients
+    if department in department_emails:
+        all_recipients.append((department_emails[department], f"{department.title()} Department"))
+
+    # Send notifications to all recipients
+    for recipient_email, recipient_name in all_recipients:
+        subject = f"New Hr Document Uploaded - {files[0]['filename'] if files else batch_name}"
         body = f"""
-        <h2>New Documents Uploaded</h2>
-        <p>Hello {manager_name},</p>
-        <p>{uploader['full_name']} has uploaded {len(files)} documents for the {department} department.</p>
-        <p><strong>Batch:</strong> {batch_name}</p>
-        <p><strong>Files:</strong></p>
-        <ul>
+        <html>
+            <body>
+                <h2>📄 New Document Uploaded for Review</h2>
+                <p><strong>📋 Document:</strong> {files[0]['filename'] if files else batch_name}</p>
+                <p><strong>👤 Uploaded by:</strong> {uploader['full_name']} ({uploader['email']})</p>
+                <p><strong>🏢 From Department:</strong> {uploader['department'].title()}</p>
+                <p><strong>🎯 Target Department:</strong> {department.title()}</p>
+                <p><strong>📊 Batch Name:</strong> {batch_name}</p>
+                <p><strong>📁 Number of Files:</strong> {len(files)}</p>
+
+                <h3>📋 File Details:</h3>
+                <ul>
         """
-        
+
         for file in files:
-            body += f"<li>{file['filename']} ({file['type']}, {file['priority']} priority)</li>"
-        
-        body += """
-        </ul>
-        <p>Please review these documents in the IDCR system.</p>
+            body += f"<li>📄 {file['filename']} - Type: {file['type']}, Priority: {file['priority']}</li>"
+
+        body += f"""
+                </ul>
+
+                <p><strong>🎯 Action Required:</strong> Please review these documents in the IDCR system.</p>
+                <p><strong>⏰ Uploaded at:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+
+                <hr>
+                <p style="font-size: 12px; color: #666;">
+                    This is an automated notification from the IDCR Document Management System.
+                </p>
+            </body>
+        </html>
         """
-        
-        await send_email(manager_email, subject, body, "document_notification")
+
+        await send_email_demo(recipient_email, subject, body, "document_notification")
 
 @app.get("/api/documents")
 async def get_documents(current_user: dict = Depends(get_current_user)):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     if current_user['role'] in ['manager', 'admin']:
-        # Managers can see documents for their department
+        # Managers can see ALL documents for their department (regardless of who uploaded)
         cursor.execute('''
             SELECT d.*, u.full_name as uploader_name
             FROM documents d
             JOIN users u ON d.uploaded_by = u.id
-            WHERE d.target_department = ?
+            WHERE d.target_department = ? OR d.document_type = ?
             ORDER BY d.uploaded_at DESC
-        ''', (current_user['department'],))
+        ''', (current_user['department'], current_user['department']))
     else:
         # Employees can only see their own documents
         cursor.execute('''
@@ -491,20 +432,20 @@ async def get_documents(current_user: dict = Depends(get_current_user)):
             WHERE d.uploaded_by = ?
             ORDER BY d.uploaded_at DESC
         ''', (current_user['id'],))
-    
+
     documents = cursor.fetchall()
     conn.close()
-    
+
     return {
         "documents": [
             {
                 "doc_id": doc[1],
                 "original_name": doc[4],
-                "document_type": doc[8],
-                "priority": doc[9],
-                "review_status": doc[10],
-                "uploaded_at": doc[11],
-                "department": doc[7],
+                "document_type": doc[9],
+                "priority": doc[10],
+                "review_status": doc[11],
+                "uploaded_at": doc[12],
+                "department": doc[8],
                 "uploader": doc[-1]
             }
             for doc in documents
@@ -515,53 +456,44 @@ async def get_documents(current_user: dict = Depends(get_current_user)):
 async def get_statistics(current_user: dict = Depends(get_current_user)):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     # Basic statistics
-    cursor.execute('SELECT COUNT(*) FROM documents')
-    total_docs = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM documents WHERE review_status = "approved"')
-    processed_docs = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM documents WHERE review_status = "pending"')
-    pending_docs = cursor.fetchone()[0]
-    
+    if current_user['role'] in ['manager', 'admin']:
+        # Managers see stats for their department
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE target_department = ? OR document_type = ?', 
+                      (current_user['department'], current_user['department']))
+        total_docs = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE (target_department = ? OR document_type = ?) AND review_status = "approved"',
+                      (current_user['department'], current_user['department']))
+        processed_docs = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE (target_department = ? OR document_type = ?) AND review_status = "pending"',
+                      (current_user['department'], current_user['department']))
+        pending_docs = cursor.fetchone()[0]
+    else:
+        # Employees see their own stats
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE uploaded_by = ?', (current_user['id'],))
+        total_docs = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE uploaded_by = ? AND review_status = "approved"', (current_user['id'],))
+        processed_docs = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM documents WHERE uploaded_by = ? AND review_status = "pending"', (current_user['id'],))
+        pending_docs = cursor.fetchone()[0]
+
     processing_rate = round((processed_docs / total_docs * 100) if total_docs > 0 else 0, 1)
-    
-    # Document types
-    cursor.execute('''
-        SELECT document_type, COUNT(*) 
-        FROM documents 
-        GROUP BY document_type
-    ''')
-    doc_types = dict(cursor.fetchall())
-    
-    # Departments
-    cursor.execute('''
-        SELECT target_department, COUNT(*) 
-        FROM documents 
-        GROUP BY target_department
-    ''')
-    departments = dict(cursor.fetchall())
-    
-    # Priorities
-    cursor.execute('''
-        SELECT priority, COUNT(*) 
-        FROM documents 
-        GROUP BY priority
-    ''')
-    priorities = dict(cursor.fetchall())
-    
+
     conn.close()
-    
+
     return {
         "total_documents": total_docs,
         "processed_documents": processed_docs,
         "pending_documents": pending_docs,
         "processing_rate": processing_rate,
-        "document_types": doc_types,
-        "departments": departments,
-        "priorities": priorities,
+        "document_types": {},
+        "departments": {},
+        "priorities": {},
         "upload_trends": []
     }
 
@@ -569,16 +501,36 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT * FROM email_notifications 
-        ORDER BY sent_at DESC
-        LIMIT 50
-    ''')
-    
+
+    if current_user['role'] in ['manager', 'admin']:
+        # Managers see notifications for their department
+        department_emails = {
+            'hr': 'hr@company.com',
+            'finance': 'finance@company.com', 
+            'legal': 'legal@company.com',
+            'it': 'it@company.com',
+            'operations': 'operations@company.com'
+        }
+
+        dept_email = department_emails.get(current_user['department'], '')
+        cursor.execute('''
+            SELECT * FROM email_notifications 
+            WHERE recipient_email = ? OR recipient_email LIKE ?
+            ORDER BY sent_at DESC
+            LIMIT 50
+        ''', (dept_email, f"%{current_user['department']}%"))
+    else:
+        # Employees see their own notifications
+        cursor.execute('''
+            SELECT * FROM email_notifications 
+            WHERE recipient_email = ?
+            ORDER BY sent_at DESC
+            LIMIT 50
+        ''', (current_user['email'],))
+
     emails = cursor.fetchall()
     conn.close()
-    
+
     return {
         "emails": [
             {
@@ -592,81 +544,6 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
         ]
     }
 
-@app.get("/api/audit-trail")
-async def get_audit_trail(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect('idcr_documents.db')
-    cursor = conn.cursor()
-    
-    # Only admins and managers can view full audit trail
-    if current_user['role'] not in ['admin', 'manager']:
-        cursor.execute('''
-            SELECT a.*, u.full_name 
-            FROM audit_logs a
-            JOIN users u ON a.user_id = u.id
-            WHERE a.user_id = ?
-            ORDER BY a.timestamp DESC
-            LIMIT 100
-        ''', (current_user['id'],))
-    else:
-        cursor.execute('''
-            SELECT a.*, u.full_name 
-            FROM audit_logs a
-            JOIN users u ON a.user_id = u.id
-            ORDER BY a.timestamp DESC
-            LIMIT 200
-        ''')
-    
-    logs = cursor.fetchall()
-    conn.close()
-    
-    return {
-        "audit_logs": [
-            {
-                "id": log[0],
-                "user_name": log[-1],
-                "action": log[2],
-                "resource_type": log[3],
-                "resource_id": log[4],
-                "details": log[5],
-                "timestamp": log[7]
-            }
-            for log in logs
-        ]
-    }
-
-@app.get("/api/workflow-status")
-async def get_workflow_status(current_user: dict = Depends(get_current_user)):
-    conn = sqlite3.connect('idcr_documents.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT w.*, d.original_name, u.full_name as assigned_name
-        FROM workflow_states w
-        JOIN documents d ON w.doc_id = d.doc_id
-        LEFT JOIN users u ON w.assigned_to = u.id
-        WHERE w.completed_at IS NULL
-        ORDER BY w.started_at DESC
-        LIMIT 50
-    ''')
-    
-    workflows = cursor.fetchall()
-    conn.close()
-    
-    return {
-        "active_workflows": [
-            {
-                "id": wf[0],
-                "doc_id": wf[1],
-                "state": wf[2],
-                "document_name": wf[-2],
-                "assigned_to": wf[-1] or "Unassigned",
-                "started_at": wf[4],
-                "notes": wf[6]
-            }
-            for wf in workflows
-        ]
-    }
-
 @app.post("/api/documents/{doc_id}/review")
 async def review_document(
     doc_id: str,
@@ -676,24 +553,17 @@ async def review_document(
 ):
     if current_user['role'] not in ['manager', 'admin']:
         raise HTTPException(status_code=403, detail="Only managers can review documents")
-    
+
     conn = sqlite3.connect('idcr_documents.db')
     cursor = conn.cursor()
-    
+
     # Update document status
     cursor.execute('''
         UPDATE documents 
         SET review_status = ?, reviewed_at = CURRENT_TIMESTAMP, reviewed_by = ?
         WHERE doc_id = ?
     ''', (action, current_user['id'], doc_id))
-    
-    # Update workflow state
-    cursor.execute('''
-        UPDATE workflow_states 
-        SET state = ?, completed_at = CURRENT_TIMESTAMP, notes = ?
-        WHERE doc_id = ? AND completed_at IS NULL
-    ''', (action, comments, doc_id))
-    
+
     # Get document details for notification
     cursor.execute('''
         SELECT d.original_name, d.uploaded_by, u.email, u.full_name
@@ -701,11 +571,11 @@ async def review_document(
         JOIN users u ON d.uploaded_by = u.id
         WHERE d.doc_id = ?
     ''', (doc_id,))
-    
+
     doc_info = cursor.fetchone()
     conn.commit()
     conn.close()
-    
+
     if doc_info:
         # Send notification to document uploader
         subject = f"Document Review: {doc_info[0]} - {action.title()}"
@@ -716,18 +586,9 @@ async def review_document(
         {f'<p><strong>Comments:</strong> {comments}</p>' if comments else ''}
         <p>Please check the IDCR system for more details.</p>
         """
-        
-        await send_email(doc_info[2], subject, body, "document_review")
-    
-    # Log audit trail
-    await log_audit(
-        current_user['id'],
-        f'DOCUMENT_{action.upper()}',
-        'document',
-        doc_id,
-        f'Document {action} with comments: {comments}'
-    )
-    
+
+        await send_email_demo(doc_info[2], subject, body, "document_review")
+
     return {"message": f"Document {action} successfully", "doc_id": doc_id}
 
 # Mount static files and serve frontend
@@ -743,12 +604,12 @@ async def serve_frontend():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Initialize database
     init_database()
-    
+
     print("🚀 Starting IDCR Demo Server...")
     print("📂 Frontend available at: http://0.0.0.0:5000")
     print("📊 API docs available at: http://0.0.0.0:5000/docs")
-    
+
     uvicorn.run(app, host="0.0.0.0", port=5000, log_level="info")
