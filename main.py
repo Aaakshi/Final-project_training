@@ -1786,18 +1786,23 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
         if current_user['role'] == 'admin':
             # Admin can see all documents
             where_clause = ""
+            params = []
         elif current_user['role'] == 'manager':
             # Department managers see their department's documents
             where_clause = "WHERE department = ?"
-            params.append(current_user['department'])
+            params = [current_user['department']]
         else:
             # Regular employees see only their own documents
             where_clause = "WHERE user_id = ?"
-            params.append(current_user['user_id'])
+            params = [current_user['user_id']]
 
         # Get total documents
-        query = f'SELECT COUNT(*) FROM documents {where_clause}'
-        cursor.execute(query, params)
+        if where_clause:
+            query = f'SELECT COUNT(*) FROM documents {where_clause}'
+            cursor.execute(query, params)
+        else:
+            query = 'SELECT COUNT(*) FROM documents'
+            cursor.execute(query)
         total_documents = cursor.fetchone()[0]
 
         # Get processed documents (classified status)
@@ -1840,24 +1845,28 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             cursor.execute(query)
         doc_types = dict(cursor.fetchall())
 
-        # Get department distribution
-        if where_clause:
-            query = f'''
-                SELECT department, COUNT(*) 
-                FROM documents 
-                {where_clause} AND department IS NOT NULL 
-                GROUP BY department
-            '''
-            cursor.execute(query, params)
+        # Get department distribution - only show if admin or manager
+        if current_user['role'] in ['admin', 'manager']:
+            if where_clause:
+                query = f'''
+                    SELECT department, COUNT(*) 
+                    FROM documents 
+                    {where_clause} AND department IS NOT NULL 
+                    GROUP BY department
+                '''
+                cursor.execute(query, params)
+            else:
+                query = '''
+                    SELECT department, COUNT(*) 
+                    FROM documents 
+                    WHERE department IS NOT NULL 
+                    GROUP BY department
+                '''
+                cursor.execute(query)
+            departments = dict(cursor.fetchall())
         else:
-            query = '''
-                SELECT department, COUNT(*) 
-                FROM documents 
-                WHERE department IS NOT NULL 
-                GROUP BY department
-            '''
-            cursor.execute(query)
-        departments = dict(cursor.fetchall())
+            # For regular employees, only show their own department
+            departments = {current_user['department']: total_documents}
 
         # Get priority distribution
         if where_clause:
@@ -1901,7 +1910,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
         conn.close()
 
-        return {
+        stats_response = {
             "total_documents": total_documents,
             "processed_documents": processed_documents,
             "pending_documents": pending_documents,
@@ -1912,10 +1921,15 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "upload_trends": upload_trends
         }
 
+        return JSONResponse(
+            content=stats_response,
+            headers={"Content-Type": "application/json"}
+        )
+
     except Exception as e:
         print(f"Stats error: {e}")
-        # Return empty stats instead of raising error to prevent script errors
-        return {
+        # Return empty stats as JSON to prevent script errors
+        empty_stats = {
             "total_documents": 0,
             "processed_documents": 0,
             "pending_documents": 0,
@@ -1925,6 +1939,10 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
             "priorities": {},
             "upload_trends": []
         }
+        return JSONResponse(
+            content=empty_stats,
+            headers={"Content-Type": "application/json"}
+        )
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):
