@@ -577,9 +577,9 @@
         }
 
         .status-rejected { background-color: #dc3545; color: white; }
-        .priority-high { background-color: #dc3545; color: white; }
-        .priority-medium { background-color: #ffc107; color: black; }
-        .priority-low { background-color: #28a745; color: white; }
+        .priority-high { color: #dc3545; font-weight: bold; }
+        .priority-medium { color: #ffc107; font-weight: bold; }
+        .priority-low { color: #3182ce; font-weight: bold; }
 
         .review-section {
             margin-top: 2rem;
@@ -1634,7 +1634,7 @@
                 '<span class="email-type-badge ' + email.email_type + '">' + email.email_type + '</span>' +
                 '</div>' +
                 '<div>' +
-                '<span class="priority-badge priority-' + email.priority + '">' + email.priority + '</span>' +
+                '<span class="priority-' + email.priority + '">' + email.priority + '</span>' +
                 '<span class="email-status status-' + email.status + '">' + email.status + '</span>' +
                 '</div>' +
                 '</div>' +
@@ -1744,7 +1744,7 @@
 
             try {
                 // Create document types chart
-                if (stats.document_types && Object.keys(statsstats.document_types).length > 0) {
+                if (stats.document_types && Object.keys(stats.document_types).length > 0) {
                     const ctx1 = document.getElementById('docTypesChart');
                     if (ctx1) {
                         new Chart(ctx1, {
