@@ -961,15 +961,15 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
             <h2 id="modalTitle">Document Details</h2>
-            
+
              <div class="tab-buttons">
                         <button class="tab-btn active" onclick="showTab('basic-info')">Basic Info</button>
                         <button class="tab-btn" onclick="showTab('analysis-tab')">Analysis</button>
                         <button class="tab-btn" onclick="showTab('content-preview')">Content</button>
                         <button class="tab-btn" onclick="showTab('tags-section')">Tags</button>
                     </div>
-            
-            
+
+
              <div class="tab-content">
                         <div id="basic-info" class="tab-pane active">
                             <div class="info-grid">
@@ -1049,7 +1049,7 @@
                             <div id="modalTags" class="tags-container"></div>
                         </div>
                     </div>
-           
+
             <div id="modalContent">
                 <!-- Document details will be loaded here -->
             </div>
@@ -1243,7 +1243,7 @@
                  document.querySelector(`.modal-content .tab-buttons .tab-btn[onclick="showTab('${tabName}')"]`).classList.add('active');
                   return;
             }
-            
+
 
             // Load data based on tab
             if (tabName === 'documents') {
@@ -1464,10 +1464,11 @@
                 if (response.ok) {
                     const doc = await response.json();
 
+                    // Set modal title
+                    document.getElementById('modalTitle').textContent = doc.file_name || doc.original_name;
+
                     // Populate modal fields
-                    document.getElementById('modalDocId').textContent = doc.doc_id;
-                    document.getElementById('modalFilename').textContent = doc.original_name;
-                    document.getElementById('modalDocType').textContent = doc.doc_type || 'N/A';
+                    document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
                     document.getElementById('modalDepartment').textContent = doc.department || 'N/A';
 
                     const priorityElement = document.getElementById('modalPriority');
@@ -1847,8 +1848,7 @@
                     <h3>${stats.total_documents}</h3>
                     <p>Total Documents</p>
                 </div>
-                <div class="stat-card">
-                    <h3>${stats.processed_documents}</h3>
+                <div class="stat-card">                    <h3>${stats.processed_documents}</h3>
                     <p>Processed Documents</p>
                 </div>
                 <div class="stat-card">

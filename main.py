@@ -1991,6 +1991,8 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
     except Exception as e:
         print(f"Error in statistics endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         # Return default empty statistics in case of error
         return {
             "total_documents": 0,
@@ -2006,7 +2008,8 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
     finally:
         # Ensure connection is always closed
-        conn.close()
+        if 'conn' in locals():
+            conn.close()nn.close()
 
 # --- Document Analysis Functions ---
 
