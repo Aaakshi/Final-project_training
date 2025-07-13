@@ -575,6 +575,53 @@
             color: #718096;
             font-style: italic;
         }
+
+        .status-rejected { background-color: #dc3545; color: white; }
+        .priority-high { background-color: #dc3545; color: white; }
+        .priority-medium { background-color: #ffc107; color: black; }
+        .priority-low { background-color: #28a745; color: white; }
+
+        .review-section {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .section-description {
+            color: #6c757d;
+            margin-bottom: 1rem;
+            font-style: italic;
+        }
+
+        .btn-approve, .btn-reject {
+            padding: 0.4rem 0.8rem;
+            margin: 0 0.2rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .btn-approve {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background-color: #218838;
+        }
+
+        .btn-reject {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background-color: #c82333;
+        }
     </style>
 </head>
 <body>
@@ -847,6 +894,7 @@
                 </div>
                 <div class="info-item">
                     <label>Department:</label>
+                    ```python
                     <span id="modalDepartment"></span>
                 </div>
                 <div class="info-item">
@@ -1696,7 +1744,7 @@
 
             try {
                 // Create document types chart
-                if (stats.document_types && Object.keys(stats.document_types).length > 0) {
+                if (stats.document_types && Object.keys(statsstats.document_types).length > 0) {
                     const ctx1 = document.getElementById('docTypesChart');
                     if (ctx1) {
                         new Chart(ctx1, {

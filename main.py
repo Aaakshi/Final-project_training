@@ -102,7 +102,7 @@ DB_PATH = "idcr_documents.db"
 
 
 def init_database():
-    """Initialize SQLite database for document storage and user management"""
+    """Initialize the database with required tables"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
@@ -220,6 +220,22 @@ def init_database():
         cursor.execute(
             'ALTER TABLE documents ADD COLUMN uploaded_by TEXT DEFAULT "General Employee"')
 
+    # Add new columns if they don't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE documents ADD COLUMN reviewed_by TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE documents ADD COLUMN review_date TIMESTAMP')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
+    try:
+        cursor.execute('ALTER TABLE documents ADD COLUMN review_comments TEXT')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
+
     # Create sample documents for better statistics
 
     # Create sample priority documents first
@@ -317,7 +333,7 @@ def init_database():
             f"Sample content for {original_name} - This is a {doc_type} document for {dept} department.", uploaded_by_name
         ))
 
-    
+
 
     # Create upload batches table (updated)
     cursor.execute('''
@@ -367,7 +383,7 @@ def init_database():
         )
     ''')
 
-    
+
 
     # Check if user_id column exists in upload_batches table, add if missing
     cursor.execute("PRAGMA table_info(upload_batches)")
@@ -1439,80 +1455,108 @@ def update_document_classification(doc_id: str, classification_result: dict):
     conn.close()
 
 
-@app.post("/api/documents/{doc_id}/review")
-async def review_document(doc_id: str,
-                          review: DocumentReview,
-                          current_user: dict = Depends(get_current_user)):
-    """Review a document (approve/reject) - Only for HR, Legal, Finance managers and admins"""
-    
-    # Check if user has permission to review documents
-    if not (current_user['role'] == 'admin' or 
-            (current_user['role'] == 'manager' and current_user['department'] in ['hr', 'legal', 'finance'])):
-        raise HTTPException(status_code=403, detail="Access denied. Only HR, Legal, and Finance managers can review documents.")
+@app.post("/api/logout")
+async def logout():
+    """Logout endpoint"""
+    return {"message": "Logged out successfully"}
+
+@app.post("/api/review-document/{doc_id}")
+async def review_document(
+    doc_id: str,
+    review_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Review a document (approve/reject)"""
+    if current_user.get('role') != 'manager':
+        raise HTTPException(status_code=403, detail="Only managers can review documents")
+
+    action = review_data.get('action')  # 'approve' or 'reject'
+    comments = review_data.get('comments', '')
+
+    if action not in ['approve', 'reject']:
+        raise HTTPException(status_code=400, detail="Action must be 'approve' or 'reject'")
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Get document info
-    cursor.execute(
-        'SELECT user_id, original_name FROM documents WHERE doc_id = ?',
-        (doc_id, ))
-    doc_result = cursor.fetchone()
+    # Verify document belongs to manager's department
+    cursor.execute("""
+        SELECT department, uploaded_by, original_name 
+        FROM documents 
+        WHERE doc_id = ?
+    """, [doc_id])
 
-    if not doc_result:
+    result = cursor.fetchone()
+    if not result:
         conn.close()
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Update document review status
-    cursor.execute(
-        '''
-        UPDATE documents 
-        SET review_status = ?, reviewed_by = ?, review_comments = ?, reviewed_at = ?
-        WHERE doc_id = ?
-    ''', (review.status, current_user['email'], review.comments,
-          datetime.datetime.utcnow().isoformat(), doc_id))
+    doc_department, uploaded_by, file_name = result
 
-    # Get user email who uploaded the document
-    cursor.execute('SELECT email, full_name FROM users WHERE user_id = ?',
-                   (doc_result[0], ))
-    user_result = cursor.fetchone()
+    if doc_department != current_user.get('department'):
+        conn.close()
+        raise HTTPException(status_code=403, detail="You can only review documents from your department")
+
+    # Update document status
+    new_status = 'approved' if action == 'approve' else 'rejected'
+    cursor.execute("""
+        UPDATE documents 
+        SET processing_status = ?, reviewed_by = ?, reviewed_at = ?, review_comments = ?
+        WHERE doc_id = ?
+    """, [new_status, current_user.get('email'), datetime.datetime.utcnow().isoformat(), comments, doc_id])
 
     conn.commit()
+
+    # Get uploader's email for notification
+    cursor.execute("SELECT email FROM users WHERE user_id = ?", [uploaded_by])
+    uploader_result = cursor.fetchone()
+
     conn.close()
 
-    if user_result:
-        user_email, user_name = user_result
-
-        # Send notification email to user
-        status_text = "approved" if review.status == "approved" else "rejected"
-        subject = f"Document Review Complete - {status_text.title()}"
+    # Send email notification to uploader
+    if uploader_result:
+        uploader_email = uploader_result[0]
+        subject = f"Document Review Update - {action.title()}"
+        status_msg = "approved" if action == 'approve' else "rejected"
 
         body = f"""
-        <html>
-            <body>
-                <h2>Document Review Complete</h2>
-                <p>Dear {user_name},</p>
-                <p>Your document <strong>{doc_result[1]}</strong> has been <strong>{status_text}</strong>.</p>
-                <p><strong>Reviewed by:</strong> {current_user['full_name']} ({current_user['email']})</p>
-                {f"<p><strong>Comments:</strong> {review.comments}</p>" if review.comments else ""}
-                <p>You can view the details in your IDCR dashboard.</p>
-                <p>Best regards,<br>IDCR Team</p>
-            </body>
-        </html>
+        Your document has been {status_msg}.
+
+        Document Details:
+        - File Name: {file_name}
+        - Document ID: {doc_id}
+        - Status: {status_msg.title()}
+        - Reviewed by: {current_user.get('email')}
+        - Review Date: {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}
+
+        {f'Comments: {comments}' if comments else ''}
+
+        Best regards,
+        IDCR System
         """
 
-        send_email(user_email, subject, body, doc_id, doc_result[1], current_user['email'])
+        try:
+            send_email(uploader_email, subject, body)
+            print(f"Review notification sent to {uploader_email} for document {doc_id}")
+        except Exception as e:
+            print(f"Failed to send review notification: {e}")
 
-    return {"message": f"Document {review.status} successfully"}
-
+    return {
+        "message": f"Document {action}d successfully",
+        "doc_id": doc_id,
+        "status": new_status
+    }
 
 @app.get("/api/documents", response_model=DocumentListResponse)
-async def get_documents(page: int = 1,
-                        page_size: int = 20,
-                        status: str = None,
-                        doc_type: str = None,
-                        department: str = None,
-                        search: str = None,
-                        current_user: dict = Depends(get_current_user)):
+async def get_documents(
+    page: int = 1,
+    page_size: int = 20,
+    status: str = None,
+    doc_type: str = None,
+    department: str = None,
+    search: str = None,
+    current_user: dict = Depends(get_current_user)
+):
     """Get paginated list of documents with filtering"""
     conn = sqlite3.connect(DB_PATH)
     cursor =conn.cursor()
@@ -1748,7 +1792,7 @@ async def get_document_details(doc_id: str,
     # Extract full content from file if not already extracted or if it's truncated
     file_path = doc_dict['file_path']
     full_content = ""
-    
+
     if os.path.exists(file_path):
         try:
             if doc_dict['mime_type'] == 'application/pdf':
@@ -1836,7 +1880,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
 
         # Build WHERE clause based on user role
         base_params = []
-        
+
         if current_user['role'] == 'admin':
             # Admin can see all documents
             where_base = ""
