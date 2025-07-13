@@ -2049,41 +2049,59 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        # Get emails sent to or from current user
+        # Get emails sent to or from current user, including department-wide notifications
         cursor.execute('''
-            SELECT e.*, d.original_name as document_name, d.department,
+            SELECT e.*, d.original_name as document_name, d.department, d.priority,
                    u1.full_name as sent_by_name, u2.full_name as received_by_name
             FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u1 ON e.sent_by = u1.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR 
+                  (e.received_by LIKE '%@company.com' AND d.department = ?)
             ORDER BY e.sent_at DESC
-            LIMIT 50
-        ''', (current_user['email'], current_user['email']))
+            LIMIT 100
+        ''', (current_user['email'], current_user['email'], current_user['department']))
 
         emails = []
         for row in cursor.fetchall():
+            # Determine email type based on sender/receiver
             email_type = "sent" if row[1] == current_user['email'] else "received"
+            
+            # Extract priority from document or subject
+            priority = "medium"
+            if row[12]:  # Document priority
+                priority = row[12]
+            elif row[3]:  # Check subject for priority keywords
+                subject_lower = row[3].lower()
+                if any(word in subject_lower for word in ['urgent', 'asap', 'immediate', 'high priority']):
+                    priority = "high"
+                elif any(word in subject_lower for word in ['reminder', 'follow up', 'pending']):
+                    priority = "medium"
+                else:
+                    priority = "low"
+
             emails.append({
                 "email_id": row[0],
-                "sent_by": row[1],
-                "received_by": row[2],
-                "subject": row[3],
-                "body_preview": row[4][:200] if row[4] else "",
+                "sent_by": row[1] or "noreply@idcr-system.com",
+                "received_by": row[2] or current_user['email'],
+                "subject": row[3] or "No Subject",
+                "body_preview": (row[4][:200] + "...") if row[4] and len(row[4]) > 200 else (row[4] or ""),
                 "doc_id": row[5],
-                "file_name": row[6],
-                "status": row[7],
-                "sent_at": row[8],
-                "document_name": row[9] or "N/A",
+                "file_name": row[6] or "N/A",
+                "status": row[7] or "sent",
+                "sent_at": row[8] or datetime.datetime.utcnow().isoformat(),
+                "document_name": row[9] or row[6] or "N/A",
                 "department": row[10] or "general",
-                "sent_by_name": row[11] or "System",
-                "received_by_name": row[12] or "Unknown",
-                "email_type": email_type,
-                "priority": "medium"
+                "priority": priority,
+                "sent_by_name": row[13] or "IDCR System",
+                "received_by_name": row[14] or current_user.get('full_name', 'User'),
+                "email_type": email_type
             })
 
         conn.close()
+
+        print(f"Email notifications loaded for {current_user['email']}: {len(emails)} emails")
 
         return {
             "emails": emails,
@@ -2092,6 +2110,8 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
 
     except Exception as e:
         print(f"Email notifications error: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to load email notifications: {str(e)}")
 
 # Main startup

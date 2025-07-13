@@ -493,6 +493,19 @@
             color: #1e40af;
         }
 
+        .status-system {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .email-type-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
         .notification-item {
             background: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -1623,27 +1636,44 @@
 
         async function loadEmailNotifications() {
             try {
+                // Show loading message
+                const container = document.getElementById('emailNotifications');
+                const countElement = document.getElementById('emailCount');
+                
+                container.innerHTML = '<div class="notification-item"><h4>📧 Loading email notifications...</h4></div>';
+                countElement.textContent = 'Loading...';
+
                 const response = await fetch('/api/email-notifications', {
                     headers: {
-                        'Authorization': 'Bearer ' + authToken
+                        'Authorization': 'Bearer ' + authToken,
+                        'Content-Type': 'application/json'
                     }
                 });
 
                 const contentType = response.headers.get('content-type');
 
                 if (response.ok) {
-                    const data = await response.json();
-                    displayEmailNotifications(data);
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        displayEmailNotifications(data);
+                        console.log('Email notifications loaded successfully:', data.total_count, 'emails');
+                    } else {
+                        showToast('Failed to load email notifications - invalid server response', 'error');
+                        container.innerHTML = '<div class="notification-item"><h4>❌ Error loading notifications</h4></div>';
+                    }
                 } else if (contentType && contentType.includes('application/json')) {
-                     const data = await response.json();
+                    const data = await response.json();
                     showToast(data.detail || 'Failed to load email notifications', 'error');
-                }
-                else {
-                     showToast('Failed to load email notifications - server error', 'error');
+                    container.innerHTML = '<div class="notification-item"><h4>❌ Error: ' + (data.detail || 'Failed to load notifications') + '</h4></div>';
+                } else {
+                    showToast('Failed to load email notifications - server error', 'error');
+                    container.innerHTML = '<div class="notification-item"><h4>❌ Server error loading notifications</h4></div>';
                 }
             } catch (error) {
                 console.error('Load email notifications error:', error);
                 showToast('Failed to load email notifications - network error', 'error');
+                const container = document.getElementById('emailNotifications');
+                container.innerHTML = '<div class="notification-item"><h4>❌ Network error loading notifications</h4></div>';
             }
         }
 
@@ -1653,32 +1683,44 @@
 
             countElement.textContent = 'Total: ' + data.total_count + ' emails';
 
-            if (data.emails.length === 0) {
+            if (!data.emails || data.emails.length === 0) {
                 container.innerHTML = '<div class="notification-item"><h4>📧 No email notifications found</h4></div>';
                 return;
             }
 
-            container.innerHTML = data.emails.map(email => 
-                '<div class="email-item">' +
-                '<div class="email-header">' +
-                '<div>' +
-                '<strong>' + email.subject + '</strong>' +
-                '<span class="email-type-badge ' + email.email_type + '">' + email.email_type + '</span>' +
-                '</div>' +
-                '<div>' +
-                '<span class="priority-' + email.priority + '">' + email.priority + '</span>' +
-                '<span class="email-status status-' + email.status + '">' + email.status + '</span>' +
-                '</div>' +
-                '</div>' +
-                '<div><strong>Sent by:</strong> ' + email.sent_by_name + ' (' + email.sent_by + ')</div>' +
-                '<div><strong>Received by:</strong> ' + email.received_by_name + ' (' + email.received_by + ')</div>' +
-                '<div><strong>File name:</strong> ' + email.document_name + '</div>' +
-                '<div><strong>Status:</strong> ' + email.status + '</div>' +
-                '<div><strong>Department:</strong> ' + email.department + '</div>' +
-                '<div><strong>Sent:</strong> ' + new Date(email.sent_at).toLocaleString() + '</div>' +
-                (email.body_preview ? '<div><strong>Preview:</strong> ' + email.body_preview + '</div>' : '') +
-                '</div>'
-            ).join('');
+            // Sort emails by date (newest first)
+            const sortedEmails = data.emails.sort((a, b) => new Date(b.sent_at) - new Date(a.sent_at));
+
+            container.innerHTML = sortedEmails.map(email => {
+                const sentByName = email.sent_by_name || email.sent_by || 'System';
+                const receivedByName = email.received_by_name || email.received_by || 'Unknown';
+                const documentName = email.document_name || email.file_name || 'N/A';
+                const department = email.department || 'general';
+                const priority = email.priority || 'medium';
+                const status = email.status || 'sent';
+                const emailType = email.email_type || 'system';
+                const bodyPreview = email.body_preview || '';
+                const sentDate = new Date(email.sent_at).toLocaleString();
+
+                return '<div class="email-item">' +
+                    '<div class="email-header">' +
+                    '<div>' +
+                    '<strong>' + (email.subject || 'No Subject') + '</strong>' +
+                    '<span class="email-status status-' + emailType + '" style="margin-left: 10px; padding: 2px 8px; border-radius: 12px; font-size: 0.8em;">' + emailType + '</span>' +
+                    '</div>' +
+                    '<div>' +
+                    '<span class="priority-' + priority + '">' + priority.toUpperCase() + '</span>' +
+                    '<span class="email-status status-' + status + '" style="margin-left: 10px; padding: 2px 8px; border-radius: 12px; font-size: 0.8em;">' + status + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div style="margin: 8px 0;"><strong>From:</strong> ' + sentByName + ' (' + email.sent_by + ')</div>' +
+                    '<div style="margin: 8px 0;"><strong>To:</strong> ' + receivedByName + ' (' + email.received_by + ')</div>' +
+                    '<div style="margin: 8px 0;"><strong>Document:</strong> ' + documentName + '</div>' +
+                    '<div style="margin: 8px 0;"><strong>Department:</strong> <span class="department-badge dept-' + department + '">' + department.toUpperCase() + '</span></div>' +
+                    '<div style="margin: 8px 0;"><strong>Sent:</strong> ' + sentDate + '</div>' +
+                    (bodyPreview ? '<div style="margin: 8px 0;"><strong>Preview:</strong> <em>' + bodyPreview + '</em></div>' : '') +
+                    '</div>';
+            }).join('');
         }
 
         async function loadStats() {
