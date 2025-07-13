@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -878,6 +879,7 @@
         let authToken = null;
         let currentPage = 1;
         const pageSize = 20;
+        let selectedFiles = [];
 
         // Check for existing auth token on page load
         window.onload = function() {
@@ -897,10 +899,756 @@
                 });
 
                 if (response.ok) {
-                    currentUser = await response```text
-.json();
+                    currentUser = await response.json();
                     showMainContent();
+                } else {
+                    authToken = null;
+                    localStorage.removeItem('authToken');
                 }
-</script>
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                authToken = null;
+                localStorage.removeItem('authToken');
+            }
+        }
+
+        function quickLogin(email, password) {
+            document.getElementById('loginEmail').value = email;
+            document.getElementById('loginPassword').value = password;
+            loginUser();
+        }
+
+        async function loginUser() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!email || !password) {
+                showToast('Please enter email and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.access_token;
+                    localStorage.setItem('authToken', authToken);
+                    currentUser = data.user;
+                    showMainContent();
+                    showToast('Login successful!', 'success');
+                } else {
+                    showToast(data.detail || 'Login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showToast('Login failed - server error', 'error');
+            }
+        }
+
+        async function registerUser() {
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const department = document.getElementById('registerDepartment').value;
+
+            if (!name || !email || !password || !department) {
+                showToast('Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        full_name: name,
+                        email: email,
+                        password: password,
+                        department: department
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('Registration successful! Please login.', 'success');
+                    showLoginForm();
+                } else {
+                    showToast(data.detail || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showToast('Registration failed - server error', 'error');
+            }
+        }
+
+        function showLoginForm() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+        }
+
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function showMainContent() {
+            document.getElementById('authContainer').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            
+            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
+            const deptBadge = document.getElementById('userDept');
+            deptBadge.textContent = currentUser.department.toUpperCase();
+            deptBadge.className = `department-badge dept-${currentUser.department}`;
+
+            // Update UI based on user role
+            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
+                document.getElementById('reviewTabBtn').style.display = 'block';
+                document.getElementById('notificationsTabBtn').style.display = 'block';
+            }
+
+            loadDocuments();
+            loadStats();
+            setupFileUpload();
+        }
+
+        function logout() {
+            currentUser = null;
+            authToken = null;
+            localStorage.removeItem('authToken');
+            document.getElementById('authContainer').classList.remove('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+            showToast('Logged out successfully', 'info');
+        }
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.add('hidden'));
+
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Show selected tab content
+            document.getElementById(tabName + 'TabContent').classList.remove('hidden');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Load data based on tab
+            if (tabName === 'documents') {
+                loadDocuments();
+            } else if (tabName === 'review') {
+                loadReviewDocuments();
+            } else if (tabName === 'stats') {
+                loadStats();
+            } else if (tabName === 'notifications') {
+                loadEmailNotifications();
+            }
+        }
+
+        function setupFileUpload() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            uploadArea.addEventListener('click', () => fileInput.click());
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                handleFileSelection(files);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                handleFileSelection(e.target.files);
+            });
+        }
+
+        function handleFileSelection(files) {
+            selectedFiles = Array.from(files);
+            displayFileList();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+        }
+
+        function displayFileList() {
+            const fileList = document.getElementById('fileList');
+            if (selectedFiles.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+
+            let html = '<h4>Selected Files:</h4><ul>';
+            selectedFiles.forEach((file, index) => {
+                html += `<li>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) 
+                         <button onclick="removeFile(${index})" style="margin-left: 10px; color: red;">Remove</button></li>`;
+            });
+            html += '</ul>';
+            fileList.innerHTML = html;
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            displayFileList();
+            document.getElementById('uploadBtn').disabled = selectedFiles.length === 0;
+        }
+
+        async function uploadFiles() {
+            const batchName = document.getElementById('batchName').value;
+            if (!batchName) {
+                showToast('Please enter a batch name', 'error');
+                return;
+            }
+
+            if (selectedFiles.length === 0) {
+                showToast('Please select files to upload', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('batch_name', batchName);
+            
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            try {
+                const response = await fetch('/api/bulk-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`${data.uploaded_count} files uploaded successfully!`, 'success');
+                    selectedFiles = [];
+                    displayFileList();
+                    document.getElementById('batchName').value = '';
+                    document.getElementById('uploadBtn').disabled = true;
+                    loadDocuments();
+                } else {
+                    showToast(data.detail || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showToast('Upload failed - server error', 'error');
+            }
+        }
+
+        async function loadDocuments() {
+            const search = document.getElementById('searchInput')?.value || '';
+            const status = document.getElementById('statusFilter')?.value || '';
+            const type = document.getElementById('typeFilter')?.value || '';
+            const department = document.getElementById('deptFilter')?.value || '';
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    page_size: pageSize,
+                    search: search,
+                    status: status,
+                    document_type: type,
+                    department: department
+                });
+
+                const response = await fetch(`/api/documents?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDocuments(data.documents);
+                    displayPagination(data.total_count, data.page, data.page_size);
+                } else {
+                    showToast('Failed to load documents', 'error');
+                }
+            } catch (error) {
+                console.error('Load documents error:', error);
+                showToast('Failed to load documents', 'error');
+            }
+        }
+
+        function displayDocuments(documents) {
+            const tbody = document.getElementById('documentsTableBody');
+            
+            if (documents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">No documents found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = documents.map(doc => {
+                const uploadedDate = new Date(doc.uploaded_at).toLocaleDateString();
+                return `
+                    <tr>
+                        <td>${doc.file_name}</td>
+                        <td>${doc.summary || 'N/A'}</td>
+                        <td>${doc.document_type || 'Unknown'}</td>
+                        <td><span class="department-badge dept-${doc.department}">${doc.department.toUpperCase()}</span></td>
+                        <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
+                        <td><span class="priority-${doc.priority}">${doc.priority}</span></td>
+                        <td>${uploadedDate}</td>
+                        <td>
+                            <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">View</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function displayPagination(totalCount, page, pageSize) {
+            const totalPages = Math.ceil(totalCount / pageSize);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            
+            if (page > 1) {
+                html += `<button onclick="changePage(${page - 1})">Previous</button>`;
+            }
+            
+            for (let i = Math.max(1, page - 2); i <= Math.min(totalPages, page + 2); i++) {
+                const activeClass = i === page ? 'active' : '';
+                html += `<button class="${activeClass}" onclick="changePage(${i})">${i}</button>`;
+            }
+            
+            if (page < totalPages) {
+                html += `<button onclick="changePage(${page + 1})">Next</button>`;
+            }
+            
+            pagination.innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadDocuments();
+        }
+
+        async function viewDocument(docId) {
+            try {
+                const response = await fetch(`/api/documents/${docId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showDocumentModal(data);
+                } else {
+                    showToast('Failed to load document details', 'error');
+                }
+            } catch (error) {
+                console.error('View document error:', error);
+                showToast('Failed to load document details', 'error');
+            }
+        }
+
+        function showDocumentModal(document) {
+            const modal = document.getElementById('documentModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = document.file_name;
+            
+            let contentHtml = `
+                <div><strong>Document ID:</strong> ${document.doc_id}</div>
+                <div><strong>Type:</strong> ${document.document_type}</div>
+                <div><strong>Department:</strong> ${document.department}</div>
+                <div><strong>Priority:</strong> ${document.priority}</div>
+                <div><strong>Status:</strong> ${document.processing_status}</div>
+                <div><strong>Uploaded:</strong> ${new Date(document.uploaded_at).toLocaleString()}</div>
+            `;
+
+            if (document.summary) {
+                contentHtml += `<div><strong>Summary:</strong> ${document.summary}</div>`;
+            }
+
+            if (document.extracted_text) {
+                contentHtml += `
+                    <div><strong>Extracted Text:</strong></div>
+                    <div class="file-content">${document.extracted_text}</div>
+                `;
+            }
+
+            modalContent.innerHTML = contentHtml;
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('documentModal').style.display = 'none';
+        }
+
+        async function loadReviewDocuments() {
+            const search = document.getElementById('reviewSearchInput')?.value || '';
+            const reviewStatus = document.getElementById('reviewStatusFilter')?.value || '';
+
+            try {
+                const params = new URLSearchParams({
+                    search: search,
+                    review_status: reviewStatus
+                });
+
+                const response = await fetch(`/api/review-documents?${params}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayReviewDocuments(data.documents);
+                } else {
+                    showToast('Failed to load review documents', 'error');
+                }
+            } catch (error) {
+                console.error('Load review documents error:', error);
+                showToast('Failed to load review documents', 'error');
+            }
+        }
+
+        function displayReviewDocuments(documents) {
+            const tbody = document.getElementById('reviewDocumentsTableBody');
+            
+            if (documents.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No documents for review</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = documents.map(doc => `
+                <tr>
+                    <td>${doc.file_name}</td>
+                    <td>${doc.uploaded_by_name}</td>
+                    <td>${doc.document_type}</td>
+                    <td><span class="priority-${doc.priority}">${doc.priority}</span></td>
+                    <td><span class="status-badge review-status-${doc.review_status}">${doc.review_status}</span></td>
+                    <td>
+                        <button class="btn" onclick="reviewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">Review</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function reviewDocument(docId) {
+            try {
+                const response = await fetch(`/api/documents/${docId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showReviewModal(data);
+                } else {
+                    showToast('Failed to load document for review', 'error');
+                }
+            } catch (error) {
+                console.error('Review document error:', error);
+                showToast('Failed to load document for review', 'error');
+            }
+        }
+
+        function showReviewModal(document) {
+            const modal = document.getElementById('documentModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = `Review: ${document.file_name}`;
+            
+            let contentHtml = `
+                <div><strong>Document ID:</strong> ${document.doc_id}</div>
+                <div><strong>Type:</strong> ${document.document_type}</div>
+                <div><strong>Department:</strong> ${document.department}</div>
+                <div><strong>Priority:</strong> ${document.priority}</div>
+                <div><strong>Status:</strong> ${document.processing_status}</div>
+                <div><strong>Uploaded By:</strong> ${document.uploaded_by_name}</div>
+                <div><strong>Uploaded:</strong> ${new Date(document.uploaded_at).toLocaleString()}</div>
+            `;
+
+            if (document.summary) {
+                contentHtml += `<div><strong>Summary:</strong> ${document.summary}</div>`;
+            }
+
+            if (document.extracted_text) {
+                contentHtml += `
+                    <div><strong>Extracted Text:</strong></div>
+                    <div class="file-content">${document.extracted_text}</div>
+                `;
+            }
+
+            contentHtml += `
+                <div class="review-form">
+                    <h4>Review Decision</h4>
+                    <div class="form-group">
+                        <label>Comments:</label>
+                        <textarea id="reviewComments" placeholder="Enter review comments..." style="width: 100%; height: 80px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;"></textarea>
+                    </div>
+                    <div class="review-buttons">
+                        <button class="btn btn-success" onclick="submitReview('${document.doc_id}', 'approved')">Approve</button>
+                        <button class="btn btn-secondary" onclick="submitReview('${document.doc_id}', 'rejected')">Reject</button>
+                    </div>
+                </div>
+            `;
+
+            modalContent.innerHTML = contentHtml;
+            modal.style.display = 'block';
+        }
+
+        async function submitReview(docId, decision) {
+            const comments = document.getElementById('reviewComments').value;
+
+            try {
+                const response = await fetch(`/api/documents/${docId}/review`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        review_status: decision,
+                        review_comments: comments
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast(`Document ${decision} successfully!`, 'success');
+                    closeModal();
+                    loadReviewDocuments();
+                } else {
+                    showToast(data.detail || 'Review submission failed', 'error');
+                }
+            } catch (error) {
+                console.error('Submit review error:', error);
+                showToast('Review submission failed', 'error');
+            }
+        }
+
+        async function loadEmailNotifications() {
+            try {
+                const response = await fetch('/api/email-notifications', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayEmailNotifications(data);
+                } else {
+                    showToast('Failed to load email notifications', 'error');
+                }
+            } catch (error) {
+                console.error('Load email notifications error:', error);
+                showToast('Failed to load email notifications', 'error');
+            }
+        }
+
+        function displayEmailNotifications(data) {
+            const container = document.getElementById('emailNotifications');
+            const countElement = document.getElementById('emailCount');
+            
+            countElement.textContent = `Total: ${data.total_count} emails`;
+
+            if (data.emails.length === 0) {
+                container.innerHTML = '<div class="notification-item"><h4>📧 No email notifications found</h4></div>';
+                return;
+            }
+
+            container.innerHTML = data.emails.map(email => `
+                <div class="email-item">
+                    <div class="email-header">
+                        <div>
+                            <strong>${email.subject}</strong>
+                            <span class="email-type-badge ${email.email_type}">${email.email_type}</span>
+                        </div>
+                        <div>
+                            <span class="priority-badge priority-${email.priority}">${email.priority}</span>
+                            <span class="email-status status-${email.status}">${email.status}</span>
+                        </div>
+                    </div>
+                    <div><strong>From:</strong> ${email.sent_by_name} (${email.sent_by})</div>
+                    <div><strong>To:</strong> ${email.received_by_name} (${email.received_by})</div>
+                    <div><strong>Document:</strong> ${email.document_name} (${email.document_type})</div>
+                    <div><strong>Department:</strong> ${email.department}</div>
+                    <div><strong>Sent:</strong> ${new Date(email.sent_at).toLocaleString()}</div>
+                    ${email.body_preview ? `<div><strong>Preview:</strong> ${email.body_preview}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayStats(data);
+                    createCharts(data);
+                } else {
+                    showToast('Failed to load statistics', 'error');
+                }
+            } catch (error) {
+                console.error('Load stats error:', error);
+                showToast('Failed to load statistics', 'error');
+            }
+        }
+
+        function displayStats(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <h3>${stats.total_documents}</h3>
+                    <p>Total Documents</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.processed_documents}</h3>
+                    <p>Processed</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.pending_documents}</h3>
+                    <p>Pending</p>
+                </div>
+                <div class="stat-card">
+                    <h3>${stats.processing_rate}%</h3>
+                    <p>Processing Rate</p>
+                </div>
+            `;
+        }
+
+        function createCharts(stats) {
+            // Document Types Chart
+            const docTypesCtx = document.getElementById('docTypesChart').getContext('2d');
+            new Chart(docTypesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(stats.document_types),
+                    datasets: [{
+                        data: Object.values(stats.document_types),
+                        backgroundColor: ['#4299e1', '#38a169', '#e53e3e', '#dd6b20', '#9f7aea']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Departments Chart
+            const departmentsCtx = document.getElementById('departmentsChart').getContext('2d');
+            new Chart(departmentsCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(stats.departments),
+                    datasets: [{
+                        label: 'Documents',
+                        data: Object.values(stats.departments),
+                        backgroundColor: '#4299e1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Priority Chart
+            const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+            new Chart(priorityCtx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(stats.priorities),
+                    datasets: [{
+                        data: Object.values(stats.priorities),
+                        backgroundColor: ['#e53e3e', '#dd6b20', '#38a169']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+
+            // Trends Chart
+            const trendsCtx = document.getElementById('trendsChart').getContext('2d');
+            new Chart(trendsCtx, {
+                type: 'line',
+                data: {
+                    labels: stats.upload_trends.map(trend => trend.date),
+                    datasets: [{
+                        label: 'Daily Uploads',
+                        data: stats.upload_trends.map(trend => trend.count),
+                        borderColor: '#4299e1',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.style.display = 'block';
+
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('documentModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
 </body>
 </html>
