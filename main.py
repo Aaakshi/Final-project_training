@@ -339,6 +339,13 @@ def init_database():
     if 'user_id' not in columns:
         cursor.execute(
             'ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT "system"')
+    
+    # Check if uploaded_by column exists in documents table, add if missing
+    cursor.execute("PRAGMA table_info(documents)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'uploaded_by' not in columns:
+        cursor.execute(
+            'ALTER TABLE documents ADD COLUMN uploaded_by TEXT DEFAULT "General Employee"')
 
     # Check if user_id column exists in upload_batches table, add if missing
     cursor.execute("PRAGMA table_info(upload_batches)")
