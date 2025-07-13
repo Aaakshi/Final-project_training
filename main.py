@@ -1361,6 +1361,9 @@ async def get_documents(page: int = 1,
     cursor.execute(count_query, params)
     total_count = cursor.fetchone()[0]
 
+    # Calculate offset for pagination
+    offset = (page - 1) * page_size
+
     # Update query to include extracted_text
     query = f'''
         SELECT doc_id, original_name, file_size, file_type, uploaded_at, 
