@@ -325,6 +325,7 @@ def init_database():
 
     # Add sample email notifications for demo
     sample_emails = [
+        # Document upload notifications
         ('hr.manager@company.com', 'finance@company.com', 'New Financial Document for Review - Invoice_2024_001.pdf', 
          '<html><body><h2>New Document Uploaded for Review</h2><p>A new financial document has been uploaded and classified to your department.</p></body></html>',
          'doc1', 'Invoice_2024_001.pdf'),
@@ -337,9 +338,41 @@ def init_database():
         ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required', 
          '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
          'doc4', 'IT_Security_Policy.docx'),
+        
+        # System notifications
         ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
-         None, None)
+         None, None),
+        ('noreply@idcr-system.com', 'hr.manager@company.com', 'Weekly Document Processing Report', 
+         '<html><body><h2>Weekly Report</h2><p>This week: 15 documents processed, 12 approved, 3 pending review.</p></body></html>',
+         None, None),
+        
+        # Inter-department communications
+        ('hr.employee@company.com', 'finance.manager@company.com', 'Employee Expense Reimbursement Request', 
+         '<html><body><h2>Expense Reimbursement</h2><p>Please review and process the attached expense report for employee travel.</p></body></html>',
+         'doc5', 'Expense_Report.pdf'),
+        ('sales.manager@company.com', 'legal.manager@company.com', 'Contract Review Required - ABC Client', 
+         '<html><body><h2>Contract Review Request</h2><p>New client contract requires legal review before signing.</p></body></html>',
+         'doc6', 'Contract_ABC_Client.pdf'),
+        ('finance.employee@company.com', 'hr.employee@company.com', 'Payroll Processing Complete', 
+         '<html><body><h2>Payroll Update</h2><p>Monthly payroll has been processed and is ready for review.</p></body></html>',
+         None, None),
+        
+        # Urgent notifications
+        ('admin@company.com', 'it.manager@company.com', 'URGENT: Security Breach Alert', 
+         '<html><body><h2>URGENT: Security Alert</h2><p>Potential security breach detected. Immediate action required.</p></body></html>',
+         None, None),
+        ('it.manager@company.com', 'admin@company.com', 'System Maintenance Scheduled', 
+         '<html><body><h2>Scheduled Maintenance</h2><p>System maintenance scheduled for this weekend. All users will be notified.</p></body></html>',
+         None, None),
+        
+        # Document review notifications
+        ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Employee Policy Update', 
+         '<html><body><h2>Document Approved</h2><p>Your submitted policy update document has been approved and is now active.</p></body></html>',
+         'doc7', 'Policy_Update.docx'),
+        ('legal.manager@company.com', 'sales.manager@company.com', 'Contract Review Complete - Terms Accepted', 
+         '<html><body><h2>Contract Review Complete</h2><p>Legal review of the ABC client contract is complete. Terms are acceptable.</p></body></html>',
+         'doc8', 'ABC_Contract_Final.pdf')
     ]
 
     for sent_by, received_by, subject, body, doc_id, file_name in sample_emails:
@@ -1545,73 +1578,108 @@ async def get_email_notifications(page: int = 1,
     dept_result = cursor.fetchone()
     user_dept_email = dept_result[0] if dept_result else current_user['email']
 
-    # Get emails based on user role
+    # Get emails based on user role - show all relevant emails
     offset = (page - 1) * page_size
 
     if current_user['role'] == 'employee':
-        # Employees see emails sent to them personally or about their uploaded documents
+        # Employees see emails sent to them, by them, or related to their documents
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
                    d.original_name, d.document_type, d.priority, d.department,
-                   u.full_name as sender_name, u2.full_name as recipient_name
+                   sender_u.full_name as sender_name, receiver_u.full_name as recipient_name
             FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            LEFT JOIN users u ON e.sent_by = u.email
-            LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+            LEFT JOIN users sender_u ON e.sent_by = sender_u.email
+            LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], page_size, offset])
 
         # Get total count for employees
         count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
         '''
-        cursor.execute(count_query, [current_user['email'], current_user['email'], current_user['user_id']])
+        cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id']])
         total_count = cursor.fetchone()[0]
 
-    else:
-        # Managers and admins see all emails related to their department
+    elif current_user['role'] == 'manager':
+        # Managers see all emails for their department plus system emails
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
                    d.original_name, d.document_type, d.priority, d.department,
-                   u.full_name as sender_name, u2.full_name as recipient_name
+                   sender_u.full_name as sender_name, receiver_u.full_name as recipient_name
             FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            LEFT JOIN users u ON e.sent_by = u.email
-            LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
+            LEFT JOIN users sender_u ON e.sent_by = sender_u.email
+            LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR e.sent_by LIKE '%@company.com'
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
         cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
 
-        # Get total count for managers/admins
+        # Get total count for managers
         count_query = '''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR e.sent_by LIKE '%@company.com'
         '''
         cursor.execute(count_query, [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
         total_count = cursor.fetchone()[0]
 
-    emails = cursor.fetchall()
+    else:
+        # Admins see ALL emails in the system
+        query = '''
+            SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
+                   e.file_name, e.status, e.sent_at, e.read_at,
+                   d.original_name, d.document_type, d.priority, d.department,
+                   sender_u.full_name as sender_name, receiver_u.full_name as recipient_name
+            FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            LEFT JOIN users sender_u ON e.sent_by = sender_u.email
+            LEFT JOIN users receiver_u ON e.received_by = receiver_u.email
+            ORDER BY e.sent_at DESC
+            LIMIT ? OFFSET ?
+        '''
+        cursor.execute(query, [page_size, offset])
 
+        # Get total count for admins
+        count_query = 'SELECT COUNT(*) FROM email_notifications'
+        cursor.execute(count_query)
+        total_count = cursor.fetchone()[0]
+
+    emails = cursor.fetchall()
     conn.close()
 
     email_list = []
     for email in emails:
+        # Determine sender name with fallback logic
+        sender_name = email[14] if email[14] else "IDCR System"
+        if email[1] == "noreply@idcr-system.com":
+            sender_name = "IDCR System"
+        elif "@company.com" in email[1]:
+            # Extract department from email for system emails
+            dept_name = email[1].split('@')[0].replace('.', ' ').title()
+            sender_name = f"{dept_name} Department"
+
+        # Determine recipient name
+        recipient_name = email[15] if email[15] else "Department Email"
+        if "@company.com" in email[2]:
+            dept_name = email[2].split('@')[0].replace('.', ' ').title()
+            recipient_name = f"{dept_name} Department"
+
         email_list.append({
             "email_id": email[0],
             "sent_by": email[1],
-            "sent_by_name": email[14] or "IDCR System",
+            "sent_by_name": sender_name,
             "received_by": email[2],
-            "received_by_name": email[15] if len(email) > 15 else "Unknown",
+            "received_by_name": recipient_name,
             "subject": email[3],
             "body_preview": email[4][:200] + "..." if email[4] and len(email[4]) > 200 else email[4],
             "doc_id": email[5],
@@ -1632,6 +1700,41 @@ async def get_email_notifications(page: int = 1,
         "page": page,
         "page_size": page_size
     }
+
+@app.post("/api/generate-sample-emails")
+async def generate_sample_emails(current_user: dict = Depends(get_current_user)):
+    """Generate additional sample emails for testing (admin only)"""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Generate some fresh sample emails
+    new_sample_emails = [
+        (current_user['email'], 'hr@company.com', 'Test Email from Current User', 
+         '<html><body><h2>Test Email</h2><p>This is a test email sent by the current user to demonstrate email notifications.</p></body></html>',
+         None, None),
+        ('hr@company.com', current_user['email'], 'Response: Test Email Received', 
+         '<html><body><h2>Email Received</h2><p>We have received your test email and are responding accordingly.</p></body></html>',
+         None, None),
+        ('finance@company.com', current_user['email'], 'Document Processing Update', 
+         '<html><body><h2>Processing Update</h2><p>Your recently uploaded financial document has been processed and classified.</p></body></html>',
+         None, None)
+    ]
+    
+    for sent_by, received_by, subject, body, doc_id, file_name in new_sample_emails:
+        email_id = str(uuid.uuid4())
+        sent_time = datetime.datetime.utcnow() - datetime.timedelta(minutes=random.randint(1, 60))
+        cursor.execute('''
+            INSERT INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (email_id, sent_by, received_by, subject, body, doc_id, file_name, 'sent', sent_time.isoformat()))
+    
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Sample emails generated successfully", "count": len(new_sample_emails)}
 
 @app.get("/api/stats")
 async def get_statistics(current_user: dict = Depends(get_current_user)):
