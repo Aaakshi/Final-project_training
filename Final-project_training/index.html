@@ -631,11 +631,11 @@
             </div>
 
             <div class="tabs">
-                <button class="tab active" onclick="showTab('upload')" id="uploadTab">Upload Documents</button>
-                <button class="tab" onclick="showTab('documents')" id="documentsTab">My Documents</button>
+                <button class="tab active" onclick="showTab('upload')" id="uploadTabBtn">Upload Documents</button>
+                <button class="tab" onclick="showTab('documents')" id="documentsTabBtn">My Documents</button>
                 <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
-                <button class="tab" onclick="showTab('notifications')" id="notificationsTab" style="display: none;">Email Notifications</button>
-                <button class="tab" onclick="showTab('stats')">Statistics</button>
+                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn" style="display: none;">Email Notifications</button>
+                <button class="tab" onclick="showTab('stats')" id="statsTabBtn">Statistics</button>
             </div>
 
             <!-- Upload Tab -->
@@ -993,8 +993,19 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
 
             // Show selected tab
-            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
-            event.target.classList.add('active');
+            const tabContent = document.getElementById(`${tabName}Tab`);
+            if (tabContent) {
+                tabContent.classList.remove('hidden');
+            }
+            
+            // Find and activate the correct tab button
+            const tabButtons = document.querySelectorAll('.tab');
+            tabButtons.forEach(button => {
+                if (button.textContent.toLowerCase().includes(tabName.toLowerCase()) || 
+                    button.onclick && button.onclick.toString().includes(tabName)) {
+                    button.classList.add('active');
+                }
+            });
 
             // Load data for specific tabs
             if (tabName === 'documents') {
@@ -1005,6 +1016,9 @@
                 loadStatistics();
             } else if (tabName === 'notifications') {
                 loadEmailNotifications();
+            } else if (tabName === 'upload') {
+                // Reinitialize upload functionality when switching back to upload tab
+                initializeFileUpload();
             }
         }
 

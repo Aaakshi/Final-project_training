@@ -323,29 +323,72 @@ def init_database():
             'ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"'
         )
 
-    # Add sample email notifications for demo
+    # Add comprehensive sample email notifications for demo
     sample_emails = [
+        # HR Department emails
+        ('hr.manager@company.com', 'hr@company.com', 'New HR Document Uploaded - Employee_Handbook.pdf', 
+         '<html><body><h2>New Document Uploaded</h2><p>Employee_Handbook.pdf has been uploaded and classified to HR department.</p><p><strong>Priority:</strong> Medium</p><p><strong>Type:</strong> HR Document</p></body></html>',
+         None, 'Employee_Handbook.pdf'),
+        ('hr.employee@company.com', 'hr.manager@company.com', 'Document Review Request - Meeting_Minutes.docx', 
+         '<html><body><h2>Document Review Required</h2><p>Meeting_Minutes.docx uploaded by HR Employee requires review.</p><p><strong>Priority:</strong> Low</p></body></html>',
+         None, 'Meeting_Minutes.docx'),
+        ('hr.manager@company.com', 'hr.employee@company.com', 'Document Approved - Meeting_Minutes.docx', 
+         '<html><body><h2>Document Review Complete</h2><p>Your document Meeting_Minutes.docx has been approved.</p><p><strong>Reviewed by:</strong> HR Manager</p></body></html>',
+         None, 'Meeting_Minutes.docx'),
+        
+        # Finance Department emails
         ('hr.manager@company.com', 'finance@company.com', 'New Financial Document for Review - Invoice_2024_001.pdf', 
-         '<html><body><h2>New Document Uploaded for Review</h2><p>A new financial document has been uploaded and classified to your department.</p></body></html>',
-         'doc1', 'Invoice_2024_001.pdf'),
-        ('finance.manager@company.com', 'hr@company.com', 'Document Review Complete - Employee_Handbook.pdf', 
-         '<html><body><h2>Document Review Complete</h2><p>Your document Employee_Handbook.pdf has been approved.</p></body></html>',
-         'doc2', 'Employee_Handbook.pdf'),
+         '<html><body><h2>New Document Uploaded for Review</h2><p>Invoice_2024_001.pdf has been uploaded and classified to finance department.</p><p><strong>Priority:</strong> High</p><p><strong>Type:</strong> Financial Document</p></body></html>',
+         None, 'Invoice_2024_001.pdf'),
+        ('finance.manager@company.com', 'hr.manager@company.com', 'Invoice Processed - Invoice_2024_001.pdf', 
+         '<html><body><h2>Document Review Complete</h2><p>Your invoice Invoice_2024_001.pdf has been processed and approved.</p></body></html>',
+         None, 'Invoice_2024_001.pdf'),
+        ('general.employee@company.com', 'finance@company.com', 'Expense Report Submitted - Expense_Report.pdf', 
+         '<html><body><h2>New Expense Report</h2><p>Expense_Report.pdf submitted for processing.</p><p><strong>Priority:</strong> Low</p></body></html>',
+         None, 'Expense_Report.pdf'),
+        
+        # Legal Department emails
         ('legal.manager@company.com', 'legal@company.com', 'High Priority Legal Document - Contract_ABC_Corp.pdf', 
-         '<html><body><h2>High Priority Document Alert</h2><p>A high priority legal document requires immediate attention.</p></body></html>',
-         'doc3', 'Contract_ABC_Corp.pdf'),
-        ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required', 
-         '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
-         'doc4', 'IT_Security_Policy.docx'),
+         '<html><body><h2>High Priority Document Alert</h2><p>Contract_ABC_Corp.pdf requires immediate legal review.</p><p><strong>Priority:</strong> High</p></body></html>',
+         None, 'Contract_ABC_Corp.pdf'),
+        ('legal.manager@company.com', 'legal@company.com', 'Legal Compliance Document - Legal_Compliance.pdf', 
+         '<html><body><h2>Compliance Review</h2><p>Legal_Compliance.pdf uploaded for compliance review.</p><p><strong>Priority:</strong> High</p></body></html>',
+         None, 'Legal_Compliance.pdf'),
+        
+        # IT Department emails
+        ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required - IT_Security_Policy.docx', 
+         '<html><body><h2>Security Policy Review</h2><p>IT_Security_Policy.docx uploaded for review and approval.</p><p><strong>Priority:</strong> High</p></body></html>',
+         None, 'IT_Security_Policy.docx'),
+        
+        # Sales Department emails
+        ('sales.manager@company.com', 'sales@company.com', 'Q4 Sales Report Available - Sales_Report_Q4.xlsx', 
+         '<html><body><h2>Sales Report Ready</h2><p>Sales_Report_Q4.xlsx has been uploaded for review.</p><p><strong>Priority:</strong> Medium</p></body></html>',
+         None, 'Sales_Report_Q4.xlsx'),
+        
+        # Marketing Department emails
+        ('finance.manager@company.com', 'marketing@company.com', 'Marketing Campaign Document - Marketing_Campaign.pptx', 
+         '<html><body><h2>New Marketing Document</h2><p>Marketing_Campaign.pptx uploaded for marketing team review.</p><p><strong>Priority:</strong> Medium</p></body></html>',
+         None, 'Marketing_Campaign.pptx'),
+        
+        # System notifications
         ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
          '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
-         None, None)
+         None, None),
+        ('noreply@idcr-system.com', 'hr.manager@company.com', 'Welcome to IDCR System - Manager Access', 
+         '<html><body><h2>Welcome to IDCR System!</h2><p>Your manager account is now active. You can review documents and manage your department.</p></body></html>',
+         None, None),
+        ('noreply@idcr-system.com', 'finance.manager@company.com', 'Welcome to IDCR System - Manager Access', 
+         '<html><body><h2>Welcome to IDCR System!</h2><p>Your manager account is now active. You can review documents and manage your department.</p></body></html>',
+         None, None),
+        ('noreply@idcr-system.com', 'legal.manager@company.com', 'Welcome to IDCR System - Manager Access', 
+         '<html><body><h2>Welcome to IDCR System!</h2><p>Your manager account is now active. You can review documents and manage your department.</p></body></html>',
+         None, None),
     ]
 
     for sent_by, received_by, subject, body, doc_id, file_name in sample_emails:
         email_id = str(uuid.uuid4())
-        # Create emails from the past few days
-        sent_time = datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(0, 7), hours=random.randint(0, 23))
+        # Create emails from the past few days with more realistic timestamps
+        sent_time = datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(0, 14), hours=random.randint(0, 23), minutes=random.randint(0, 59))
         cursor.execute('''
             INSERT OR IGNORE INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1482,13 +1525,13 @@ async def get_email_notifications(page: int = 1,
     # Get department email for current user
     cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?', (current_user['department'],))
     dept_result = cursor.fetchone()
-    user_dept_email = dept_result[0] if dept_result else current_user['email']
+    user_dept_email = dept_result[0] if dept_result else f"{current_user['department']}@company.com"
 
     # Get emails based on user role
     offset = (page - 1) * page_size
     
     if current_user['role'] == 'employee':
-        # Employees see emails sent to them personally or about their uploaded documents
+        # Employees see emails sent to/from them personally or about their uploaded documents
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1498,21 +1541,14 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], current_user['user_id'], page_size, offset])
-        
-        # Get total count for employees
-        cursor.execute('''
-            SELECT COUNT(*) FROM email_notifications e
-            LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR d.user_id = ?
-        ''', [current_user['email'], current_user['email'], current_user['user_id']])
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['user_id'], page_size, offset])
         
     else:
-        # Managers and admins see all emails related to their department
+        # Managers and admins see all emails related to their department plus their personal emails
         query = '''
             SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
                    e.file_name, e.status, e.sent_at, e.read_at,
@@ -1522,44 +1558,60 @@ async def get_email_notifications(page: int = 1,
             LEFT JOIN documents d ON e.doc_id = d.doc_id
             LEFT JOIN users u ON e.sent_by = u.email
             LEFT JOIN users u2 ON e.received_by = u2.email
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR 
+                  (d.department IS NULL AND (e.sent_by LIKE ? OR e.received_by LIKE ?))
             ORDER BY e.sent_at DESC
             LIMIT ? OFFSET ?
         '''
-        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], page_size, offset])
-        
-        # Get total count for managers/admins
+        dept_pattern = f"%{current_user['department']}%"
+        cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, current_user['department'], dept_pattern, dept_pattern, page_size, offset])
+
+    emails = cursor.fetchall()
+    
+    # Get total count separately
+    if current_user['role'] == 'employee':
         cursor.execute('''
             SELECT COUNT(*) FROM email_notifications e
             LEFT JOIN documents d ON e.doc_id = d.doc_id
-            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ?
-        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department']])
-
-    emails = cursor.fetchall()
-    total_count = cursor.fetchone()[0]
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.user_id = ?
+        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['user_id']])
+    else:
+        dept_pattern = f"%{current_user['department']}%"
+        cursor.execute('''
+            SELECT COUNT(*) FROM email_notifications e
+            LEFT JOIN documents d ON e.doc_id = d.doc_id
+            WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ? OR d.department = ? OR 
+                  (d.department IS NULL AND (e.sent_by LIKE ? OR e.received_by LIKE ?))
+        ''', [current_user['email'], current_user['email'], user_dept_email, current_user['department'], dept_pattern, dept_pattern])
+    
+    total_count_result = cursor.fetchone()
+    total_count = total_count_result[0] if total_count_result else 0
 
     conn.close()
 
     email_list = []
     for email in emails:
+        # Determine if email was sent or received by current user
+        email_type = "sent" if email[1] == current_user['email'] else "received"
+        
         email_list.append({
             "email_id": email[0],
             "sent_by": email[1],
-            "sent_by_name": email[14] or "IDCR System",
+            "sent_by_name": email[14] if email[14] else ("IDCR System" if "noreply" in email[1] else email[1].split('@')[0].title()),
             "received_by": email[2],
-            "received_by_name": email[15] if len(email) > 15 else "Unknown",
+            "received_by_name": email[15] if email[15] else email[2].split('@')[0].title(),
             "subject": email[3],
             "body_preview": email[4][:200] + "..." if email[4] and len(email[4]) > 200 else email[4],
             "doc_id": email[5],
             "file_name": email[6] or "N/A",
             "document_name": email[10] or email[6] or "N/A",
-            "document_type": email[11] or "Unknown",
+            "document_type": email[11] or "System Notification",
             "priority": email[12] or "Medium",
-            "department": email[13] or "General",
+            "department": email[13] or current_user['department'].title(),
             "status": email[7],
             "sent_at": email[8],
             "read_at": email[9],
-            "email_type": "sent" if email[1] == current_user['email'] else "received"
+            "email_type": email_type
         })
 
     return {
