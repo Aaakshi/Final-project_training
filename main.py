@@ -1,1835 +1,335 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IDCR - Intelligent Document Classification & Routing</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            min-height: 100vh;
-            color: #2d3748;
-            transition: all 0.3s ease;
-        }
-
-        /* Smooth page transitions */
-        .page-transition {
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.4s ease;
-        }
-
-        .page-transition.active {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .header {
-            text-align: center;
-            color: #2d3748;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
-        .auth-container {
-            background: white;
-            padding: 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        .main-content {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            overflow: hidden;
-        }
-
-        .nav {
-            background: #2d3748;
-            color: white;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .nav h2 {
-            margin: 0;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .btn {
-            background: #4299e1;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .btn:hover {
-            background: #3182ce;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-
-        .btn-secondary {
-            background: #e53e3e;
-        }
-
-        .btn-secondary:hover {
-            background: #c53030;
-        }
-
-        .btn-success {
-            background: #38a169;
-        }
-
-        .btn-success:hover {
-            background: #2f855a;
-        }
-
-        .tabs {
-            display: flex;
-            background: #f7fafc;
-            border-bottom: 2px solid #e2e8f0;
-        }
-
-        .tab {
-            padding: 15px 25px;
-            cursor: pointer;
-            background: transparent;
-            border: none;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-
-        .tab.active {
-            background: white;
-            border-bottom: 3px solid #3182ce;
-            color: #3182ce;
-            font-weight: bold;
-        }
-
-        .tab-content {
-            padding: 30px;
-        }
-
-        .upload-area {
-            border: 3px dashed #cbd5e0;
-            border-radius: 12px;
-            padding: 50px;
-            text-align: center;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .upload-area:hover {
-            border-color: #3182ce;
-            background: #f7fafc;
-        }
-
-        .upload-area.dragover {
-            border-color: #3182ce;
-            background: #ebf8ff;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #4a5568;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #3182ce;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            color: white;
-            padding: 25px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .stat-card h3 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-
-        .stat-card p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-
-        .documents-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        .documents-table th,
-        .documents-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .documents-table th {
-            background: #f7fafc;
-            font-weight: bold;
-            color: #4a5568;
-        }
-
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .status-uploaded { background: #bee3f8; color: #2b6cb0; }
-        .status-processing { background: #fbb6ce; color: #b83280; }
-        .status-classified { background: #c6f6d5; color: #2f855a; }
-        .status-completed { background: #9ae6b4; color: #276749; }
-        .status-failed { background: #fed7d7; color: #c53030; }
-
-        .review-status-pending { background: #fbb6ce; color: #b83280; }
-        .review-status-approved { background: #c6f6d5; color: #2f855a; }
-        .review-status-rejected { background: #fed7d7; color: #c53030; }
-
-        .priority-high { color: #e53e3e; font-weight: bold; }
-        .priority-medium { color: #dd6b20; }
-        .priority-low { color: #38a169; }
-
-        .hidden {
-            display: none;
-        }
-
-        .filters {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .filters select,
-        .filters input {
-            padding: 8px 12px;
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 12px;
-            width: 80%;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close:hover {
-            color: #000;
-        }
-
-        .file-content {
-            background: #f7fafc;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 15px 0;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: monospace;
-        }
-
-        .review-form {
-            margin-top: 20px;
-            padding: 20px;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-        }
-
-        .review-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .department-badge {
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .dept-hr { background: #fbb6ce; color: #b83280; }
-        .dept-finance { background: #c6f6d5; color: #2f855a; }
-        .dept-legal { background: #fed7d7; color: #c53030; }
-        .dept-sales { background: #bee3f8; color: #2b6cb0; }
-        .dept-marketing { background: #e9d8fd; color: #6b46c1; }
-        .dept-it { background: #fbb6ce; color: #b83280; }
-        .dept-operations { background: #fed7e2; color: #97266d; }
-        .dept-support { background: #c6f6d5; color: #2f855a; }
-        .dept-procurement { background: #fef5e7; color: #dd6b20; }
-        .dept-product { background: #e6fffa; color: #319795; }
-        .dept-administration { background: #f0fff4; color: #38a169; }
-        .dept-executive { background: #f7fafc; color: #4a5568; }
-        .dept-general { background: #f7fafc; color: #4a5568; }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 20px;
-            gap: 10px;
-        }
-
-        .pagination button {
-            padding: 8px 12px;
-            border: 1px solid #e2e8f0;
-            background: white;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-
-        .pagination button:hover {
-            background: #f7fafc;
-        }
-
-        .pagination button.active {
-            background: #3182ce;
-            color: white;
-        }
-
-        .toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            border-radius: 8px;
-            color: white;
-            z-index: 1001;
-            display: none;
-        }
-
-        .toast.success { background: #38a169; }
-        .toast.error { background: #e53e3e; }
-        .toast.info { background: #3182ce; }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
-            }
-
-            .filters {
-                flex-direction: column;
-            }
-
-            .documents-table {
-                font-size: 14px;
-            }
-
-            .modal-content {
-                width: 95%;
-                margin: 10% auto;
-            }
-        }
-
-        .chart-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin: 20px 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-            position: relative;
-            height: 400px;
-            width: 100%;
-        }
-
-        .chart-container:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
-
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        .chart-container canvas {
-            position: absolute !important;
-            top: 50px;
-            left: 20px;
-            right: 20px;
-            bottom: 20px;
-            width: calc(100% - 40px) !important;
-            height: calc(100% - 70px) !important;
-        }
-        .nav-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .nav-btn {
-            padding: 0.75rem 1.5rem;
-            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .nav-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .nav-btn:hover::before {
-            left: 100%;
-        }
-
-        .nav-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-        }
-
-        .nav-btn.active {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-        }
-
-        /* Email notification styles */
-        .email-item {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #3b82f6;
-            transition: all 0.3s ease;
-        }
-
-        .email-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-        }
-
-        .email-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .email-status {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .status-sent {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-received {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>IDCR System</h1>
-            <p>Intelligent Document Classification & Routing Platform</p>
-        </div>
-
-        <!-- Auth Container -->
-        <div id="authContainer" class="auth-container">
-            <div id="loginForm">
-                <h2 style="text-align: center; margin-bottom: 20px; color: #2d3748;">Login to IDCR System</h2>
-
-                <!-- Demo Users Section -->
-                <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
-                    <h4 style="margin: 0 0 10px 0; color: #4a5568;">Demo Users - Click to Login:</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.manager@company.com', 'password123')">HR Manager</button>
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('hr.employee@company.com', 'password123')">HR Employee</button>
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('finance.manager@company.com', 'password123')">Finance Manager</button>
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('legal.manager@company.com', 'password123')">Legal Manager</button>
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('general.employee@company.com', 'password123')">General Employee</button>
-                        <button class="btn" style="padding: 8px; font-size: 11px;" onclick="quickLogin('admin@company.com', 'admin123')">System Admin</button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" id="loginEmail" placeholder="Enter your email" required>
-                </div>
-                <div class="form-group">
-                    <label>Password:</label>
-                    <input type="password" id="loginPassword" placeholder="Enter your password" required>
-                </div>
-                <button class="btn" style="width: 100%; margin-bottom: 15px;" onclick="loginUser()">Login</button>
-                <p style="text-align: center;">
-                    Don't have an account? 
-                    <a href="#" onclick="showRegisterForm()" style="color: #4299e1;">Register here</a>
-                </p>
-            </div>
-
-            <div id="registerForm" class="hidden">
-                <h2 style="text-align: center; margin-bottom: 30px; color: #4a5568;">Register</h2>
-                <div class="form-group">
-                    <label>Full Name:</label>
-                    <input type="text" id="registerName" placeholder="Enter your full name" required>
-                </div>
-                <div class="form-group">
-                    <label>Email:</label>
-                    <input type="email" id="registerEmail" placeholder="Enter your email" required>
-                </div>
-                <div class="form-group">
-                    <label>Password:</label>
-                    <input type="password" id="registerPassword" placeholder="Create a password" required>
-                </div>
-                <div class="form-group">
-                    <label>Department:</label>
-                    <select id="registerDepartment" required>
-                        <option value="">Select Department</option>
-                        <option value="hr">Human Resources (HR)</option>
-                        <option value="finance">Finance & Accounting</option>
-                        <option value="legal">Legal</option>
-                        <option value="sales">Sales</option>
-                        <option value="marketing">Marketing</option>
-                        <option value="it">IT (Information Technology)</option>
-                        <option value="operations">Operations</option>
-                        <option value="support">Customer Support</option>
-                        <option value="procurement">Procurement / Purchase</option>
-                        <option value="product">Product / R&D</option>
-                        <option value="administration">Administration</option>
-                        <option value="executive">Executive / Management</option>
-                    </select>
-                </div>
-                <button class="btn" style="width: 100%; margin-bottom: 15px;" onclick="registerUser()">Register</button>
-                <p style="text-align: center;">
-                    Already have an account? 
-                    <a href="#" onclick="showLoginForm()" style="color: #3182ce;">Login here</a>
-                </p>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div id="mainContent" class="main-content hidden">
-            <div class="nav">
-                <h2>IDCR Dashboard</h2>
-                <div class="user-info">
-                    <span id="userName">Welcome</span>
-                    <span id="userDept" class="department-badge"></span>
-                    <button class="btn btn-secondary" onclick="logout()">Logout</button>
-                </div>
-            </div>
-
-            <div class="tabs">
-                <button class="tab active" onclick="showTab('upload')" id="uploadTabBtn">Upload Documents</button>
-                <button class="tab" onclick="showTab('documents')" id="documentsTabBtn">My Documents</button>
-                <button class="tab" onclick="showTab('review')" id="reviewTabBtn" style="display: none;">Review Documents</button>
-                <button class="tab" onclick="showTab('notifications')" id="notificationsTabBtn">Email Notifications</button>
-                <button class="tab" onclick="showTab('stats')" id="statsTabBtn">Statistics</button>
-            </div>
-
-            <!-- Upload Tab -->
-            <div id="uploadTab" class="tab-content">
-                <h3>Upload Documents</h3>
-                <p>Upload multiple documents for automatic classification and routing.</p>
-
-                <div class="form-group">
-                    <label>Batch Name:</label>
-                    <input type="text" id="batchName" placeholder="Enter a name for this batch" required>
-                </div>
-                <div class="form-group">
-                    <label>Target Department:</label>
-                    <select id="targetDepartment" required>
-                        <option value="">Select Department</option>
-                        <option value="hr">Human Resources (HR)</option>
-                        <option value="finance">Finance & Accounting</option>
-                        <option value="legal">Legal</option>
-                        <option value="sales">Sales</option>
-                        <option value="marketing">Marketing</option>
-                        <option value="it">IT (Information Technology)</option>
-                        <option value="operations">Operations</option>
-                        <option value="support">Customer Support</option>
-                        <option value="procurement">Procurement / Purchase</option>
-                        <option value="product">Product / R&D</option>
-                        <option value="administration">Administration</option>
-                        <option value="executive">Executive / Management</option>
-                        <option value="general">General</option>
-                    </select>
-                </div>
-
-                <div class="upload-area" id="uploadArea">
-                    <div>
-                        <h3>📁 Drop files here or click to select</h3>
-                        <p>Supported formats: PDF, DOC, DOCX, TXT</p>
-                        <p>Maximum 50 files, 10MB per file</p>
-                    </div>
-                    <input type="file" id="fileInput" multiple accept=".pdf,.doc,.docx,.txt" style="display: none;">
-                </div>
-
-                <div id="fileList" style="margin-top: 20px;"></div>
-                <button class="btn" id="uploadBtn" onclick="uploadFiles()" style="margin-top: 20px;" disabled>Upload Files</button>
-            </div>
-
-            <!-- Documents Tab -->
-            <div id="documentsTab" class="tab-content hidden">
-                <h3>Document Management</h3>
-
-                <div class="filters">
-                    <input type="text" id="searchInput" placeholder="Search documents..." onkeyup="loadDocuments()">
-                    <select id="statusFilter" onchange="loadDocuments()">
-                        <option value="">All Status</option>
-                        <option value="uploaded">Uploaded</option>
-                        <option value="processing">Processing</option>
-                        <option value="classified">Classified</option>
-                        <option value="completed">Completed</option>
-                        <option value="failed">Failed</option>
-                    </select>
-                    <select id="typeFilter" onchange="loadDocuments()">
-                        <option value="">All Types</option>
-                        <option value="invoice">Invoice</option>
-                        <option value="contract">Contract</option>
-                        <option value="hr_document">HR Document</option>
-                        <option value="it_document">IT Document</option>
-                        <option value="general">General</option>
-                    </select>
-                    <select id="deptFilter" onchange="loadDocuments()">
-                        <option value="">All Departments</option>
-                        <option value="hr">Human Resources</option>
-                        <option value="finance">Finance & Accounting</option>
-                        <option value="legal">Legal</option>
-                        <option value="sales">Sales</option>
-                        <option value="marketing">Marketing</option>
-                        <option value="it">IT</option>
-                        <option value="operations">Operations</option>
-                        <option value="support">Customer Support</option>
-                        <option value="procurement">Procurement</option>
-                        <option value="product">Product / R&D</option>
-                        <option value="administration">Administration</option>
-                        <option value="executive">Executive</option>
-                    </select>
-                </div>
-
-                <table class="documents-table">
-                    <thead>
-                        <tr>
-                            <th>Document Name</th>
-                            <th>Type</th>
-                            <th>Department</th>
-                            <th>Summary</th>
-                            <th>Status</th>
-                            <th>Review Status</th>
-                            <th>Priority</th>
-                            <th>Uploaded</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="documentsTableBody">
-                    </tbody>
-                </table>
-
-                <div class="pagination" id="pagination"></div>
-            </div>
-
-            <!-- Notifications Tab -->
-            <div id="notificationsTab" class="tab-content hidden">
-                <h3>📧 Email Notifications</h3>
-                <p>See email notifications related to document processing</p>
-
-                <div style="background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                    <h4 style="color: #2d3748; margin-bottom: 15px;">📬 Your Department Email: <span id="deptEmail" style="color: #4299e1;"></span></h4>
-                    <p style="color: #718096; margin-bottom: 10px;">Email notifications are sent when:</p>
-                    <ul style="color: #718096; margin-left: 20px;">
-                        <li>Your documents are processed and reviewed</li>
-                        <li>New documents are uploaded to your department (for managers)</li>
-                        <li>Documents require review and approval (for managers)</li>
-                        <li>High priority documents need immediate attention</li>
-                    </ul>
-                </div>
-
-                <div id="emailSimulation" style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
-                    <h4 style="color: #2d3748; margin-bottom: 15px;">📩 Recent Email Notifications (Demo)</h4>
-                    <div id="emailList">
-                        <p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Review Tab -->
-            <div id="reviewTab" class="tab-content hidden">
-                <h3>Review Documents</h3>
-                <p>Documents pending review in your department</p>
-
-                <div class="filters">
-                    <input type="text" id="reviewSearchInput" placeholder="Search documents..." onkeyup="loadReviewDocuments()">
-                    <select id="reviewStatusFilter" onchange="loadReviewDocuments()">
-                        <option value="">All Review Status</option>
-                        <option value="pending">Pending Review</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                    </select>
-                </div>
-
-                <table class="documents-table">
-                    <thead>
-                        <tr>
-                            <th>Document Name</th>
-                            <th>Uploaded By</th>
-                            <th>Type</th>
-                            <th>Summary</th>
-                            <th>Priority</th>
-                            <th>Review Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reviewDocumentsTableBody">
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Stats Tab -->
-            <div id="statsTab" class="tab-content hidden">
-                <h3>Statistics</h3>
-                <div class="stats-grid" id="statsGrid">
-                </div>
-                <div class="chart-grid">
-                    <div class="chart-container">
-                        <h3>Document Types Distribution</h3>
-                        <canvas id="docTypesChart" width="350" height="300"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Department Distribution</h3>
-                        <canvas id="departmentsChart" width="350" height="300"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Priority Distribution</h3>
-                        <canvas id="priorityChart" width="350" height="300"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <h3>Upload Trends (Last 30 Days)</h3>
-                        <canvas id="trendsChart" width="350" height="300"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Document Detail Modal -->
-    <div id="documentModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">×</span>
-            <h2 id="modalTitle">Document Details</h2>
-            <div id="modalContent">
-                <!-- Document details will be loaded here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <script>
-        let currentUser = null;
-        let authToken = null;
-        let currentPage = 1;
-        const pageSize = 20;
-
-        // Check for existing auth token on page load
-        window.onload = function() {
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                authToken = token;
-                checkAuth();
-            }
-        };
-
-        // Check authentication on page load
-        async function checkAuth() {
-            try {
-                const token = localStorage.getItem('authToken');
-                if (!token) {
-                    showLoginForm();
-                    return;
-                }
-
-                const response = await fetch('/api/me', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.ok) {
-                    currentUser = await response.json();
-                    showMainContent();
-                } else {
-                    logout();
-                }
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                logout();
-            }
-        }
-
-        function showLoginForm() {
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('registerForm').classList.add('hidden');
-        }
-
-        function showRegisterForm() {
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.remove('hidden');
-        }
-
-        async function registerUser() {
-            const name = document.getElementById('registerName').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const department = document.getElementById('registerDepartment').value;
-
-            if (!name || !email || !password || !department) {
-                showToast('Please fill all fields', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        full_name: name,
-                        email: email,
-                        password: password,
-                        department: department
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast('Registration successful! Please login.', 'success');
-                    showLoginForm();
-                } else {
-                    showToast(data.detail || 'Registration failed', 'error');
-                }
-            } catch (error) {
-                console.error('Registration failed:', error);
-                showToast('Registration failed. Please try again.', 'error');
-            }
-        }
-
-        async function loginUser() {
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            if (!email || !password) {
-                showToast('Please enter email and password', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    authToken = data.access_token;
-                    currentUser = data.user;
-                    localStorage.setItem('authToken', authToken);
-                    showMainContent();
-                    showToast('Login successful!', 'success');
-                } else {
-                    showToast(data.detail || 'Login failed', 'error');
-                }
-            } catch (error) {
-                console.error('Login failed:', error);
-                showToast('Login failed. Please try again.', 'error');
-            }
-        }
-
-        function logout() {
-            authToken = null;
-            currentUser = null;
-            localStorage.removeItem('authToken');
-            document.getElementById('authContainer').classList.remove('hidden');
-            document.getElementById('mainContent').classList.add('hidden');
-            showLoginForm();
-        }
-
-        function quickLogin(email, password) {
-            document.getElementById('loginEmail').value = email;
-            document.getElementById('loginPassword').value = password;
-            loginUser();
-        }
-
-        function showMainContent() {
-            document.getElementById('authContainer').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('hidden');
-
-            // Update user info
-            document.getElementById('userName').textContent = `Welcome, ${currentUser.full_name} (${currentUser.role})`;
-            const deptBadge = document.getElementById('userDept');
-            deptBadge.textContent = currentUser.department.toUpperCase();
-            deptBadge.className = `department-badge dept-${currentUser.department}`;
-
-            // Show tabs based on role
-            if (currentUser.role === 'admin' || currentUser.role === 'manager') {
-                document.getElementById('reviewTabBtn').style.display = 'block';
-            }
-
-            // Show notifications tab for all users - it's always visible now
-            document.getElementById('notificationsTabBtn').style.display = 'block';
-
-            // Set department email for notifications
-            const deptEmails = {
-                'hr': 'hr@company.com',
-                'finance': 'finance@company.com', 
-                'legal': 'legal@company.com',
-                'sales': 'sales@company.com',
-                'marketing': 'marketing@company.com',
-                'it': 'it@company.com',
-                'operations': 'operations@company.com',
-                'support': 'support@company.com',
-                'procurement': 'procurement@company.com',
-                'product': 'product@company.com',
-                'administration': 'administration@company.com',
-                'executive': 'executive@company.com'
-            };
-            document.getElementById('deptEmail').textContent = deptEmails[currentUser.department] || 'general@company.com';
-
-            // Load initial data
-            loadStatistics();
-            loadDocuments();
-            loadEmailNotifications(); // Load for all users
-        }
-
-        function showTab(tabName) {
-            // Hide all tabs first
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-
-            // Show selected tab
-            const tabContent = document.getElementById(`${tabName}Tab`);
-            if (tabContent) {
-                tabContent.classList.remove('hidden');
-            }
-
-            // Activate correct tab button based on tabName
-            const tabMapping = {
-                'upload': 'uploadTabBtn',
-                'documents': 'documentsTabBtn', 
-                'review': 'reviewTabBtn',
-                'notifications': 'notificationsTabBtn',
-                'stats': 'statsTabBtn'
-            };
-
-            const activeTabButton = document.getElementById(tabMapping[tabName]);
-            if (activeTabButton) {
-                activeTabButton.classList.add('active');
-            }
-
-            // Load data for specific tabs
-            if (tabName === 'documents') {
-                loadDocuments();
-            } else if (tabName === 'review') {
-                loadReviewDocuments();
-            } else if (tabName === 'stats') {
-                loadStatistics();
-            } else if (tabName === 'notifications') {
-                loadEmailNotifications();
-            } else if (tabName === 'upload') {
-                // Reinitialize upload functionality when switching back to upload tab
-                initializeFileUpload();
-            }
-        }
-
-        // File upload functionality
-        function initializeFileUpload() {
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-
-            if (uploadArea && fileInput) {
-                uploadArea.addEventListener('click', () => fileInput.click());
-                uploadArea.addEventListener('dragover', handleDragOver);
-                uploadArea.addEventListener('drop', handleDrop);
-                fileInput.addEventListener('change', handleFileSelect);
-            }
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.currentTarget.classList.add('dragover');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            document.getElementById('fileInput').files = files; // Ensure fileInput is updated
-            displayFiles(files);
-            checkUploadReadiness(); // Added to ensure button state is updated
-        }
-
-        function handleFileSelect(e) {
-            const files = e.target.files;
-            displayFiles(files);
-            checkUploadReadiness(); // Added to ensure button state is updated
-        }
-
-        function displayFiles(files) {
-            const fileList = document.getElementById('fileList');
-            const uploadBtn = document.getElementById('uploadBtn');
-
-            fileList.innerHTML = '';
-
-            if (files.length > 0) {
-                fileList.innerHTML = '<h4>Selected Files:</h4>';
-                Array.from(files).forEach(file => {
-                    const fileItem = document.createElement('div');
-                    fileItem.innerHTML = `
-                        <p>📄 ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</p>
-                    `;
-                    fileList.appendChild(fileItem);
-                });
-                uploadBtn.disabled = false;
-            } else {
-                uploadBtn.disabled = true;
-            }
-        }
-
-        async function uploadFiles() {
-            const files = document.getElementById('fileInput').files;
-            const targetDepartment = document.getElementById('targetDepartment').value;
-
-            if (files.length === 0) return;
-
-            if (!targetDepartment) {
-                showToast('Please select a target department', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('batch_name', `Upload_${new Date().toISOString().split('T')[0]}`);
-            formData.append('target_department', targetDepartment);
-
-            Array.from(files).forEach(file => {
-                formData.append('files', file);
-            });
-
-            try {
-                showToast('Uploading files...', 'info');
-                const response = await fetch('/api/bulk-upload', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast(`Successfully uploaded ${data.total_files} files to ${targetDepartment.toUpperCase()} department`, 'success');
-                    document.getElementById('batchName').value = '';
-                    document.getElementById('fileInput').value = '';
-                    document.getElementById('targetDepartment').value = '';
-                    document.getElementById('fileList').innerHTML = '';
-                    document.getElementById('uploadBtn').disabled = true;
-                    loadStatistics();
-
-                    // Refresh notifications if user is manager/admin
-                    if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
-                        setTimeout(() => {
-                            loadEmailNotifications();
-                        }, 2000); // Wait for processing
-                    }
-                } else {
-                    showToast(data.detail || 'Upload failed', 'error');
-                }
-            } catch (error) {
-                console.error('Upload failed:', error);
-                showToast('Upload failed. Please try again.', 'error');
-            }
-        }
-
-        async function loadDocuments() {
-            const search = document.getElementById('searchInput')?.value || '';
-            const status = document.getElementById('statusFilter')?.value || '';
-            const docType = document.getElementById('typeFilter')?.value || '';
-            const department = document.getElementById('deptFilter')?.value || '';
-
-            try {
-                const params = new URLSearchParams({
-                    page: currentPage,
-                    page_size: pageSize,
-                    search: search,
-                    status: status,
-                    doc_type: docType,
-                    department: department
-                });
-
-                const response = await fetch(`/api/documents?${params}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayDocuments(data.documents);
-                    updatePagination(data.total_count, data.page, data.page_size);
-                } else {
-                    showToast('Failed to load documents', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to load documents:', error);
-                showToast('Failed to load documents', 'error');
-            }
-        }
-
-        function displayDocuments(documents) {
-            const tbody = document.getElementById('documentsTableBody');
-            tbody.innerHTML = '';
-
-            documents.forEach(doc => {
-                const row = document.createElement('tr');
-                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 100) + '...' : 'Processing...';
-                row.innerHTML = `
-                    <td>${doc.original_name}</td>
-                    <td>${doc.document_type || 'Unknown'}</td>
-                    <td><span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></td>
-                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
-                    <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
-                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
-                    <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
-                    <td>${new Date(doc.uploaded_at).toLocaleDateString()}</td>
-                    <td>
-                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="viewDocument('${doc.doc_id}')">Details</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        async function loadReviewDocuments() {
-            const search = document.getElementById('reviewSearchInput')?.value || '';
-            const reviewStatus = document.getElementById('reviewStatusFilter')?.value || '';
-
-            try {
-                const params = new URLSearchParams({
-                    page: 1,
-                    page_size: 50,
-                    search: search,
-                    department: currentUser.department
-                });
-
-                if (reviewStatus) {
-                    params.append('review_status', reviewStatus);
-                }
-
-                const response = await fetch(`/api/documents/review?${params}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    displayReviewDocuments(data.documents);
-                } else {
-                    showToast('Failed to load review documents', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to load review documents:', error);
-                showToast('Failed to load review documents', 'error');
-            }
-        }
-
-        function displayReviewDocuments(documents) {
-            const tbody = document.getElementById('reviewDocumentsTableBody');
-            tbody.innerHTML = '';
-
-            documents.forEach(doc => {
-                const row = document.createElement('tr');
-                const summary = doc.extracted_text ? doc.extracted_text.substring(0, 80) + '...' : 'Processing...';
-                row.innerHTML = `
-                    <td>${doc.original_name}</td>
-                    <td>${doc.uploaded_by || 'Unknown'}</td>
-                    <td>${doc.document_type || 'Unknown'}</td>
-                    <td title="${doc.extracted_text || 'Processing...'}" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${summary}</td>
-                    <td><span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></td>
-                    <td><span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></td>
-                    <td>
-                        <button class="btn" style="padding: 5px 10px; font-size: 12px;" onclick="reviewDocument('${doc.doc_id}')">Review</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        async function viewDocument(docId) {
-            try {
-                const response = await fetch(`/api/documents/${docId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const doc = await response.json();
-
-                if (response.ok) {
-                    showDocumentModal(doc, false);
-                } else {
-                    showToast('Failed to load document details', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to load document:', error);
-                showToast('Failed to load document details', 'error');
-            }
-        }
-
-        async function reviewDocument(docId) {
-            try {
-                const response = await fetch(`/api/documents/${docId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const doc = await response.json();
-
-                if (response.ok) {
-                    showDocumentModal(doc, true);
-                } else {
-                    showToast('Failed to load document details', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to load document:', error);
-                showToast('Failed to load document details', 'error');
-            }
-        }
-
-        function showDocumentModal(doc, isReview = false) {
-            const modal = document.getElementById('documentModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const modalContent = document.getElementById('modalContent');
-
-            modalTitle.textContent = doc.original_name;
-
-            let content = `
-                <div style="margin-bottom: 20px;">
-                    <h4>Document Information</h4>
-                    <p><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
-                    <p><strong>Department:</strong> <span class="department-badge dept-${doc.department}">${doc.department || 'General'}</span></p>
-                    <p><strong>Size:</strong> ${(doc.file_size / 1024).toFixed(2)} KB</p>
-                    <p><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
-                    <p><strong>Confidence:</strong> ${doc.classification_confidence ? (doc.classification_confidence * 100).toFixed(1) + '%' : 'N/A'}</p>
-                    <p><strong>Status:</strong> <span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></p>
-                    <p><strong>Review Status:</strong> <span class="status-badge review-status-${doc.review_status || 'pending'}">${doc.review_status || 'Pending'}</span></p>
-                    <p><strong>Uploaded:</strong> ${new Date(doc.uploaded_at).toLocaleString()}</p>
-                </div>
-            `;
-
-            if (doc.extracted_text) {
-                content += `
-                    <h4>Document Content</h4>
-                    <div class="file-content">${doc.extracted_text}</div>
-                `;
-            }
-
-            if (isReview && (doc.review_status === 'pending' || !doc.review_status)) {
-                content += `
-                    <div class="review-form">
-                        <h4>Review Document</h4>
-                        <div class="form-group">
-                            <label>Comments (optional):</label>
-                            <textarea id="reviewComments" rows="3" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px;"></textarea>
-                        </div>
-                        <div class="review-buttons">
-                            <button class="btn btn-success" onclick="submitReview('${doc.doc_id}', 'approved')">Approve</button>
-                            <button class="btn btn-secondary" onclick="submitReview('${doc.doc_id}', 'rejected')">Reject</button>
-                        </div>
-                    </div>
-                `;
-            } else if (doc.review_status && doc.review_status !== 'pending') {
-                content += `
-                    <div style="margin-top: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <h4>Review Information</h4>
-                        <p><strong>Status:</strong> <span class="status-badge review-status-${doc.review_status}">${doc.review_status}</span></p>
-                        <p><strong>Reviewed by:</strong> ${doc.reviewed_by || 'Unknown'}</p>
-                        <p><strong>Reviewed at:</strong> ${doc.reviewed_at ? new Date(doc.reviewed_at).toLocaleString() : 'Unknown'}</p>
-                        ${doc.review_comments ? `<p><strong>Comments:</strong> ${doc.review_comments}</p>` : ''}
-                    </div>
-                `;
-            }
-
-            modalContent.innerHTML = content;
-            modal.style.display = 'block';
-        }
-
-        async function submitReview(docId, status) {
-            const comments = document.getElementById('reviewComments').value;
-
-            try {
-                const response = await fetch(`/api/documents/${docId}/review`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({
-                        doc_id: docId,
-                        status: status,
-                        comments: comments || null
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast(`Document ${status} successfully! User will receive email notification.`, 'success');
-                    closeModal();
-                    loadReviewDocuments();
-                    loadEmailNotifications();
-                } else {
-                    showToast(data.detail || 'Review submission failed', 'error');
-                }
-            } catch (error) {
-                console.error('Review submission failed:', error);
-                showToast('Review submission failed', 'error');
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('documentModal').style.display = 'none';
-        }
-
-        async function loadStatistics() {
-            if (!authToken || !currentUser) {
-                console.warn('No auth token or user for statistics');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/stats', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                if (response.ok) {
-                    const stats = await response.json();
-                    displayStatistics(stats);
-                    renderCharts(stats);
-                } else {
-                    console.error('Statistics API error:', response.status, response.statusText);
-                    const errorData = await response.text();
-                    console.error('Error response:', errorData);
-                    showToast('Failed to load statistics: ' + response.status, 'error');
-
-                    // Show default empty statistics
-                    displayStatistics({
-                        total_documents: 0,
-                        processed_documents: 0,
-                        pending_documents: 0,
-                        error_documents: 0,
-                        processing_rate: 0,
-                        document_types: {},
-                        departments: {},
-                        priorities: {},
-                        upload_trends: []
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load statistics:', error);
-                showToast('Network error loading statistics', 'error');
-
-                // Show default empty statistics
-                displayStatistics({
-                    total_documents: 0,
-                    processed_documents: 0,
-                    pending_documents: 0,
-                    error_documents: 0,
-                    processing_rate: 0,
-                    document_types: {},
-                    departments: {},
-                    priorities: {},
-                    upload_trends: []
-                });
-            }
-        }
-
-        function displayStatistics(stats) {
-            const statsGrid = document.getElementById('statsGrid');
-            if (!statsGrid) {
-                console.error('Stats grid element not found');
-                return;
-            }
-
-            // Ensure stats object exists and has default values
-            const safeStats = {
-                total_documents: stats?.total_documents || 0,
-                processed_documents: stats?.processed_documents || 0,
-                pending_documents: stats?.pending_documents || 0,
-                error_documents: stats?.error_documents || 0,
-                processing_rate: stats?.processing_rate || 0
-            };
-
-            statsGrid.innerHTML = `
-                <div class="stat-card">
-                    <h3>${safeStats.total_documents}</h3>
-                    <p>Total Documents</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${safeStats.processed_documents}</h3>
-                    <p>Processed</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${safeStats.pending_documents}</h3>
-                    <p>Pending</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${safeStats.error_documents}</h3>
-                    <p>Errors</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${safeStats.processing_rate}%</h3>
-                    <p>Processing Rate</p>
-                </div>
-            `;
-        }
-
-        function renderCharts(stats) {
-            // Ensure Chart is defined
-            if (typeof Chart === 'undefined') {
-                console.error('Chart.js not loaded');
-                showToast('Failed to load charts: Chart.js not available', 'error');
-                return;
-            }
-
-            // Clear existing charts first
-            Chart.helpers.each(Chart.instances, function(instance) {
-                instance.destroy();
-            });
-
-            // Document Types Chart
-            if (stats?.document_types && Object.keys(stats.document_types).length > 0) {
-                const docTypesCtx = document.getElementById('docTypesChart');
-                if (docTypesCtx) {
-                    docTypesCtx.width = 350;
-                    docTypesCtx.height = 300;
-                    new Chart(docTypesCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: Object.keys(stats.document_types),
-                            datasets: [{
-                                data: Object.values(stats.document_types),
-                                backgroundColor: ['#4299e1', '#48bb78', '#ed8936', '#9f7aea', '#38b2ac', '#f56565']
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Departments Chart
-            if (stats?.departments && Object.keys(stats.departments).length > 0) {
-                const deptCtx = document.getElementById('departmentsChart');
-                if (deptCtx) {
-                    deptCtx.width = 350;
-                    deptCtx.height = 300;
-                    new Chart(deptCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: Object.keys(stats.departments),
-                            datasets: [{
-                                label: 'Documents',
-                                data: Object.values(stats.departments),
-                                backgroundColor: '#4299e1'
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            },
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Priority Chart
-            if (stats?.priorities && Object.keys(stats.priorities).length > 0) {
-                const priorityCtx = document.getElementById('priorityChart');
-                if (priorityCtx) {
-                    priorityCtx.width = 350;
-                    priorityCtx.height = 300;
-                    new Chart(priorityCtx, {
-                        type: 'pie',
-                        data: {
-                            labels: Object.keys(stats.priorities),
-                            datasets: [{
-                                data: Object.values(stats.priorities),
-                                backgroundColor: ['#e53e3e', '#dd6b20', '#38a169']
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom'
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-
-            // Upload Trends Chart
-            if (stats?.upload_trends && stats.upload_trends.length > 0) {
-                const trendsCtx = document.getElementById('trendsChart');
-                if (trendsCtx) {
-                    trendsCtx.width = 350;
-                    trendsCtx.height = 300;
-                    new Chart(trendsCtx, {
-                        type: 'line',
-                        data: {
-                            labels: stats.upload_trends.map(item => item.date),
-                            datasets: [{
-                                label: 'Documents Uploaded',
-                                data: stats.upload_trends.map(item => item.count),
-                                borderColor: '#4299e1',
-                                backgroundColor: 'rgba(66, 153, 225, 0.1)',
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            },
-                            plugins: {
-                                legend: {
-                                    display: true
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-        }
-
-        function updatePagination(totalCount, currentPageNum, pageSizeNum) {
-            const pagination = document.getElementById('pagination');
-            const totalPages = Math.ceil(totalCount / pageSizeNum);
-
-            let paginationHTML = '';
-
-            if (currentPageNum > 1) {
-                paginationHTML += `<button onclick="changePage(${currentPageNum - 1})">Previous</button>`;
-            }
-
-            for (let i = Math.max(1, currentPageNum - 2); i <= Math.min(totalPages, currentPageNum + 2); i++) {
-                paginationHTML += `<button onclick="changePage(${i})" ${i === currentPageNum ? 'class="active"' : ''}>${i}</button>`;
-            }
-
-            if (currentPageNum < totalPages) {
-                paginationHTML += `<button onclick="changePage(${currentPageNum + 1})">Next</button>`;
-            }
-
-            pagination.innerHTML = paginationHTML;
-        }
-
-        function changePage(page) {
-            currentPage = page;
-            loadDocuments();
-        }
-
-        async function loadEmailNotifications() {
-            const emailList = document.getElementById('emailList');
-
-            try {
-                const response = await fetch('/api/email-notifications?page=1&page_size=10', {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.emails && data.emails.length > 0) {
-                    let emailHTML = '';
-                    data.emails.forEach(email => {
-                        const time = new Date(email.sent_at).toLocaleString();
-                        const emailIcon = email.email_type === 'sent' ? '📤' : '📧';
-                        const emailDirection = email.email_type === 'sent' ? 'Sent' : 'Received';
-
-                        emailHTML += `
-                            <div class="email-item">
-                                <div class="email-header">
-                                    <strong style="color: #2d3748;">${emailIcon} ${email.subject}</strong>
-                                    <div style="display: flex; align-items: center; gap: 10px;">
-                                        <span class="email-status status-${email.email_type}">${emailDirection}</span>
-                                        <small style="color: #718096;">${time}</small>
-                                    </div>
-                                </div>
-                                <div style="margin-bottom: 10px;">
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>From:</strong> ${email.sent_by_name || 'IDCR System'} (${email.sent_by})</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>To:</strong> ${email.received_by_name || email.received_by} (${email.received_by})</p>
-                                </div>
-                                ${email.document_name && email.document_name !== 'N/A' ? `
-                                <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0;">
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Document:</strong> ${email.document_name}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Type:</strong> ${email.document_type}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Department:</strong> ${email.department}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
-                                </div>
-                                ` : ''}
-                                ${email.body_preview ? `<p style="margin: 8px 0; color: #718096; font-size: 14px; font-style: italic;">${email.body_preview}</p>` : ''}
-                                <div style="text-align: right; margin-top: 10px;">
-                                    <small style="color: #a0aec0;">Status: ${email.status}</small>
-                                </div>
-                            </div>
-                        `;
-                    });
-                    emailList.innerHTML = emailHTML;
-                } else {
-                    emailList.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: #718096;">
-                            <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
-                            <h4 style="margin-bottom: 8px;">No Email Notifications Yet</h4>
-                            <p>Email notifications will appear here when:</p>
-                            <ul style="list-style: none; padding: 0; margin: 16px 0;">
-                                <li>📄 Documents are uploaded and classified</li>
-                                <li>🔍 Documents require review and approval</li>
-                                <li>⚡ High priority documents need attention</li>
-                            </ul>
-                            <p style="margin-top: 16px;"><em>Upload a document to see email notifications in action!</em></p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading email notifications:', error);
-                emailList.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #e53e3e;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
-                        <h4>Error Loading Notifications</h4>
-                        <p>Unable to load email notifications. Please try again.</p>
-                    </div>
-                `;
-            }
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast ${type}`;
-            toast.style.display = 'block';
-
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('documentModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        };
-
-        // Check if upload is ready (files + department selected)
-        function checkUploadReadiness() {
-            const files = document.getElementById('fileInput').files;
-            const department = document.getElementById('targetDepartment').value;
-            const uploadBtn = document.getElementById('uploadBtn');
-
-            if (files.length > 0 && department) {
-                uploadBtn.disabled = false;
-                displayFiles(files);
-            } else {
-                uploadBtn.disabled = true;
-                if (files.length === 0) {
-                    document.getElementById('fileList').innerHTML = '';
-                }
-            }
-        }
-
-        // Initialize event listeners when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            // File upload handling
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-            const targetDepartment = document.getElementById('targetDepartment');
-
-            // Initialize file upload listeners
-            initializeFileUpload();
-
-            // Additional upload handling with null checks
-            if (uploadArea) {
-                uploadArea.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    e.currentTarget.style.borderColor = '#007bff';
-                });
-
-                uploadArea.addEventListener('dragleave', (e) => {
-                    e.preventDefault();
-                    e.currentTarget.style.borderColor = '#ddd';
-                });
-
-                uploadArea.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    e.currentTarget.style.borderColor = '#ddd';
-
-                    const files = e.dataTransfer.files;
-                    fileInput.files = files;
-                    checkUploadReadiness();
-                });
-            }
-
-            if (fileInput) {
-                fileInput.addEventListener('change', checkUploadReadiness);
-            }
-
-            if (targetDepartment) {
-                targetDepartment.addEventListener('change', checkUploadReadiness);
-            }
-        });
-    </script>
-</body>
-</html>
+import os
+import uvicorn
+from fastapi import FastAPI, HTTPException, Depends, File, UploadFile, Form, BackgroundTasks
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Float, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+import jwt
+import uuid
+import shutil
+from pathlib import Path
+import logging
+from typing import List, Optional
+import json
+import smtplib
+from email.mime.text import MimeText
+from email.mime.multipart import MimeMultipart
+from pydantic import BaseModel
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Database setup
+SQLALCHEMY_DATABASE_URL = "sqlite:///./idcr_documents.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Security
+SECRET_KEY = "your-secret-key-here"
+ALGORITHM = "HS256"
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
+
+# FastAPI app
+app = FastAPI(title="IDCR Document Management System")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Models
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    department = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doc_id = Column(String, unique=True, index=True)
+    original_name = Column(String)
+    file_path = Column(String)
+    document_type = Column(String)
+    department = Column(String)
+    priority = Column(String)
+    processing_status = Column(String, default="uploaded")
+    review_status = Column(String, default="pending")
+    uploaded_by = Column(String)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    classification_confidence = Column(Float)
+    page_count = Column(Integer)
+    tags = Column(Text)
+
+class EmailNotification(Base):
+    __tablename__ = "email_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sent_by = Column(String)
+    sent_by_name = Column(String)
+    received_by = Column(String)
+    received_by_name = Column(String)
+    subject = Column(String)
+    body_preview = Column(Text)
+    email_type = Column(String)  # sent, received
+    document_name = Column(String)
+    document_type = Column(String)
+    department = Column(String)
+    priority = Column(String)
+    status = Column(String, default="sent")
+    sent_at = Column(DateTime, default=datetime.utcnow)
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Pydantic models
+class UserCreate(BaseModel):
+    full_name: str
+    email: str
+    password: str
+    department: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: dict
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Auth functions
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(hours=24)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return email
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user(email: str = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+# Routes
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    return FileResponse("Final-project_training/index.html")
+
+@app.post("/api/register")
+async def register(user: UserCreate, db: Session = Depends(get_db)):
+    # Check if user exists
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Create user
+    hashed_password = get_password_hash(user.password)
+    db_user = User(
+        full_name=user.full_name,
+        email=user.email,
+        hashed_password=hashed_password,
+        department=user.department
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    return {"message": "User created successfully"}
+
+@app.post("/api/login", response_model=Token)
+async def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(data={"sub": db_user.email})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": {
+            "id": db_user.id,
+            "full_name": db_user.full_name,
+            "email": db_user.email,
+            "department": db_user.department
+        }
+    }
+
+@app.get("/api/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "department": current_user.department
+    }
+
+@app.get("/api/stats")
+async def get_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        total_docs = db.query(Document).count()
+        processed_docs = db.query(Document).filter(Document.processing_status == "completed").count()
+        pending_docs = db.query(Document).filter(Document.review_status == "pending").count()
+        error_docs = db.query(Document).filter(Document.processing_status == "failed").count()
+
+        processing_rate = (processed_docs / total_docs * 100) if total_docs > 0 else 0
+
+        return {
+            "total_documents": total_docs,
+            "processed_documents": processed_docs,
+            "pending_documents": pending_docs,
+            "error_documents": error_docs,
+            "processing_rate": round(processing_rate, 1),
+            "document_types": {},
+            "departments": {},
+            "priorities": {},
+            "upload_trends": []
+        }
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
+        return {
+            "total_documents": 0,
+            "processed_documents": 0,
+            "pending_documents": 0,
+            "error_documents": 0,
+            "processing_rate": 0,
+            "document_types": {},
+            "departments": {},
+            "priorities": {},
+            "upload_trends": []
+        }
+
+@app.post("/api/bulk-upload")
+async def bulk_upload(
+    batch_name: str = Form(...),
+    target_department: str = Form(...),
+    files: List[UploadFile] = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    batch_id = str(uuid.uuid4())
+    upload_dir = Path(f"uploads/{batch_id}")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded_files = []
+
+    for file in files:
+        # Save file
+        file_path = upload_dir / file.filename
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Create document record
+        doc_id = str(uuid.uuid4())
+        document = Document(
+            doc_id=doc_id,
+            original_name=file.filename,
+            file_path=str(file_path),
+            document_type="general",
+            department=target_department,
+            priority="medium",
+            uploaded_by=current_user.email
+        )
+        db.add(document)
+        uploaded_files.append(file.filename)
+
+    db.commit()
+    logger.info(f"Uploaded {len(files)} files in batch {batch_name}")
+
+    return {"message": f"Successfully uploaded {len(files)} files", "batch_id": batch_id}
+
+@app.get("/api/documents")
+async def get_documents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        documents = db.query(Document).all()
+        doc_list = []
+        for doc in documents:
+            doc_list.append({
+                "doc_id": doc.doc_id,
+                "original_name": doc.original_name,
+                "document_type": doc.document_type,
+                "department": doc.department,
+                "priority": doc.priority,
+                "processing_status": doc.processing_status,
+                "review_status": doc.review_status,
+                "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                "uploaded_by": doc.uploaded_by
+            })
+        return {"documents": doc_list}
+    except Exception as e:
+        logger.error(f"Error getting documents: {e}")
+        return {"documents": []}
+
+@app.get("/api/email-notifications")
+async def get_email_notifications(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        emails = db.query(EmailNotification).order_by(EmailNotification.sent_at.desc()).limit(50).all()
+        email_list = []
+        for email in emails:
+            email_list.append({
+                "id": email.id,
+                "sent_by": email.sent_by,
+                "sent_by_name": email.sent_by_name,
+                "received_by": email.received_by,
+                "received_by_name": email.received_by_name,
+                "subject": email.subject,
+                "body_preview": email.body_preview,
+                "email_type": email.email_type,
+                "document_name": email.document_name,
+                "document_type": email.document_type,
+                "department": email.department,
+                "priority": email.priority,
+                "status": email.status,
+                "sent_at": email.sent_at.isoformat() if email.sent_at else None
+            })
+        return {"emails": email_list}
+    except Exception as e:
+        logger.error(f"Error getting email notifications: {e}")
+        return {"emails": []}
+
+if __name__ == "__main__":
+    logger.info("Database initialized")
+    uvicorn.run(app, host="0.0.0.0", port=5000)
