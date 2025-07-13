@@ -632,17 +632,17 @@ app.mount("/uploads",
 @app.get("/")
 async def serve_frontend():
     """Serve the main frontend application"""
-    return FileResponse("Final-project_training/index.html")
+    return FileResponse("Final-project_training/index.html", media_type="text/html")
 
 @app.get("/index.html")
 async def serve_index():
     """Alternative path to serve frontend"""
-    return FileResponse("Final-project_training/index.html")
+    return FileResponse("Final-project_training/index.html", media_type="text/html")
 
 @app.get("/app")
 async def serve_app():
     """Another path to serve frontend"""
-    return FileResponse("Final-project_training/index.html")
+    return FileResponse("Final-project_training/index.html", media_type="text/html")
 
 
 @app.get("/favicon.ico")
