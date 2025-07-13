@@ -51,19 +51,32 @@ async def classify_document(file: UploadFile = File(...)):
             priority = "high"
             tags = ["finance", "invoice", "payment"]
         elif ("contract" in content_lower or "agreement" in content_lower or "legal" in content_lower or
-              "contract" in filename or "agreement" in filename):
+              "terms and conditions" in content_lower or "liability" in content_lower or "compliance" in content_lower or
+              "policy" in content_lower or "regulation" in content_lower or "lawsuit" in content_lower or
+              "litigation" in content_lower or "intellectual property" in content_lower or "copyright" in content_lower or
+              "trademark" in content_lower or "patent" in content_lower or "non-disclosure" in content_lower or
+              "nda" in content_lower or "privacy policy" in content_lower or "terms of service" in content_lower or
+              "contract" in filename or "agreement" in filename or "legal" in filename or "nda" in filename or
+              "policy" in filename or "compliance" in filename):
             doc_type = "legal_document"
             department = "legal"
             confidence = 0.85
             priority = "high"
-            tags = ["legal", "contract"]
-        elif ("employee" in content_lower or "hr" in content_lower or 
-              "hr" in filename or "employee" in filename):
+            tags = ["legal", "contract", "compliance"]
+        elif ("employee" in content_lower or "hr" in content_lower or "human resources" in content_lower or
+              "personnel" in content_lower or "hiring" in content_lower or "training" in content_lower or
+              "performance" in content_lower or "recruitment" in content_lower or "onboarding" in content_lower or
+              "benefits" in content_lower or "leave" in content_lower or "vacation" in content_lower or
+              "disciplinary" in content_lower or "termination" in content_lower or "resignation" in content_lower or
+              "promotion" in content_lower or "performance review" in content_lower or "appraisal" in content_lower or
+              "job description" in content_lower or "workplace policy" in content_lower or "harassment" in content_lower or
+              "hr" in filename or "employee" in filename or "personnel" in filename or "hiring" in filename or
+              "training" in filename or "benefits" in filename or "leave" in filename or "performance" in filename):
             doc_type = "hr_document"
             department = "hr"
-            confidence = 0.8
+            confidence = 0.85
             priority = "medium"
-            tags = ["hr", "employee"]
+            tags = ["hr", "employee", "personnel"]
         elif ("it" in content_lower or "technology" in content_lower or
               "it" in filename or "tech" in filename):
             doc_type = "it_document"

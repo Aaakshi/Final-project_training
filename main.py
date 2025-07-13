@@ -1201,13 +1201,13 @@ def classify_document_locally(content: str, filename: str):
             "base_priority": "high",
             "tags": ["legal", "contract", "compliance"]
         },
-        # Human Resources - Medium Priority
+        # Human Resources - Medium Priority (Enhanced keywords)
         {
-            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance", "recruitment", "onboarding", "benefits", "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", "termination", "resignation", "promotion", "performance review", "appraisal", "job description", "organizational chart", "employee handbook", "workplace policy", "harassment", "diversity", "inclusion"],
-            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training", "benefits", "leave", "performance", "recruitment", "onboarding", "handbook", "policy"],
+            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance", "recruitment", "onboarding", "benefits", "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", "termination", "resignation", "promotion", "performance review", "appraisal", "job description", "organizational chart", "employee handbook", "workplace policy", "harassment", "diversity", "inclusion", "staff", "workforce", "employee relations", "compensation", "salary review", "performance evaluation", "employee satisfaction", "team building", "skill development", "career development"],
+            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training", "benefits", "leave", "performance", "recruitment", "onboarding", "handbook", "policy", "staff", "workforce", "compensation", "evaluation"],
             "doc_type": "hr_document",
             "department": "hr",
-            "confidence": 0.88,
+            "confidence": 0.90,
             "base_priority": "medium",
             "tags": ["hr", "employee", "personnel"]
         },
