@@ -989,7 +989,15 @@
 
         function showTab(tabName) {
             // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            const allTabContents = ['uploadTab', 'documentsTab', 'reviewTab', 'notificationsTab', 'statsTab'];
+            allTabContents.forEach(tabId => {
+                const tab = document.getElementById(tabId);
+                if (tab) {
+                    tab.classList.add('hidden');
+                }
+            });
+            
+            // Remove active class from all tabs
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
 
             // Show selected tab content
@@ -1667,7 +1675,7 @@ async function loadStatistics() {
                                 <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0; border-left: 4px solid #4299e1;">
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>📄 Document:</strong> ${email.document_name}</p>
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>🏷️ Type:</strong> ${email.document_type}</p>
-                                    <p style="margin: 3px 0; color: #4a5568;"><strong>🏢 Department:</strong> ${email.department}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>🏢 Routed to:</strong> ${email.department}</p>
                                     <p style="margin: 3px 0; color: #4a5568;"><strong>⚡ Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
                                 </div>
                                 ` : ''}
