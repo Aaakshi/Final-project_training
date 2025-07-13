@@ -1404,14 +1404,21 @@
 
             tbody.innerHTML = documents.map(doc => {
                 const uploadedDate = new Date(doc.uploaded_at).toLocaleDateString();
+                const fileName = doc.original_name || doc.file_name || 'Unknown';
+                const summary = doc.summary || 'N/A';
+                const docType = doc.document_type || 'Unknown';
+                const department = doc.department || 'general';
+                const status = doc.processing_status || 'unknown';
+                const priority = doc.priority || 'medium';
+                
                 return `
                     <tr>
-                        <td>${doc.file_name}</td>
-                        <td>${doc.summary || 'N/A'}</td>
-                        <td>${doc.document_type || 'Unknown'}</td>
-                        <td><span class="department-badge dept-${doc.department}">${doc.department.toUpperCase()}</span></td>
-                        <td><span class="status-badge status-${doc.processing_status}">${doc.processing_status}</span></td>
-                        <td><span class="priority-${doc.priority}">${doc.priority}</span></td>
+                        <td>${fileName}</td>
+                        <td>${summary}</td>
+                        <td>${docType}</td>
+                        <td><span class="department-badge dept-${department}">${department.toUpperCase()}</span></td>
+                        <td><span class="status-badge status-${status}">${status}</span></td>
+                        <td><span class="priority-${priority}">${priority}</span></td>
                         <td>${uploadedDate}</td>
                         <td>
                             <button class="btn" onclick="viewDocument('${doc.doc_id}')" style="padding: 5px 10px; font-size: 12px;">View</button>
@@ -1465,7 +1472,7 @@
                     const doc = await response.json();
 
                     // Set modal title
-                    document.getElementById('modalTitle').textContent = doc.file_name || doc.original_name;
+                    document.getElementById('modalTitle').textContent = doc.original_name || doc.file_name || 'Unknown Document';
 
                     // Populate modal fields
                     document.getElementById('modalDocType').textContent = doc.document_type || 'N/A';
@@ -1473,13 +1480,13 @@
 
                     const priorityElement = document.getElementById('modalPriority');
                     priorityElement.textContent = doc.priority || 'N/A';
-                    priorityElement.className = `priority-${doc.priority}`;
+                    priorityElement.className = `priority-${doc.priority || 'medium'}`;
 
-                    document.getElementById('modalStatus').textContent = doc.status || 'N/A';
-                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size);
-                    document.getElementById('modalUploadDate').textContent = formatDate(doc.upload_date);
+                    document.getElementById('modalStatus').textContent = doc.processing_status || doc.status || 'N/A';
+                    document.getElementById('modalFileSize').textContent = formatFileSize(doc.file_size || 0);
+                    document.getElementById('modalUploadDate').textContent = formatDate(doc.uploaded_at || doc.upload_date);
                     document.getElementById('modalUploadedBy').textContent = doc.uploaded_by || 'N/A';
-                    document.getElementById('modalConfidence').textContent = doc.confidence ? `${(doc.confidence * 100).toFixed(1)}%` : 'N/A';
+                    document.getElementById('modalConfidence').textContent = doc.classification_confidence ? `${(doc.classification_confidence * 100).toFixed(1)}%` : 'N/A';
                     document.getElementById('modalExtractedText').textContent = doc.extracted_text || 'No text content available';
 
                     // Display analysis data if available

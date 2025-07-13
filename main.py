@@ -2009,7 +2009,7 @@ async def get_statistics(current_user: dict = Depends(get_current_user)):
     finally:
         # Ensure connection is always closed
         if 'conn' in locals():
-            conn.close()nn.close()
+            conn.close()
 
 # --- Document Analysis Functions ---
 
