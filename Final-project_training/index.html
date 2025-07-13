@@ -1365,7 +1365,7 @@
         }
 
 
-        
+
 async function loadStatistics() {
             if (!authToken || !currentUser) {
                 console.warn('No auth token or user for statistics');
@@ -1621,11 +1621,10 @@ async function loadStatistics() {
         }
 
         async function loadEmailNotifications() {
-            // Simulate email notifications for demo
             const emailList = document.getElementById('emailList');
 
             try {
-                const response = await fetch('/api/documents/review?page=1&page_size=5', {
+                const response = await fetch('/api/email-notifications?page=1&page_size=10', {
                     headers: {
                         'Authorization': `Bearer ${authToken}`
                     }
@@ -1633,30 +1632,64 @@ async function loadStatistics() {
 
                 const data = await response.json();
 
-                if (response.ok && data.documents && data.documents.length > 0) {
+                if (response.ok && data.emails && data.emails.length > 0) {
                     let emailHTML = '';
-                    data.documents.forEach(doc => {
-                        const time = new Date(doc.uploaded_at).toLocaleString();
+                    data.emails.forEach(email => {
+                        const time = new Date(email.sent_at).toLocaleString();
+                        const emailIcon = email.email_type === 'sent' ? '📤' : '📧';
+                        const emailDirection = email.email_type === 'sent' ? 'Sent' : 'Received';
+
                         emailHTML += `
-                            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 10px; background: #f9fafb;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <strong style="color: #2d3748;">📧 New Document for Review</strong>
-                                    <small style="color: #718096;">${time}</small>
+                            <div class="email-item">
+                                <div class="email-header">
+                                    <strong style="color: #2d3748;">${emailIcon} ${email.subject}</strong>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span class="email-status status-${email.email_type}">${emailDirection}</span>
+                                        <small style="color: #718096;">${time}</small>
+                                    </div>
                                 </div>
-                                <p style="margin: 5px 0; color: #4a5568;"><strong>From:</strong> ${doc.uploaded_by || 'Unknown User'}</p>
-                                <p style="margin: 5px 0; color: #4a5568;"><strong>Document:</strong> ${doc.original_name}</p>
-                                <p style="margin: 5px 0; color: #4a5568;"><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
-                                <p style="margin: 5px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${doc.priority || 'low'}">${doc.priority || 'Low'}</span></p>
-                                <p style="margin: 5px 0; color: #718096; font-size: 14px;">Please log into the IDCR system to review this document.</p>
+                                <div style="margin-bottom: 10px;">
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>From:</strong> ${email.sent_by_name} (${email.sent_by})</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>To:</strong> ${email.received_by}</p>
+                                </div>
+                                <div style="background: #f7fafc; padding: 10px; border-radius: 6px; margin: 10px 0;">
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Document:</strong> ${email.document_name}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Type:</strong> ${email.document_type}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Department:</strong> ${email.department}</p>
+                                    <p style="margin: 3px 0; color: #4a5568;"><strong>Priority:</strong> <span class="priority-${email.priority.toLowerCase()}">${email.priority}</span></p>
+                                </div>
+                                ${email.body_preview ? `<p style="margin: 8px 0; color: #718096; font-size: 14px; font-style: italic;">${email.body_preview}</p>` : ''}
+                                <div style="text-align: right; margin-top: 10px;">
+                                    <small style="color: #a0aec0;">Status: ${email.status}</small>
+                                </div>
                             </div>
                         `;
                     });
                     emailList.innerHTML = emailHTML;
                 } else {
-                    emailList.innerHTML = '<p style="color: #718096; text-align: center; padding: 20px;">No recent notifications. Upload a document to see email notifications in action!</p>';
+                    emailList.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #718096;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+                            <h4 style="margin-bottom: 8px;">No Email Notifications Yet</h4>
+                            <p>Email notifications will appear here when:</p>
+                            <ul style="list-style: none; padding: 0; margin: 16px 0;">
+                                <li>📄 Documents are uploaded and classified</li>
+                                <li>🔍 Documents require review and approval</li>
+                                <li>⚡ High priority documents need attention</li>
+                            </ul>
+                            <p style="margin-top: 16px;"><em>Upload a document to see email notifications in action!</em></p>
+                        </div>
+                    `;
                 }
             } catch (error) {
-                emailList.innerHTML = '<p style="color: #e53e3e; text-align: center; padding: 20px;">Error loading notifications</p>';
+                console.error('Error loading email notifications:', error);
+                emailList.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #e53e3e;">
+                        <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                        <h4>Error Loading Notifications</h4>
+                        <p>Unable to load email notifications. Please try again.</p>
+                    </div>
+                `;
             }
         }
 

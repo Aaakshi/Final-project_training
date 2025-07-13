@@ -16,6 +16,7 @@ import shutil
 import threading
 from pathlib import Path
 import smtplib
+import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Template
@@ -322,6 +323,34 @@ def init_database():
             'ALTER TABLE upload_batches ADD COLUMN user_id TEXT DEFAULT "system"'
         )
 
+    # Add sample email notifications for demo
+    sample_emails = [
+        ('hr.manager@company.com', 'finance@company.com', 'New Financial Document for Review - Invoice_2024_001.pdf', 
+         '<html><body><h2>New Document Uploaded for Review</h2><p>A new financial document has been uploaded and classified to your department.</p></body></html>',
+         'doc1', 'Invoice_2024_001.pdf'),
+        ('finance.manager@company.com', 'hr@company.com', 'Document Review Complete - Employee_Handbook.pdf', 
+         '<html><body><h2>Document Review Complete</h2><p>Your document Employee_Handbook.pdf has been approved.</p></body></html>',
+         'doc2', 'Employee_Handbook.pdf'),
+        ('legal.manager@company.com', 'legal@company.com', 'High Priority Legal Document - Contract_ABC_Corp.pdf', 
+         '<html><body><h2>High Priority Document Alert</h2><p>A high priority legal document requires immediate attention.</p></body></html>',
+         'doc3', 'Contract_ABC_Corp.pdf'),
+        ('it.manager@company.com', 'it@company.com', 'IT Security Policy Update Required', 
+         '<html><body><h2>Security Policy Review</h2><p>New IT security policy document uploaded for review and approval.</p></body></html>',
+         'doc4', 'IT_Security_Policy.docx'),
+        ('noreply@idcr-system.com', 'general.employee@company.com', 'Welcome to IDCR System', 
+         '<html><body><h2>Welcome to IDCR System!</h2><p>Your account has been successfully created. You can now upload and manage documents.</p></body></html>',
+         None, None)
+    ]
+
+    for sent_by, received_by, subject, body, doc_id, file_name in sample_emails:
+        email_id = str(uuid.uuid4())
+        # Create emails from the past few days
+        sent_time = datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(0, 7), hours=random.randint(0, 23))
+        cursor.execute('''
+            INSERT OR IGNORE INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (email_id, sent_by, received_by, subject, body, doc_id, file_name, 'sent', sent_time.isoformat()))
+
     conn.commit()
     conn.close()
     print("✓ Database initialized")
@@ -452,10 +481,14 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_name: str = None):
+def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_name: str = None, sender_email: str = None):
     """Send email using Outlook SMTP with fallback - DEMO VERSION"""
+    # Use provided sender email or default to system email
+    from_email = sender_email or EMAIL_USER
+    
     # For demo purposes, we'll log the email instead of actually sending it
     print(f"\n📧 EMAIL NOTIFICATION (DEMO MODE)")
+    print(f"From: {from_email}")
     print(f"To: {to_email}")
     print(f"Subject: {subject}")
     print(f"Body Preview: {body[:200]}...")
@@ -469,7 +502,7 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
     cursor.execute('''
         INSERT INTO email_notifications (email_id, sent_by, received_by, subject, body, doc_id, file_name, status, sent_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (email_id, EMAIL_USER, to_email, subject, body, doc_id, file_name, 'sent', datetime.datetime.utcnow().isoformat()))
+    ''', (email_id, from_email, to_email, subject, body, doc_id, file_name, 'sent', datetime.datetime.utcnow().isoformat()))
 
     conn.commit()
     conn.close()
@@ -478,7 +511,7 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
     try:
         # Create message with fallback approach
         msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
+        msg['From'] = from_email
         msg['To'] = to_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'html'))
@@ -487,7 +520,7 @@ def send_email(to_email: str, subject: str, body: str, doc_id: str = None, file_
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(EMAIL_USER, EMAIL_PASSWORD)
-        server.sendmail(EMAIL_USER, to_email, msg.as_string())
+        server.sendmail(from_email, to_email, msg.as_string())
         server.quit()
 
         print(f"📧 Email actually sent successfully to {to_email}")
@@ -568,7 +601,7 @@ async def register_user(user_data: UserRegistration):
         </body>
     </html>
     """
-    send_email(user_data.email, "Welcome to IDCR System", welcome_body, None, None)
+    send_email(user_data.email, "Welcome to IDCR System", welcome_body, None, None, "noreply@idcr-system.com")
 
     return {"message": "User registered successfully", "user_id": user_id}
 
@@ -1088,7 +1121,7 @@ async def notify_department(doc_id: str, classification_result: dict,
         file_name = doc_result[0] if doc_result else "Unknown"
         conn2.close()
 
-        send_email(dept_email, subject, body, doc_id, file_name)
+        send_email(dept_email, subject, body, doc_id, file_name, user['email'])
 
 
 def update_document_status(doc_id: str, status: str):
@@ -1184,7 +1217,7 @@ async def review_document(doc_id: str,
         </html>
         """
 
-        send_email(user_email, subject, body, doc_id, doc_result[1])
+        send_email(user_email, subject, body, doc_id, doc_result[1], current_user['email'])
 
     return {"message": f"Document {review.status} successfully"}
 
@@ -1446,24 +1479,34 @@ async def get_email_notifications(page: int = 1,
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # Get emails sent to or from the user
+    # Get department email for current user
+    cursor.execute('SELECT dept_email FROM departments WHERE dept_id = ?', (current_user['department'],))
+    dept_result = cursor.fetchone()
+    user_dept_email = dept_result[0] if dept_result else current_user['email']
+
+    # Get emails sent to or from the user or their department
     offset = (page - 1) * page_size
     query = '''
-        SELECT email_id, sent_by, received_by, subject, doc_id, file_name, status, sent_at, read_at
-        FROM email_notifications 
-        WHERE sent_by = ? OR received_by = ?
-        ORDER BY sent_at DESC
+        SELECT e.email_id, e.sent_by, e.received_by, e.subject, e.body, e.doc_id, 
+               e.file_name, e.status, e.sent_at, e.read_at,
+               d.original_name, d.document_type, d.priority, d.department,
+               u.full_name as sender_name
+        FROM email_notifications e
+        LEFT JOIN documents d ON e.doc_id = d.doc_id
+        LEFT JOIN users u ON e.sent_by = u.email
+        WHERE e.sent_by = ? OR e.received_by = ? OR e.received_by = ?
+        ORDER BY e.sent_at DESC
         LIMIT ? OFFSET ?
     '''
 
-    cursor.execute(query, [current_user['email'], current_user['email'], page_size, offset])
+    cursor.execute(query, [current_user['email'], current_user['email'], user_dept_email, page_size, offset])
     emails = cursor.fetchall()
 
     # Get total count
     cursor.execute('''
         SELECT COUNT(*) FROM email_notifications 
-        WHERE sent_by = ? OR received_by = ?
-    ''', [current_user['email'], current_user['email']])
+        WHERE sent_by = ? OR received_by = ? OR received_by = ?
+    ''', [current_user['email'], current_user['email'], user_dept_email])
     total_count = cursor.fetchone()[0]
 
     conn.close()
@@ -1473,13 +1516,20 @@ async def get_email_notifications(page: int = 1,
         email_list.append({
             "email_id": email[0],
             "sent_by": email[1],
+            "sent_by_name": email[14] or "IDCR System",
             "received_by": email[2],
             "subject": email[3],
-            "doc_id": email[4],
-            "file_name": email[5] or "N/A",
-            "status": email[6],
-            "sent_at": email[7],
-            "read_at": email[8]
+            "body_preview": email[4][:200] + "..." if email[4] and len(email[4]) > 200 else email[4],
+            "doc_id": email[5],
+            "file_name": email[6] or "N/A",
+            "document_name": email[10] or email[6] or "N/A",
+            "document_type": email[11] or "Unknown",
+            "priority": email[12] or "Medium",
+            "department": email[13] or "General",
+            "status": email[7],
+            "sent_at": email[8],
+            "read_at": email[9],
+            "email_type": "sent" if email[1] == current_user['email'] else "received"
         })
 
     return {
