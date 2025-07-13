@@ -40,22 +40,60 @@ async def classify_document(file: UploadFile = File(...)):
         filename = file.filename.lower()
         text_content = content.decode('utf-8', errors='ignore') if content else ""
         
-        # Enhanced classification logic
+        # Enhanced classification logic with comprehensive keywords
         content_lower = text_content.lower()
         
-        if ("invoice" in content_lower or "payment" in content_lower or "finance" in content_lower or 
-            "invoice" in filename or "bill" in filename or "payment" in filename):
+        # HR Keywords
+        hr_keywords = ["hr", "human resources", "employee relations", "talent acquisition", "recruitment", 
+                      "onboarding", "performance management", "compensation & benefits", "payroll", 
+                      "employee engagement", "training & development", "succession planning", 
+                      "workforce planning", "hr policies", "diversity & inclusion", "labor relations", 
+                      "employee retention", "hris", "benefits administration", "workplace safety", 
+                      "employee", "personnel", "hiring", "training", "performance", "benefits", 
+                      "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", 
+                      "termination", "resignation", "promotion", "performance review", "appraisal", 
+                      "job description", "organizational chart", "employee handbook", "workplace policy", 
+                      "harassment", "diversity", "inclusion", "staff", "workforce", "compensation", 
+                      "salary review", "performance evaluation", "employee satisfaction", "team building", 
+                      "skill development", "career development"]
+        
+        # Finance Keywords
+        finance_keywords = ["finance", "financial planning", "budgeting", "accounting", "financial reporting", 
+                           "accounts payable", "accounts receivable", "general ledger", "cash flow", 
+                           "profit & loss", "balance sheet", "financial analysis", "treasury", 
+                           "tax compliance", "auditing", "cost management", "revenue forecasting", 
+                           "capital expenditure", "financial risk management", "erp", "enterprise resource planning", 
+                           "invoice", "payment", "bill", "receipt", "expense", "revenue", "profit", "loss", 
+                           "tax", "audit", "salary", "wage", "reimbursement", "cost", "expenditure", 
+                           "vendor payment", "purchase order", "transaction", "bank statement", "credit", "debit"]
+        
+        # Legal Keywords
+        legal_keywords = ["legal", "compliance", "contracts", "corporate governance", "litigation", 
+                         "regulatory affairs", "intellectual property", "ip", "risk management", 
+                         "employment law", "data privacy", "gdpr", "general data protection regulation", 
+                         "legal counsel", "dispute resolution", "due diligence", "mergers & acquisitions", 
+                         "m&a", "corporate law", "legal documentation", "policy compliance", 
+                         "contract", "agreement", "terms", "policy", "regulation", "lawsuit", 
+                         "copyright", "trademark", "patent", "non-disclosure", "nda", "privacy policy", 
+                         "terms of service", "liability", "warranty", "indemnification", "arbitration", 
+                         "clause", "amendment", "addendum", "legal notice", "cease and desist"]
+        
+        # Check HR keywords
+        if any(keyword in content_lower for keyword in hr_keywords) or any(keyword in filename for keyword in ["hr", "employee", "personnel", "training", "benefits", "recruitment", "onboarding"]):
+            doc_type = "hr_document"
+            department = "hr"
+            confidence = 0.95
+            priority = "medium"
+            tags = ["hr", "employee", "personnel"]
+        # Check Finance keywords
+        elif any(keyword in content_lower for keyword in finance_keywords) or any(keyword in filename for keyword in ["finance", "invoice", "bill", "payment", "budget", "accounting"]):
             doc_type = "financial_document"
             department = "finance"
-            confidence = 0.9
+            confidence = 0.95
             priority = "high"
             tags = ["finance", "invoice", "payment"]
-        elif ("contract" in content_lower or "agreement" in content_lower or "legal" in content_lower or
-              "terms and conditions" in content_lower or "liability" in content_lower or "compliance" in content_lower or
-              "policy" in content_lower or "regulation" in content_lower or "lawsuit" in content_lower or
-              "litigation" in content_lower or "intellectual property" in content_lower or "copyright" in content_lower or
-              "trademark" in content_lower or "patent" in content_lower or "non-disclosure" in content_lower or
-              "nda" in content_lower or "privacy policy" in content_lower or "terms of service" in content_lower or
+        # Check Legal keywords  
+        elif any(keyword in content_lower for keyword in legal_keywords) or any(keyword in filename for keyword in ["legal", "contract", "agreement", "compliance", "policy", "nda"])
               "contract" in filename or "agreement" in filename or "legal" in filename or "nda" in filename or
               "policy" in filename or "compliance" in filename):
             doc_type = "legal_document"

@@ -1179,37 +1179,37 @@ def classify_document_locally(content: str, filename: str):
     else:
         keyword_priority = "low"  # Default
 
-    # Enhanced classification for all departments with improved keywords
+    # Enhanced classification for all departments with comprehensive keywords
     classification_rules = [
-        # Finance & Accounting - High Priority
+        # Human Resources - Comprehensive Keywords
         {
-            "keywords": ["invoice", "payment", "finance", "bill", "receipt", "accounting", "budget", "expense", "revenue", "profit", "loss", "tax", "audit", "financial statement", "balance sheet", "cash flow", "accounts payable", "accounts receivable", "payroll", "salary", "wage", "reimbursement", "cost", "expenditure", "vendor payment", "purchase order", "transaction", "bank statement", "credit", "debit"],
-            "filename_keywords": ["invoice", "finance", "bill", "receipt", "payment", "expense", "budget", "financial", "tax", "audit", "payroll", "cost", "po", "purchase", "transaction", "bank", "credit", "debit"],
+            "keywords": ["hr", "human resources", "employee relations", "talent acquisition", "recruitment", "onboarding", "performance management", "compensation & benefits", "payroll", "employee engagement", "training & development", "succession planning", "workforce planning", "hr policies", "diversity & inclusion", "labor relations", "employee retention", "hris", "human resources information system", "benefits administration", "workplace safety", "employee", "personnel", "hiring", "training", "performance", "benefits", "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", "termination", "resignation", "promotion", "performance review", "appraisal", "job description", "organizational chart", "employee handbook", "workplace policy", "harassment", "diversity", "inclusion", "staff", "workforce", "compensation", "salary review", "performance evaluation", "employee satisfaction", "team building", "skill development", "career development"],
+            "filename_keywords": ["hr", "human resources", "employee", "personnel", "hiring", "recruitment", "training", "benefits", "leave", "performance", "onboarding", "handbook", "policy", "staff", "workforce", "compensation", "evaluation", "talent", "payroll", "engagement"],
+            "doc_type": "hr_document",
+            "department": "hr",
+            "confidence": 0.95,
+            "base_priority": "medium",
+            "tags": ["hr", "employee", "personnel"]
+        },
+        # Finance - Comprehensive Keywords
+        {
+            "keywords": ["finance", "financial planning", "budgeting", "accounting", "financial reporting", "accounts payable", "accounts receivable", "general ledger", "cash flow", "profit & loss", "balance sheet", "financial analysis", "treasury", "tax compliance", "auditing", "cost management", "revenue forecasting", "capital expenditure", "financial risk management", "erp", "enterprise resource planning", "invoice", "payment", "bill", "receipt", "expense", "revenue", "profit", "loss", "tax", "audit", "salary", "wage", "reimbursement", "cost", "expenditure", "vendor payment", "purchase order", "transaction", "bank statement", "credit", "debit", "financial", "fiscal", "budget", "expenditures"],
+            "filename_keywords": ["finance", "financial", "budget", "accounting", "invoice", "bill", "receipt", "payment", "expense", "tax", "audit", "payroll", "cost", "purchase", "transaction", "bank", "credit", "debit", "treasury", "revenue", "profit", "loss"],
             "doc_type": "financial_document",
             "department": "finance",
             "confidence": 0.95,
             "base_priority": "high",
             "tags": ["finance", "accounting", "financial"]
         },
-        # Legal - High Priority
+        # Legal - Comprehensive Keywords
         {
-            "keywords": ["contract", "agreement", "legal", "terms", "compliance", "policy", "regulation", "lawsuit", "litigation", "intellectual property", "copyright", "trademark", "patent", "non-disclosure", "nda", "privacy policy", "terms of service", "liability", "warranty", "indemnification", "arbitration", "clause", "amendment", "addendum", "legal notice", "cease and desist"],
-            "filename_keywords": ["contract", "legal", "agreement", "terms", "compliance", "policy", "nda", "lawsuit", "patent", "copyright", "trademark", "liability", "amendment"],
+            "keywords": ["legal", "compliance", "contracts", "corporate governance", "litigation", "regulatory affairs", "intellectual property", "ip", "risk management", "employment law", "data privacy", "gdpr", "general data protection regulation", "legal counsel", "dispute resolution", "due diligence", "mergers & acquisitions", "m&a", "corporate law", "legal documentation", "policy compliance", "contract", "agreement", "terms", "policy", "regulation", "lawsuit", "copyright", "trademark", "patent", "non-disclosure", "nda", "privacy policy", "terms of service", "liability", "warranty", "indemnification", "arbitration", "clause", "amendment", "addendum", "legal notice", "cease and desist", "attorney", "lawyer", "court", "judge", "settlement"],
+            "filename_keywords": ["legal", "contract", "agreement", "terms", "compliance", "policy", "nda", "lawsuit", "patent", "copyright", "trademark", "liability", "amendment", "litigation", "gdpr", "governance", "regulatory", "intellectual property"],
             "doc_type": "legal_document",
             "department": "legal",
-            "confidence": 0.92,
+            "confidence": 0.95,
             "base_priority": "high",
             "tags": ["legal", "contract", "compliance"]
-        },
-        # Human Resources - Medium Priority (Enhanced keywords)
-        {
-            "keywords": ["employee", "hr", "human resources", "personnel", "hiring", "training", "performance", "recruitment", "onboarding", "benefits", "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", "termination", "resignation", "promotion", "performance review", "appraisal", "job description", "organizational chart", "employee handbook", "workplace policy", "harassment", "diversity", "inclusion", "staff", "workforce", "employee relations", "compensation", "salary review", "performance evaluation", "employee satisfaction", "team building", "skill development", "career development"],
-            "filename_keywords": ["hr", "employee", "personnel", "hiring", "training", "benefits", "leave", "performance", "recruitment", "onboarding", "handbook", "policy", "staff", "workforce", "compensation", "evaluation"],
-            "doc_type": "hr_document",
-            "department": "hr",
-            "confidence": 0.90,
-            "base_priority": "medium",
-            "tags": ["hr", "employee", "personnel"]
         },
         # Sales - High Priority
         {
@@ -1394,8 +1394,7 @@ async def notify_department(doc_id: str, classification_result: dict,
         send_email(dept_email, subject, body, doc_id, file_name, user['email'])
 
         # Also send confirmation email to the uploader
-        confirmation_subject = f"Document Upload Confirmation - {file_name}"
-        confirmation_body = f"""
+        confirmation_subject = f"Document Upload Confirmation - {file_name}"confirmation_body = f"""
         <html>
             <body>
                 <h2>✅ Document Upload Successful</h2>
@@ -1512,7 +1511,7 @@ async def review_document(
         # First try to find by user_id
         cursor.execute("SELECT email, full_name FROM users WHERE user_id = ?", [uploaded_by])
         uploader_result = cursor.fetchone()
-        
+
         if not uploader_result:
             # If not found by user_id, try to find by full_name
             cursor.execute("SELECT email, full_name FROM users WHERE full_name = ?", [uploaded_by])
@@ -1535,7 +1534,7 @@ async def review_document(
                 <h2>Document Review Update</h2>
                 <p>Dear {uploader_name},</p>
                 <p>Your document has been <strong>{status_msg}</strong>.</p>
-                
+
                 <h3>Document Details:</h3>
                 <ul>
                     <li><strong>File Name:</strong> {file_name}</li>
@@ -2067,7 +2066,7 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
         for row in cursor.fetchall():
             # Determine email type based on sender/receiver
             email_type = "sent" if row[1] == current_user['email'] else "received"
-            
+
             # Extract priority from document or subject
             priority = "medium"
             if row[12]:  # Document priority

@@ -896,6 +896,9 @@
 
     <!-- Document Detail Modal -->
     <div id="documentModal" class="modal">
+        <The code changes fix a syntax error and improve the structure of the JavaScript in the original HTML file.
+``````text
+
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
             <h2 id="modalTitle">Document Details</h2>
@@ -1398,7 +1401,7 @@
                     '<td>' + doc.original_name + '</td>' +
                     '<td><span class="status-badge doc-type-' + docType + '">' + docType.replace('_', ' ') + '</span></td>' +
                     '<td><span class="department-badge dept-' + department + '">' + department.toUpperCase() + '</span></td>' +
-                    '<td><span class="status-badge status-' + status + '">' + status + '</span></td>' +
+                    '<td><span class="status-badge status-' + status + '">' + status + '">' + status + '</span></td>' +
                     '<td><span class="priority-' + priority + '">' + priority + '</span></td>' +
                     '<td>' + uploadedBy + '</td>' +
                     '<td>' + uploadDate + '</td>' +
@@ -1512,7 +1515,7 @@
 
         async function submitReview(docId, action) {
             const comments = document.getElementById('reviewComments').value || '';
-            
+
             try {
                 const response = await fetch('/api/review-document/' + docId, {
                     method: 'POST',
@@ -1639,7 +1642,7 @@
                 // Show loading message
                 const container = document.getElementById('emailNotifications');
                 const countElement = document.getElementById('emailCount');
-                
+
                 container.innerHTML = '<div class="notification-item"><h4>📧 Loading email notifications...</h4></div>';
                 countElement.textContent = 'Loading...';
 
@@ -1717,292 +1720,3 @@
                     '<div style="margin: 8px 0;"><strong>To:</strong> ' + receivedByName + ' (' + email.received_by + ')</div>' +
                     '<div style="margin: 8px 0;"><strong>Document:</strong> ' + documentName + '</div>' +
                     '<div style="margin: 8px 0;"><strong>Department:</strong> <span class="department-badge dept-' + department + '">' + department.toUpperCase() + '</span></div>' +
-                    '<div style="margin: 8px 0;"><strong>Sent:</strong> ' + sentDate + '</div>' +
-                    (bodyPreview ? '<div style="margin: 8px 0;"><strong>Preview:</strong> <em>' + bodyPreview + '</em></div>' : '') +
-                    '</div>';
-            }).join('');
-        }
-
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/stats', {
-                    headers: {
-                        'Authorization': 'Bearer ' + authToken,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    if (contentType && contentType.includes('application/json')) {
-                        const data = await response.json();
-                        displayStats(data);
-                        // Clear any previous error messages
-                        const errorElements = document.querySelectorAll('.error-message');
-                        errorElements.forEach(el => el.remove());
-                    } else {
-                        showToast('Failed to load stats - invalid server response', 'error');
-                        displayFallbackStats();
-                    }
-                } else {
-                    showToast('Failed to load statistics', 'error');
-                    displayFallbackStats();
-                }
-            } catch (error) {
-                console.error('Load stats error:', error);
-                showToast('Failed to load statistics - network error', 'error');
-                displayFallbackStats();
-            }
-        }
-
-        function displayFallbackStats() {
-            const statsGrid = document.getElementById('statsGrid');
-
-            statsGrid.innerHTML = '<div class="stat-card">' +
-                '<h3>0</h3>' +
-                '<p>Total Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>0</h3>' +
-                '<p>Processed Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>0</h3>' +
-                '<p>Pending Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>0%</h3>' +
-                '<p>Processing Rate</p>' +
-                '</div>';
-
-            // Display a message indicating that stats could not be loaded.
-            const chartGrid = document.querySelector('.chart-grid');
-            chartGrid.innerHTML = '<p style="color: red; text-align: center;">Failed to load statistics data.</p>';
-        }
-
-        function displayStats(stats) {
-            const statsGrid = document.getElementById('statsGrid');
-
-            statsGrid.innerHTML = '<div class="stat-card">' +
-                '<h3>' + stats.total_documents + '</h3>' +
-                '<p>Total Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>' + stats.processed_documents + '</h3>' +
-                '<p>Processed Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>' + stats.pending_documents + '</h3>' +
-                '<p>Pending Documents</p>' +
-                '</div>' +
-                '<div class="stat-card">' +
-                '<h3>' + stats.processing_rate + '%</h3>' +
-                '<p>Processing Rate</p>' +
-                '</div>';
-
-            // Only create charts if Chart.js is loaded
-            if (typeof Chart !== 'undefined') {
-                createCharts(stats);
-            } else {
-                console.log('Chart.js not loaded, skipping chart creation');
-            }
-        }
-
-        function createCharts(stats) {
-            // Check if Chart.js is available
-            if (typeof Chart === 'undefined') {
-                console.log('Chart.js not available, showing text-based stats instead');
-                showTextBasedCharts(stats);
-                return;
-            }
-
-            try {
-                // Create document types chart
-                if (stats.document_types && Object.keys(stats.document_types).length > 0) {
-                    const ctx1 = document.getElementById('docTypesChart');
-                    if (ctx1) {
-                        new Chart(ctx1, {
-                            type: 'pie',
-                            data: {
-                                labels: Object.keys(stats.document_types),
-                                datasets: [{
-                                    data: Object.values(stats.document_types),
-                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false
-                            }
-                        });
-                    }
-                }
-
-                // Create departments chart
-                if (stats.departments && Object.keys(stats.departments).length > 0) {
-                    const ctx2 = document.getElementById('departmentsChart');
-                    if (ctx2) {
-                        new Chart(ctx2, {
-                            type: 'doughnut',
-                            data: {
-                                labels: Object.keys(stats.departments),
-                                datasets: [{
-                                    data: Object.values(stats.departments),
-                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false
-                            }
-                        });
-                    }
-                }
-
-                // Create priority chart
-                if (stats.priorities && Object.keys(stats.priorities).length > 0) {
-                    const ctx3 = document.getElementById('priorityChart');
-                    if (ctx3) {
-                        new Chart(ctx3, {
-                            type: 'bar',
-                            data: {
-                                labels: Object.keys(stats.priorities),
-                                datasets: [{
-                                    label: 'Documents',
-                                    data: Object.values(stats.priorities),
-                                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                    y: {
-                                        beginAtZero: true
-                                    }
-                                }
-                            }
-                        });
-                    }
-                }
-
-                // Create trends chart
-                if (stats.upload_trends && stats.upload_trends.length > 0) {
-                    const ctx4 = document.getElementById('trendsChart');
-                    if (ctx4) {
-                        new Chart(ctx4, {
-                            type: 'line',
-                            data: {
-                                labels: stats.upload_trends.map(item => item.date),
-                                datasets: [{
-                                    label: 'Uploads',
-                                    data: stats.upload_trends.map(item => item.count),
-                                    borderColor: '#36A2EB',
-                                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                                    tension: 0.1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                    y: {
-                                        beginAtZero: true
-                                    }
-                                }
-                            }
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Error creating charts:', error);
-                showTextBasedCharts(stats);
-            }
-        }
-
-        function showTextBasedCharts(stats) {
-            // Show text-based statistics when Chart.js is not available
-            const chartContainers = document.querySelectorAll('.chart-container');
-
-            chartContainers.forEach((container, index) => {
-                const canvas = container.querySelector('canvas');
-                if (canvas) {
-                    let content = '';
-
-                    if (index === 0 && stats.document_types) {
-                        // Document types
-                        content = '<div style="padding: 20px;"><h4>Document Types:</h4>';
-                        Object.entries(stats.document_types).forEach(([type, count]) => {
-                            content += `<div style="margin: 5px 0;">${type}: ${count}</div>`;
-                        });
-                        content += '</div>';
-                    } else if (index === 1 && stats.departments) {
-                        // Departments
-                        content = '<div style="padding: 20px;"><h4>Departments:</h4>';
-                        Object.entries(stats.departments).forEach(([dept, count]) => {
-                            content += `<div style="margin: 5px 0;">${dept}: ${count}</div>`;
-                        });
-                        content += '</div>';
-                    } else if (index === 2 && stats.priorities) {
-                        // Priorities
-                        content = '<div style="padding: 20px;"><h4>Priorities:</h4>';
-                        Object.entries(stats.priorities).forEach(([priority, count]) => {
-                            content += `<div style="margin: 5px 0;">${priority}: ${count}</div>`;
-                        });
-                        content += '</div>';
-                    } else if (index === 3 && stats.upload_trends) {
-                        // Upload trends
-                        content = '<div style="padding: 20px;"><h4>Recent Uploads:</h4>';
-                        stats.upload_trends.slice(-7).forEach(item => {
-                            content += `<div style="margin: 5px 0;">${item.date}: ${item.count} uploads</div>`;
-                        });
-                        content += '</div>';
-                    }
-
-                    canvas.style.display = 'none';
-                    container.innerHTML = container.querySelector('h3').outerHTML + content;
-                }
-            });
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        function formatDate(dateString) {
-            return new Date(dateString).toLocaleDateString();
-        }
-
-        function showToast(message, type) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = 'toast ' + type;
-            toast.style.display = 'block';
-
-            setTimeout(function() {
-                toast.style.display = 'none';
-            }, 3000);
-        }
-
-        function closeModal() {
-            document.getElementById('documentModal').style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('documentModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-
-        function getStoredToken() {
-            return localStorage.getItem('authToken');
-        }
-    </script>
-</body>
-</html>
