@@ -1,2 +1,1010 @@
-This code incorporates the addition of a Review Documents tab with filtering capabilities, a document review modal, JavaScript functions for handling review functionalities, CSS styles for the new review features, and fixes the login authentication handling.
-```
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Management System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        /* Header Styles */
+        .header {
+            background: #34495e;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+        }
+
+        /* Navigation Styles */
+        .tabs {
+            display: flex;
+            justify-content: flex-start;
+            /* Align tabs to the left */
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            /* Enable horizontal scrolling for tabs */
+            white-space: nowrap;
+            /* Prevent tabs from wrapping */
+        }
+
+        .tab-btn {
+            background: #bdc3c7;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #333;
+            transition: background-color 0.3s ease;
+            white-space: nowrap;
+            /* Prevent text from wrapping */
+        }
+
+        .tab-btn:hover {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .tab-btn.active {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        /* Tab Content Styles */
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Form Styles */
+        form {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        form label {
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        form input[type="file"],
+        form input[type="text"],
+        form input[type="email"],
+        form textarea,
+        form select {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            color: #333;
+        }
+
+        form textarea {
+            resize: vertical;
+        }
+
+        form button {
+            padding: 12px 20px;
+            border: none;
+            background-color: #27ae60;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease;
+        }
+
+        form button:hover {
+            background-color: #219653;
+        }
+
+        /* Table Styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        th,
+        td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+
+        tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Document List Styles */
+        .document-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .document-list li {
+            padding: 10px 15px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background-color 0.3s ease;
+            cursor: pointer;
+        }
+
+        .document-list li:last-child {
+            border-bottom: none;
+        }
+
+        .document-list li:hover {
+            background-color: #f0f3f4;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 10px;
+            top: 0px;
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        /* Utility Styles */
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        /* Status Badge Styles */
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: white;
+            font-size: 0.8em;
+        }
+
+        .status-badge.active {
+            background-color: #27ae60;
+        }
+
+        .status-badge.inactive {
+            background-color: #e74c3c;
+        }
+
+        /* Priority Badge Styles */
+        .priority-badge {
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: white;
+            font-size: 0.8em;
+        }
+
+        .priority-badge.priority-high {
+            background-color: #e74c3c;
+        }
+
+        .priority-badge.priority-medium {
+            background-color: #f39c12;
+        }
+
+        .priority-badge.priority-low {
+            background-color: #2980b9;
+        }
+
+        /* Notification Styles */
+        #notification-area {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.4s ease-in-out;
+        }
+
+        .toast.error {
+            background-color: #F44336;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        /* Additional Styles for Improved UI */
+        .btn {
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #2980b9;
+        }
+
+        /* File Upload Styles */
+        input[type="file"] {
+            padding: 10px;
+            border: 1px dashed #bdc3c7;
+            background: #f9f9f9;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        input[type="file"]::-webkit-file-upload-button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        input[type="file"]::-webkit-file-upload-button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Statistics Styles */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .stat-card p {
+            font-size: 1.5em;
+            color: #2980b9;
+            margin: 0;
+        }
+
+        /* Adjustments for Responsiveness */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab-btn {
+                margin: 5px 0;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Style for status badges in tables */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .dept-hr {
+            background-color: #3498db;
+            /* Example color for HR */
+        }
+
+        .dept-finance {
+            background-color: #27ae60;
+            /* Example color for Finance */
+        }
+
+        .dept-legal {
+            background-color: #e74c3c;
+            /* Example color for Legal */
+        }
+
+        .dept-it {
+            background-color: #f39c12;
+            /* Example color for IT */
+        }
+
+        .dept-administration {
+            background-color: #8e44ad;
+            /* Example color for Administration */
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+        }
+
+        .info-item label {
+            font-weight: bold;
+            margin-right: 10px;
+            min-width: 120px;
+        }
+
+        .document-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+
+        .card-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .card-subtitle {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+        }
+
+        .confidentiality-bar {
+            background: #ecf0f1;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .confidentiality-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .confidentiality-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Document Management System</h1>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-btn" onclick="showTab('upload')">Upload Documents</button>
+            <button class="tab-btn" onclick="showTab('documents')">View Documents</button>
+            <button class="tab-btn" onclick="showTab('review-documents')">Review Documents</button>
+            <button class="tab-btn" onclick="showTab('email-notifications')">Email Notifications</button>
+            <button class="tab-btn" onclick="showTab('stats')">Statistics</button>
+            <button class="tab-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <!-- Upload Documents Tab -->
+        <div id="upload" class="tab-content">
+            <h2>Upload New Document</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <label for="document">Select Document:</label>
+                <input type="file" id="document" name="document" required>
+
+                <label for="department">Select Department:</label>
+                <select id="department" name="department">
+                    <option value="hr">HR</option>
+                    <option value="finance">Finance</option>
+                    <option value="legal">Legal</option>
+                    <option value="it">IT</option>
+                    <option value="administration">Administration</option>
+                    <!-- Add more departments as needed -->
+                </select>
+
+                <label for="priority">Set Priority:</label>
+                <select id="priority" name="priority">
+                    <option value="high">High</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="low">Low</option>
+                </select>
+
+                <button type="submit">Upload Document</button>
+            </form>
+        </div>
+
+        <!-- View Documents Tab -->
+        <div id="documents" class="tab-content">
+            <h2>View Documents</h2>
+            <div class="controls">
+                <input type="text" id="searchInput" placeholder="Search documents..." onkeyup="loadDocuments()">
+                <select id="departmentFilter" onchange="loadDocuments()">
+                    <option value="">All Departments</option>
+                    <option value="hr">HR</option>
+                    <option value="finance">Finance</option>
+                    <option value="legal">Legal</option>
+                    <option value="it">IT</option>
+                    <option value="administration">Administration</option>
+                </select>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Department</th>
+                            <th>Uploaded By</th>
+                            <th>Upload Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentsTableBody">
+                        <!-- Documents will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Review Documents Tab -->
+        <div id="review-documents" class="tab-content">
+            <h2>Review Documents</h2>
+            <div class="controls">
+                <input type="text" id="reviewSearchInput" placeholder="Search documents..." onkeyup="loadReviewDocuments()">
+                <select id="reviewDepartmentFilter" onchange="loadReviewDocuments()">
+                    <option value="">All Departments</option>
+                    <option value="hr">HR</option>
+                    <option value="finance">Finance</option>
+                    <option value="legal">Legal</option>
+                    <option value="it">IT</option>
+                    <option value="administration">Administration</option>
+                </select>
+                <select id="reviewPriorityFilter" onchange="loadReviewDocuments()">
+                    <option value="">All Priorities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Department</th>
+                            <th>Priority</th>
+                            <th>Uploaded By</th>
+                            <th>Upload Date</th>
+                            <th>Confidentiality</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reviewDocumentsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Email Notifications Tab -->
+        <div id="email-notifications" class="tab-content">
+            <h2>Email Notifications</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Event</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emailNotificationsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Statistics Tab -->
+        <div id="stats" class="tab-content">
+            <h2>Document Statistics</h2>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3>Total Documents Uploaded</h3>
+                    <p id="totalDocuments">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Average Uploads per Day</h3>
+                    <p id="avgUploadsPerDay">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Most Active Department</h3>
+                    <p id="mostActiveDepartment">N/A</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Highest Priority Documents</h3>
+                    <p id="highestPriorityDocuments">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for displaying document details -->
+        <div id="documentModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="document.getElementById('documentModal').style.display='none'">&times;</span>
+                <div id="documentDetails">
+                    <!-- Document details will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="notification-area">
+            <!-- Notifications will appear here -->
+        </div>
+
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+            window.location.href = '/login.html';
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // Deactivate all buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(button => button.classList.remove('active'));
+
+            // Show the selected tab
+            const selectedTab = document.getElementById(tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
+            }
+
+            // Activate the button
+            const selectedButton = Array.from(buttons).find(button => button.getAttribute('onclick') === `showTab('${tabName}')`);
+            if (selectedButton) {
+                selectedButton.classList.add('active');
+            }
+
+            if (tabName === 'documents') {
+                loadDocuments();
+            } else if (tabName === 'review-documents') {
+                loadReviewDocuments();
+            } else if (tabName === 'email-notifications') {
+                loadEmailNotifications();
+            } else if (tabName === 'stats') {
+                loadStats();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('uploadForm').addEventListener('submit', uploadDocument);
+            showTab('upload'); // Default tab
+
+            // Load initial data for other tabs if needed
+            loadEmailNotifications();
+            loadStats();
+        });
+
+        async function uploadDocument(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Document uploaded successfully', 'success');
+                    event.target.reset(); // Clear the form
+                } else {
+                    showToast('Failed to upload document: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                showToast('Failed to upload document', 'error');
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                const search = document.getElementById('searchInput').value;
+                const department = document.getElementById('departmentFilter').value;
+
+                const params = new URLSearchParams({
+                    search: search,
+                    department: department
+                });
+
+                const response = await fetch('/api/documents?' + params.toString(), {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayDocuments(data.documents);
+                } else {
+                    showToast('Failed to load documents', 'error');
+                }
+            } catch (error) {
+                console.error('Load documents error:', error);
+                showToast('Failed to load documents', 'error');
+            }
+        }
+
+        function displayDocuments(documents) {
+            const tbody = document.getElementById('documentsTableBody');
+            tbody.innerHTML = documents.map(doc => {
+                const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
+                return `<tr>
+                        <td>${doc.original_name}</td>
+                        <td><span class="status-badge dept-${doc.department}">${doc.department.toUpperCase()}</span></td>
+                        <td>${doc.uploaded_by}</td>
+                        <td>${uploadDate}</td>
+                        <td><button class="btn" onclick="showDocumentDetails('${doc.doc_id}')">View Details</button></td>
+                    </tr>`;
+            }).join('');
+        }
+
+        async function showDocumentDetails(docId) {
+            try {
+                const response = await fetch(`/api/documents/${docId}`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                const doc = await response.json();
+
+                if (response.ok) {
+                    const modalContent = document.getElementById('documentDetails');
+                    modalContent.innerHTML = `
+                        <h2>${doc.original_name}</h2>
+                        <p><strong>Uploaded By:</strong> ${doc.uploaded_by}</p>
+                        <p><strong>Department:</strong> ${doc.department}</p>
+                        <p><strong>Uploaded At:</strong> ${new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                        <p><strong>Summary:</strong> ${doc.summary}</p>
+                        <!-- Include other details as necessary -->
+                    `;
+                    document.getElementById('documentModal').style.display = 'flex';
+                } else {
+                    showToast('Error loading document details', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching document details:', error);
+                showToast('Error loading document details', 'error');
+            }
+        }
+
+        async function loadReviewDocuments() {
+            try {
+                const search = document.getElementById('reviewSearchInput') ? document.getElementById('reviewSearchInput').value : '';
+                const department = document.getElementById('reviewDepartmentFilter') ? document.getElementById('reviewDepartmentFilter').value : '';
+                const priority = document.getElementById('reviewPriorityFilter') ? document.getElementById('reviewPriorityFilter').value : '';
+
+                const params = new URLSearchParams({
+                    search: search,
+                    department: department,
+                    priority: priority
+                });
+
+                const response = await fetch('/api/documents?' + params.toString(), {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayReviewDocuments(data.documents);
+                } else {
+                    showToast('Failed to load documents for review', 'error');
+                }
+            } catch (error) {
+                console.error('Load review documents error:', error);
+                showToast('Failed to load documents for review', 'error');
+            }
+        }
+
+        function displayReviewDocuments(documents) {
+            const tbody = document.getElementById('reviewDocumentsTableBody');
+            tbody.innerHTML = documents.map(doc => {
+                const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
+                const priority = doc.priority || 'medium';
+                const department = doc.department || 'general';
+                const uploadedBy = doc.uploaded_by || 'Unknown';
+                const confidentiality = Math.round(doc.confidentiality_percent || 0);
+
+                return '<tr>' +
+                    '<td>' + (doc.original_name || 'Unknown') + '</td>' +
+                    '<td><span class="status-badge dept-' + department + '">' + department.toUpperCase() + '</span></td>' +
+                    '<td><span class="priority-badge priority-' + priority + '">' + priority.toUpperCase() + '</span></td>' +
+                    '<td>' + uploadedBy + '</td>' +
+                    '<td>' + uploadDate + '</td>' +
+                    '<td>' + confidentiality + '%</td>' +
+                    '<td><button class="btn" onclick="showDocumentCard(\'' + doc.doc_id + '\')" style="padding: 5px 10px; font-size: 12px;">Review</button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        async function showDocumentCard(docId) {
+            try {
+                const response = await fetch('/api/documents/' + docId, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const doc = await response.json();
+                    const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
+                    const uploadTime = new Date(doc.uploaded_at).toLocaleTimeString();
+                    const confidentiality = Math.round(doc.confidentiality_percent || 0);
+
+                    let confidentialityColor = '#27ae60';
+                    if (confidentiality > 70) confidentialityColor = '#e74c3c';
+                    else if (confidentiality > 40) confidentialityColor = '#f39c12';
+
+                    const modal = document.createElement('div');
+                    modal.className = 'modal';
+                    modal.innerHTML = '<div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">' +
+                        '<span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>' +
+                        '<div class="document-card">' +
+                        '<div class="card-header">' +
+                        '<h2 class="card-title">' + (doc.original_name || 'Unknown Document') + '</h2>' +
+                        '<p class="card-subtitle">Document Analysis & Review</p>' +
+                        '</div>' +
+                        '<div class="info-grid">' +
+                        '<div class="info-item"><label>Uploaded By:</label><span>' + (doc.uploaded_by || 'Unknown') + '</span></div>' +
+                        '<div class="info-item"><label>Upload Date:</label><span>' + uploadDate + ' at ' + uploadTime + '</span></div>' +
+                        '<div class="info-item"><label>Department:</label><span>' + (doc.department || 'General').toUpperCase() + '</span></div>' +
+                        '<div class="info-item"><label>Document Type:</label><span>' + (doc.document_type || 'General').replace('_', ' ') + '</span></div>' +
+                        '<div class="info-item"><label>Priority:</label><span class="priority-badge priority-' + (doc.priority || 'medium') + '">' + (doc.priority || 'Medium').toUpperCase() + '</span></div>' +
+                        '<div class="info-item"><label>Sent To:</label><span>' + (doc.routed_to || 'Not routed') + '</span></div>' +
+                        '</div>' +
+                        '<div style="margin: 20px 0;">' +
+                        '<label><strong>Confidentiality Level:</strong></label>' +
+                        '<div class="confidentiality-bar" style="margin-top: 10px;">' +
+                        '<div class="confidentiality-fill" style="width: ' + confidentiality + '%; background: ' + confidentialityColor + ';"></div>' +
+                        '<div class="confidentiality-text">' + confidentiality + '%</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '<div style="margin: 20px 0;">' +
+                        '<label><strong>Document Summary:</strong></label>' +
+                        '<div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #007bff;">' +
+                        (doc.summary || 'No summary available') +
+                        '</div>' +
+                        '</div>' +
+                        '<div style="margin: 20px 0;">' +
+                        '<label><strong>Routing Information:</strong></label>' +
+                        '<div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px;">' +
+                        (doc.routing_reason || 'Standard routing based on classification') +
+                        '</div>' +
+                        '</div>' +
+                        '</div>' +
+                        '</div>';
+                    document.body.appendChild(modal);
+                } else {
+                    showToast('Error loading document details', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching document for review:', error);
+                showToast('Error loading document details', 'error');
+            }
+        }
+
+        async function loadEmailNotifications() {
+            try {
+                const response = await fetch('/api/notifications', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayEmailNotifications(data.notifications);
+                } else {
+                    showToast('Failed to load email notifications', 'error');
+                }
+            } catch (error) {
+                console.error('Load email notifications error:', error);
+                showToast('Failed to load email notifications', 'error');
+            }
+        }
+
+        function displayEmailNotifications(notifications) {
+            const tbody = document.getElementById('emailNotificationsTableBody');
+            tbody.innerHTML = notifications.map(notification => {
+                const timestamp = new Date(notification.timestamp).toLocaleString();
+                return `<tr>
+                        <td>${timestamp}</td>
+                        <td>${notification.event}</td>
+                        <td>${notification.details}</td>
+                    </tr>`;
+            }).join('');
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('totalDocuments').innerText = data.totalDocuments;
+                    document.getElementById('avgUploadsPerDay').innerText = data.avgUploadsPerDay;
+                    document.getElementById('mostActiveDepartment').innerText = data.mostActiveDepartment || 'N/A';
+                    document.getElementById('highestPriorityDocuments').innerText = data.highestPriorityDocuments;
+                } else {
+                    showToast('Failed to load statistics', 'error');
+                }
+            } catch (error) {
+                console.error('Load stats error:', error);
+                showToast('Failed to load statistics', 'error');
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const notificationArea = document.getElementById('notification-area');
+            const toast = document.createElement('div');
+            toast.classList.add('toast', type);
+            toast.innerText = message;
+            notificationArea.appendChild(toast);
+
+            // Show the toast
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            // Hide the toast after 3 seconds
+            setTimeout(()=> {
+                toast.classList.remove('show');
+                // Remove the toast from the DOM after the transition
+                setTimeout(() => {
+                    notificationArea.removeChild(toast);
+                }, 400);
+            }, 3000);
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            window.location.href = '/login.html';
+        }
+    </script>
+</body>
+
+</html>

@@ -263,21 +263,11 @@ async def route_document(request: RoutingRequest):
 
         recipient_email = department_emails.get(request.department, 'admin@company.com')
 
-        # Send notification to main application about routing
-        try:
-            import requests
-            notification_data = {
-                'doc_id': request.doc_id,
-                'type': 'document_routed',
-                'recipient': recipient_email,
-                'department': request.department,
-                'message': f"New {request.doc_type} document routed to {request.department} department",
-                'priority': final_priority
-            }
-            requests.post('http://localhost:5000/api/internal/email-notification', 
-                         json=notification_data, timeout=5)
-        except:
-            pass  # Don't fail routing if notification fails
+        # Return routing information for main application to handle notifications
+        routing_info = {
+            'target_email': recipient_email,
+            'routing_message': f"Document routed to {request.department} department for {rule.assignee} review"
+        }
 
         return RoutingResponse(
             doc_id=request.doc_id,

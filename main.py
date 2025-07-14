@@ -111,6 +111,7 @@ def init_database():
             reviewed_at TIMESTAMP,
             review_comments TEXT,
             risk_score REAL DEFAULT 0.0,
+            confidentiality_percent REAL DEFAULT 0.0,
             sentiment TEXT DEFAULT 'neutral',
             summary TEXT,
             key_phrases TEXT,
@@ -192,6 +193,7 @@ def migrate_database():
 
     new_columns = [
         ('risk_score', 'REAL DEFAULT 0.0'),
+        ('confidentiality_percent', 'REAL DEFAULT 0.0'),
         ('sentiment', 'TEXT DEFAULT "neutral"'),
         ('summary', 'TEXT'),
         ('key_phrases', 'TEXT'),
@@ -598,6 +600,7 @@ async def bulk_upload_documents(
 
         # Store content analysis data in database
         risk_score = analysis_data.get('risk_score', 0.0)
+        confidentiality_percent = analysis_data.get('confidentiality_percent', 0.0)
         sentiment = analysis_data.get('sentiment', 'neutral')
         summary = analysis_data.get('summary', '')
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
@@ -629,12 +632,12 @@ async def bulk_upload_documents(
             INSERT INTO documents 
             (doc_id, original_name, file_path, file_size, file_type, uploaded_by, 
              batch_name, extracted_text, document_type, department, priority, processing_status,
-             risk_score, sentiment, summary, key_phrases, entities, routed_to, routing_reason)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             risk_score, confidentiality_percent, sentiment, summary, key_phrases, entities, routed_to, routing_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             doc_id, file.filename, str(file_path), file.size, file_extension,
             current_user['email'], batch_name, extracted_text, doc_type, 
-            department, priority, 'classified', risk_score, sentiment, summary,
+            department, priority, 'classified', risk_score, confidentiality_percent, sentiment, summary,
             key_phrases, entities, target_email, routing_data.get('routing_reason', '')
         ))
         conn.commit()
@@ -760,12 +763,13 @@ async def get_documents(
             'processing_status': doc[13],
             'review_status': doc[14],
             'risk_score': doc[18] if len(doc) > 18 else 0.0,
-            'sentiment': doc[19] if len(doc) > 19 else 'neutral',
-            'summary': doc[20] if len(doc) > 20 else '',
-            'key_phrases': doc[21] if len(doc) > 21 else '[]',
-            'entities': doc[22] if len(doc) > 22 else '{}',
-            'routed_to': doc[23] if len(doc) > 23 else '',
-            'routing_reason': doc[24] if len(doc) > 24 else ''
+            'confidentiality_percent': doc[19] if len(doc) > 19 else 0.0,
+            'sentiment': doc[20] if len(doc) > 20 else 'neutral',
+            'summary': doc[21] if len(doc) > 21 else '',
+            'key_phrases': doc[22] if len(doc) > 22 else '[]',
+            'entities': doc[23] if len(doc) > 23 else '{}',
+            'routed_to': doc[24] if len(doc) > 24 else '',
+            'routing_reason': doc[25] if len(doc) > 25 else ''
         })
 
     return {
@@ -805,12 +809,13 @@ async def get_document(doc_id: str, current_user: dict = Depends(get_current_use
         'reviewed_at': doc[16],
         'review_comments': doc[17],
         'risk_score': doc[18] if len(doc) > 18 else 0.0,
-        'sentiment': doc[19] if len(doc) > 19 else 'neutral',
-        'summary': doc[20] if len(doc) > 20 else '',
-        'key_phrases': doc[21] if len(doc) > 21 else '[]',
-        'entities': doc[22] if len(doc) > 22 else '{}',
-        'routed_to': doc[23] if len(doc) > 23 else '',
-        'routing_reason': doc[24] if len(doc) > 24 else ''
+        'confidentiality_percent': doc[19] if len(doc) > 19 else 0.0,
+        'sentiment': doc[20] if len(doc) > 20 else 'neutral',
+        'summary': doc[21] if len(doc) > 21 else '',
+        'key_phrases': doc[22] if len(doc) > 22 else '[]',
+        'entities': doc[23] if len(doc) > 23 else '{}',
+        'routed_to': doc[24] if len(doc) > 24 else '',
+        'routing_reason': doc[25] if len(doc) > 25 else ''
     }
 
 @app.get("/api/review-documents")

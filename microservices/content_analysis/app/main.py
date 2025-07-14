@@ -28,6 +28,7 @@ class AnalysisResponse(BaseModel):
     entities: EntityExtractionResult
     sentiment: str
     risk_score: float
+    confidentiality_percent: float
     word_count: int
     char_count: int
     language: str
@@ -143,6 +144,38 @@ def calculate_risk_score(content: str, entities: EntityExtractionResult) -> floa
     
     return min(risk_score, 1.0)
 
+def calculate_confidentiality_score(content: str, entities: EntityExtractionResult) -> float:
+    """Calculate confidentiality percentage based on content analysis"""
+    confidentiality_score = 0.0
+    content_lower = content.lower()
+    
+    # High confidentiality indicators
+    high_conf_keywords = ['confidential', 'classified', 'restricted', 'top secret', 'proprietary']
+    medium_conf_keywords = ['internal', 'private', 'sensitive', 'do not distribute', 'limited access']
+    personal_info = ['ssn', 'social security', 'credit card', 'bank account', 'password']
+    
+    # Check for high confidentiality keywords
+    if any(word in content_lower for word in high_conf_keywords):
+        confidentiality_score += 0.4
+    
+    # Check for medium confidentiality keywords
+    if any(word in content_lower for word in medium_conf_keywords):
+        confidentiality_score += 0.3
+    
+    # Check for personal information
+    if any(word in content_lower for word in personal_info):
+        confidentiality_score += 0.2
+    
+    # Based on entities found
+    if entities.amounts:
+        confidentiality_score += 0.1
+    if entities.emails:
+        confidentiality_score += 0.05
+    if entities.phone_numbers:
+        confidentiality_score += 0.05
+    
+    return min(confidentiality_score * 100, 100.0)  # Return as percentage
+
 def calculate_readability_score(content: str) -> float:
     """Simple readability score calculation"""
     words = content.split()
@@ -242,6 +275,9 @@ async def analyze_content(request: AnalysisRequest):
         # Calculate risk score
         risk_score = calculate_risk_score(content, entities)
         
+        # Calculate confidentiality percentage
+        confidentiality_percent = calculate_confidentiality_score(content, entities)
+        
         # Calculate readability
         readability_score = calculate_readability_score(content)
         
@@ -263,6 +299,7 @@ async def analyze_content(request: AnalysisRequest):
             entities=entities,
             sentiment=sentiment,
             risk_score=risk_score,
+            confidentiality_percent=confidentiality_percent,
             word_count=word_count,
             char_count=char_count,
             language=language,
