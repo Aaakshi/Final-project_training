@@ -517,6 +517,9 @@
             border-radius: 16px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.08);
             border: 1px solid #e2e8f0;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
         }
 
         .chart-title {
@@ -529,6 +532,12 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .chart-container canvas {
+            flex: 1;
+            max-height: 300px;
         }
 
         /* Form Styles */
@@ -1904,36 +1913,98 @@
                 return;
             }
 
-            // Create charts for statistics page
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+
+            // Create realistic sample data for demo
+            const sampleData = {
+                upload_trends: [
+                    { date: '2024-01-01', count: 12 },
+                    { date: '2024-01-02', count: 19 },
+                    { date: '2024-01-03', count: 8 },
+                    { date: '2024-01-04', count: 15 },
+                    { date: '2024-01-05', count: 12 },
+                    { date: '2024-01-06', count: 20 },
+                    { date: '2024-01-07', count: 16 }
+                ],
+                departments: {
+                    'HR': 25,
+                    'Finance': 35,
+                    'Legal': 20,
+                    'IT': 15,
+                    'Administration': 5
+                },
+                document_types: {
+                    'Invoice': 45,
+                    'Contract': 30,
+                    'Report': 25,
+                    'Policy': 15,
+                    'Memo': 10
+                },
+                priorities: {
+                    'High': 20,
+                    'Medium': 50,
+                    'Low': 30
+                }
+            };
+
+            // Use actual data if available, otherwise use sample data
+            const chartData = {
+                upload_trends: data.upload_trends || sampleData.upload_trends,
+                departments: data.departments || sampleData.departments,
+                document_types: data.document_types || sampleData.document_types,
+                priorities: data.priorities || sampleData.priorities
+            };
+
+            // Create document processing trends chart
             const statsLineCtx = document.getElementById('statsLineChart');
-            if (statsLineCtx && charts.statsLine) {
-                charts.statsLine.destroy();
-            }
             if (statsLineCtx) {
                 charts.statsLine = new Chart(statsLineCtx, {
                     type: 'line',
                     data: {
-                        labels: data.upload_trends?.map(t => t.date) || ['Day 1', 'Day 2', 'Day 3'],
+                        labels: chartData.upload_trends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
                         datasets: [{
-                            label: 'Documents Uploaded',
-                            data: data.upload_trends?.map(t => t.count) || [5, 10, 8],
+                            label: 'Documents Processed',
+                            data: chartData.upload_trends.map(t => t.count),
                             borderColor: '#667eea',
                             backgroundColor: 'rgba(102, 126, 234, 0.1)',
                             tension: 0.4,
-                            fill: true
+                            fill: true,
+                            pointBackgroundColor: '#667eea',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: { 
+                            legend: { 
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#2d3748',
+                                    font: { size: 12 }
+                                }
+                            }
+                        },
                         scales: { 
                             y: { 
                                 beginAtZero: true,
-                                grid: { color: '#e2e8f0' }
+                                grid: { color: '#e2e8f0' },
+                                ticks: { 
+                                    color: '#718096',
+                                    stepSize: 5
+                                }
                             },
                             x: {
-                                grid: { color: '#e2e8f0' }
+                                grid: { color: '#e2e8f0' },
+                                ticks: { color: '#718096' }
                             }
                         }
                     }
@@ -1942,21 +2013,25 @@
 
             // Department workload chart
             const statsDeptCtx = document.getElementById('statsDeptChart');
-            if (statsDeptCtx && charts.statsDept) {
-                charts.statsDept.destroy();
-            }
             if (statsDeptCtx) {
-                const deptLabels = Object.keys(data.departments || {});
-                const deptValues = Object.values(data.departments || {});
+                const deptLabels = Object.keys(chartData.departments);
+                const deptValues = Object.values(chartData.departments);
 
                 charts.statsDept = new Chart(statsDeptCtx, {
                     type: 'doughnut',
                     data: {
-                        labels: deptLabels.length ? deptLabels : ['HR', 'Finance', 'Legal'],
+                        labels: deptLabels,
                         datasets: [{
-                            data: deptValues.length ? deptValues : [10, 15, 8],
-                            backgroundColor: ['#667eea', '#48bb78', '#e53e3e', '#ed8936', '#9f7aea'],
-                            borderWidth: 0
+                            data: deptValues,
+                            backgroundColor: [
+                                '#667eea', // HR
+                                '#48bb78', // Finance
+                                '#e53e3e', // Legal
+                                '#ed8936', // IT
+                                '#9f7aea'  // Administration
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 4
                         }]
                     },
                     options: {
@@ -1967,9 +2042,11 @@
                                 position: 'bottom',
                                 labels: {
                                     padding: 20,
-                                    usePointStyle: true
+                                    usePointStyle: true,
+                                    color: '#2d3748',
+                                    font: { size: 12 }
                                 }
-                            } 
+                            }
                         }
                     }
                 });
@@ -1977,35 +2054,48 @@
 
             // Document types chart
             const statsTypeCtx = document.getElementById('statsTypeChart');
-            if (statsTypeCtx && charts.statsType) {
-                charts.statsType.destroy();
-            }
             if (statsTypeCtx) {
-                const typeLabels = Object.keys(data.document_types || {});
-                const typeValues = Object.values(data.document_types || {});
+                const typeLabels = Object.keys(chartData.document_types);
+                const typeValues = Object.values(chartData.document_types);
 
                 charts.statsType = new Chart(statsTypeCtx, {
                     type: 'bar',
                     data: {
-                        labels: typeLabels.length ? typeLabels : ['Invoice', 'Contract', 'Report'],
+                        labels: typeLabels,
                         datasets: [{
                             label: 'Document Count',
-                            data: typeValues.length ? typeValues : [15, 12, 8],
+                            data: typeValues,
                             backgroundColor: '#667eea',
-                            borderRadius: 6
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            hoverBackgroundColor: '#5a67d8'
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: { 
+                            legend: { 
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#2d3748',
+                                    font: { size: 12 }
+                                }
+                            }
+                        },
                         scales: {
                             y: { 
                                 beginAtZero: true,
-                                grid: { color: '#e2e8f0' }
+                                grid: { color: '#e2e8f0' },
+                                ticks: { 
+                                    color: '#718096',
+                                    stepSize: 10
+                                }
                             },
                             x: {
-                                grid: { display: false }
+                                grid: { display: false },
+                                ticks: { color: '#718096' }
                             }
                         }
                     }
@@ -2014,21 +2104,23 @@
 
             // Priority distribution chart
             const statsPriorityCtx = document.getElementById('statsPriorityChart');
-            if (statsPriorityCtx && charts.statsPriority) {
-                charts.statsPriority.destroy();
-            }
             if (statsPriorityCtx) {
-                const priorityLabels = Object.keys(data.priorities || {});
-                const priorityValues = Object.values(data.priorities || {});
+                const priorityLabels = Object.keys(chartData.priorities);
+                const priorityValues = Object.values(chartData.priorities);
 
                 charts.statsPriority = new Chart(statsPriorityCtx, {
                     type: 'pie',
                     data: {
-                        labels: priorityLabels.length ? priorityLabels : ['High', 'Medium', 'Low'],
+                        labels: priorityLabels,
                         datasets: [{
-                            data: priorityValues.length ? priorityValues : [15, 35, 25],
-                            backgroundColor: ['#e53e3e', '#ed8936', '#48bb78'],
-                            borderWidth: 0
+                            data: priorityValues,
+                            backgroundColor: [
+                                '#e53e3e', // High
+                                '#ed8936', // Medium
+                                '#48bb78'  // Low
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 4
                         }]
                     },
                     options: {
@@ -2039,9 +2131,11 @@
                                 position: 'bottom',
                                 labels: {
                                     padding: 20,
-                                    usePointStyle: true
+                                    usePointStyle: true,
+                                    color: '#2d3748',
+                                    font: { size: 12 }
                                 }
-                            } 
+                            }
                         }
                     }
                 });
