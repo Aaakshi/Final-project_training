@@ -885,6 +885,14 @@ async def review_document(
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
 
+    # Get document details before updating
+    cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
+    document = cursor.fetchone()
+    
+    if not document:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Document not found")
+
     # Update review status
     new_status = 'approved' if review.action == 'approve' else 'rejected'
     cursor.execute('''
@@ -893,10 +901,32 @@ async def review_document(
         WHERE doc_id = ?
     ''', (new_status, current_user['email'], datetime.now().isoformat(), review.comments, doc_id))
 
+    # Send notification to the person who uploaded the document
+    uploader_email = document[6]  # uploaded_by field
+    doc_name = document[2]  # original_name field
+    
+    # Create email notification
+    subject = f"Document Review: {doc_name} - {new_status.upper()}"
+    body = f"""
+    Your document "{doc_name}" has been {new_status} by {current_user['email']}.
+    
+    Review Comments: {review.comments or 'No comments provided'}
+    
+    Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+    
+    You can view the document details in the IDCR system.
+    """
+    
+    cursor.execute('''
+        INSERT INTO email_notifications 
+        (from_email, to_email, subject, body_html, notification_type, doc_id, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (current_user['email'], uploader_email, subject, body, 'document_review', doc_id, 'sent'))
+
     conn.commit()
     conn.close()
 
-    return {'message': f'Document {review.action}d successfully'}
+    return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):

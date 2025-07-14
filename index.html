@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -601,18 +600,18 @@
         <!-- Login Form -->
         <div id="loginContainer" class="auth-container">
             <h2 style="text-align: center; margin-bottom: 30px; color: #2c3e50;">Login to IDCR</h2>
-            
+
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">Email:</label>
                     <input type="email" id="email" name="email" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label for="password">Password:</label>
                     <input type="password" id="password" name="password" required>
                 </div>
-                
+
                 <button type="submit" class="btn" style="width: 100%;">
                     <i class="fas fa-sign-in-alt"></i> Login
                 </button>
@@ -667,7 +666,7 @@
                 <div class="page-title">
                     <i class="fas fa-tachometer-alt"></i> Dashboard Overview
                 </div>
-                
+
                 <div class="dashboard-stats">
                     <div class="stat-card">
                         <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
@@ -719,20 +718,20 @@
                 <div class="page-title">
                     <i class="fas fa-cloud-upload-alt"></i> Upload Documents
                 </div>
-                
+
                 <div class="form-section">
                     <form id="uploadForm" enctype="multipart/form-data">
                         <div class="form-group">
                             <label for="batchName">Batch Name:</label>
                             <input type="text" id="batchName" name="batch_name" placeholder="Enter descriptive batch name" required>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="files">Select Documents:</label>
                             <input type="file" id="files" name="files" multiple accept=".pdf,.doc,.docx,.txt" required>
                             <small style="color: #7f8c8d; font-size: 12px;">Supported formats: PDF, DOC, DOCX, TXT (Max 10MB per file)</small>
                         </div>
-                        
+
                         <button type="submit" class="btn">
                             <i class="fas fa-upload"></i> Upload Documents
                         </button>
@@ -745,7 +744,7 @@
                 <div class="page-title">
                     <i class="fas fa-folder-open"></i> Document Library
                 </div>
-                
+
                 <div class="filters">
                     <div class="form-group search-box">
                         <input type="text" id="searchInput" placeholder="Search documents..." onkeyup="loadDocuments()">
@@ -778,7 +777,7 @@
                 <div class="page-title">
                     <i class="fas fa-search"></i> Review Documents
                 </div>
-                
+
                 <div class="filters">
                     <div class="form-group search-box">
                         <input type="text" id="reviewSearchInput" placeholder="Search documents..." onkeyup="loadReviewDocuments()">
@@ -818,7 +817,7 @@
                 <div class="page-title">
                     <i class="fas fa-chart-line"></i> System Statistics
                 </div>
-                
+
                 <div class="dashboard-stats">
                     <div class="stat-card">
                         <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
@@ -941,7 +940,7 @@
 
         async function handleLogin(event) {
             event.preventDefault();
-            
+
             const formData = new FormData(event.target);
             const loginData = {
                 email: formData.get('email'),
@@ -982,7 +981,7 @@
 
         async function handleUpload(event) {
             event.preventDefault();
-            
+
             const formData = new FormData(event.target);
 
             try {
@@ -1020,7 +1019,7 @@
             document.getElementById('dashProcessedDocuments').textContent = document.getElementById('processedDocuments').textContent;
             document.getElementById('dashPendingDocuments').textContent = document.getElementById('pendingDocuments').textContent;
             document.getElementById('dashProcessingRate').textContent = document.getElementById('processingRate').textContent;
-            
+
             createDashboardCharts();
         }
 
@@ -1063,7 +1062,7 @@
                 const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
                 const department = doc.department || 'general';
                 const priority = doc.priority || 'medium';
-                
+
                 return `
                     <div class="document-card priority-${priority}" onclick="showDocumentDetails('${doc.doc_id}')">
                         <h3><i class="fas fa-file-alt"></i> ${doc.original_name}</h3>
@@ -1103,7 +1102,7 @@
                     else if (confidentiality > 40) confidentialityColor = '#f39c12';
 
                     const modalContent = document.getElementById('documentDetails');
-                    modalContent.innerHTML = `
+                    let modalHTML = `
                         <h2><i class="fas fa-file-alt"></i> ${doc.original_name}</h2>
                         <div style="margin: 20px 0;">
                             <p><strong>Uploaded by:</strong> ${doc.uploaded_by}</p>
@@ -1113,7 +1112,7 @@
                             <p><strong>Priority:</strong> <span class="badge priority-${doc.priority}">${doc.priority}</span></p>
                             <p><strong>Routed to:</strong> ${doc.routed_to || 'Not routed'}</p>
                         </div>
-                        
+
                         <div style="margin: 20px 0;">
                             <label><strong>Confidentiality Level:</strong></label>
                             <div class="confidentiality-bar">
@@ -1121,14 +1120,14 @@
                                 <div class="confidentiality-text">${confidentiality}%</div>
                             </div>
                         </div>
-                        
+
                         <div style="margin: 20px 0;">
                             <label><strong>Summary:</strong></label>
                             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e9ecef;">
                                 ${doc.summary || 'No summary available'}
                             </div>
                         </div>
-                        
+
                         <div style="margin: 20px 0;">
                             <label><strong>Routing Information:</strong></label>
                             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e9ecef;">
@@ -1136,6 +1135,22 @@
                             </div>
                         </div>
                     `;
+                    modalHTML +=
+                        '<div style="margin-top: 20px;">' +
+                        '<label><strong>Comments:</strong></label>' +
+                        '<textarea id="reviewComments" rows="3" style="width: 100%; margin: 10px 0; padding: 8px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Add review comments (optional)"></textarea>' +
+                        '</div>';
+
+                    // Only show approve/reject buttons for managers and admins
+                    if (currentUser && (currentUser.role === 'manager' || currentUser.role === 'admin')) {
+                        modalHTML += '<div style="margin-top: 20px; text-align: center;">' +
+                            '<button class="btn btn-success" onclick="reviewDocument(\'' + docId + '\', \'approve\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="margin-right: 10px; padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Approve</button>' +
+                            '<button class="btn btn-danger" onclick="reviewDocument(\'' + docId + '\', \'reject\', document.getElementById(\'reviewComments\').value); this.parentElement.parentElement.parentElement.remove();" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Reject</button>' +
+                            '</div>';
+                    }
+
+                    modalHTML += '</div>';
+                    modalContent.innerHTML = modalHTML;
                     document.getElementById('documentModal').style.display = 'block';
                 } else {
                     showToast('Error loading document details', 'error');
@@ -1176,18 +1191,51 @@
                 return;
             }
 
-            container.innerHTML = notifications.map(notif => `
-                <div class="email-notification">
-                    <h4><i class="fas fa-envelope"></i> ${notif.subject}</h4>
-                    <p><strong>From:</strong> ${notif.sent_by_name || notif.sent_by}</p>
-                    <p><strong>To:</strong> ${notif.received_by_name || notif.received_by}</p>
-                    <p><strong>Date:</strong> ${new Date(notif.sent_at).toLocaleString()}</p>
-                    <p><strong>Document:</strong> ${notif.document_name}</p>
-                    <p><strong>Department:</strong> <span class="badge badge-${notif.department}">${notif.department}</span></p>
-                    <p><strong>Priority:</strong> <span class="badge priority-${notif.priority}">${notif.priority}</span></p>
-                    <p>${notif.body_preview}</p>
-                </div>
-            `).join('');
+            container.innerHTML = notifications.map(notif => {
+                let statusColor = '#4CAF50';
+                let statusText = 'Active';
+
+                if (notif.status === 'inactive') {
+                    statusColor = '#f44336';
+                    statusText = 'Inactive';
+                }
+
+                let notificationHTML =
+                    '<div class="notification-item" style="background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; margin-bottom: 10px;">' +
+                            '<div style="display: flex; justify-content: between; align-items: flex-start;">' +
+                            '<div style="flex: 1;">' +
+                            '<h4 style="margin: 0 0 8px 0; color: #333; font-size: 16px;">' + notif.subject + '</h4>' +
+                            '<p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">' +
+                            '<strong>From:</strong> ' + notif.sent_by_name || notif.sent_by + '<br>' +
+                            '<strong>To:</strong> ' + notif.received_by_name || notif.received_by + '<br>' +
+                            '<strong>Type:</strong> ' + (notif.notification_type || 'General') +
+                            '</p>' +
+                            '<p style="margin: 0; color: #555; font-size: 13px; line-height: 1.4;">' + 
+                            (notif.body_preview ? notif.body_preview.substring(0, 200) + '...' : 'No content') + 
+                            '</p>' +
+                            '</div>' +
+                            '<div style="text-align: right; min-width: 120px; margin-left: 15px;">' +
+                            '<div style="background: ' + statusColor + '; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 8px;">' +
+                            statusText +
+                            '</div>';
+
+                        // Add approval status indicator for document review notifications
+                        if (notif.notification_type === 'document_review') {
+                            let approvalStatus = '';
+                            if (notif.body_html && notif.body_html.includes('approved')) {
+                                approvalStatus = '<div style="background: #28a745; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 4px;">APPROVED</div>';
+                            } else if (notif.body_html && notif.body_html.includes('rejected')) {
+                                approvalStatus = '<div style="background: #dc3545; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-top: 4px;">REJECTED</div>';
+                            }
+                            notificationHTML += approvalStatus;
+                        }
+
+                        notificationHTML += '<small style="color: #888; font-size: 11px;">' + new Date(notif.sent_at).toLocaleDateString() + '</small>' +
+                            '</div>' +
+                            '</div>' +
+                            '</div>'
+                return notificationHTML;
+            }).join('');
         }
 
         async function loadStats() {
@@ -1205,7 +1253,7 @@
                     document.getElementById('processedDocuments').textContent = data.processed_documents || 0;
                     document.getElementById('pendingDocuments').textContent = data.pending_documents || 0;
                     document.getElementById('processingRate').textContent = (data.processing_rate || 0) + '%';
-                    
+
                     createStatisticsCharts(data);
                 } else {
                     showToast('Failed to load statistics', 'error');
@@ -1376,7 +1424,7 @@
             if (statsDeptCtx) {
                 const deptLabels = Object.keys(data.departments || {});
                 const deptValues = Object.values(data.departments || {});
-                
+
                 charts.statsDept = new Chart(statsDeptCtx, {
                     type: 'doughnut',
                     data: {
@@ -1391,6 +1439,37 @@
                         plugins: { legend: { position: 'bottom' } }
                     }
                 });
+            }
+        }
+
+        async function reviewDocument(docId, action, comments) {
+            comments = comments || '';
+            try {
+                const response = await fetch('/api/review-document/' + docId, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        comments: comments
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast(`Document ${action}ed successfully`, 'success');
+                    closeModal('documentModal');
+                    loadDocuments(); // Refresh the document list
+                    loadEmailNotifications();
+                } else {
+                    showToast('Review failed: ' + result.detail, 'error');
+                }
+            } catch (error) {
+                console.error('Review error:', error);
+                showToast('Review failed. Please try again.', 'error');
             }
         }
 
