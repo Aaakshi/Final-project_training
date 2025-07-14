@@ -138,18 +138,26 @@ def init_database():
         ("Bob IT", "it@company.com", "it123", "it", "manager")
     ]
     
+    # First, let's clear existing users to avoid conflicts
+    cursor.execute("DELETE FROM users")
+    
     for full_name, email, password, department, role in demo_users:
-        cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", (email,))
-        if cursor.fetchone()[0] == 0:
-            hashed_password = get_password_hash(password)
-            cursor.execute('''
-                INSERT INTO users (full_name, email, password_hash, department, role)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (full_name, email, hashed_password, department, role))
+        hashed_password = get_password_hash(password)
+        cursor.execute('''
+            INSERT INTO users (full_name, email, password_hash, department, role)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (full_name, email, hashed_password, department, role))
     
     conn.commit()
     conn.close()
     print("Database initialized with demo users")
+
+# Authentication functions
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
 # Initialize database on startup
 init_database()
@@ -168,13 +176,6 @@ class UserLogin(BaseModel):
 class ReviewRequest(BaseModel):
     action: str  # 'approve' or 'reject'
     comments: str = ""
-
-# Authentication functions
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
