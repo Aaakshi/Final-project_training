@@ -643,16 +643,7 @@ async def bulk_upload_documents(
         conn.commit()
         conn.close()
 
-        # Send email notification
-        doc_info = {
-            'doc_id': doc_id,
-            'original_name': file.filename,
-            'document_type': doc_type,
-            'priority': priority,
-            'uploaded_by': current_user['full_name'],
-            'uploaded_at': datetime.now().isoformat()
-        }
-        send_email_notification(doc_info, department)
+        # Email notification already sent above in the doc_info section
 
         processed_files.append({
             'filename': file.filename,
@@ -674,7 +665,7 @@ async def bulk_upload_documents(
 @app.get("/api/documents")
 async def get_documents(
     page: int = 1,
-    page_size: int = 20,
+    page_size: int = 50,  # Increased to show more documents
     search: str = "",
     status: str = "",
     doc_type: str = "",
@@ -682,102 +673,112 @@ async def get_documents(
     sort_by: str = "uploaded_at_desc",
     current_user: dict = Depends(get_current_user)
 ):
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
 
-    # Build query
-    query = "SELECT * FROM documents WHERE 1=1"
-    params = []
+        # Build query
+        query = "SELECT * FROM documents WHERE 1=1"
+        params = []
 
-    if search:
-        query += " AND (original_name LIKE ? OR extracted_text LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%"])
+        if search:
+            query += " AND (original_name LIKE ? OR extracted_text LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%"])
 
-    if status:
-        query += " AND processing_status = ?"
-        params.append(status)
+        if status:
+            query += " AND processing_status = ?"
+            params.append(status)
 
-    if doc_type:
-        query += " AND document_type = ?"
-        params.append(doc_type)
+        if doc_type:
+            query += " AND document_type = ?"
+            params.append(doc_type)
 
-    if department:
-        query += " AND department = ?"
-        params.append(department)
+        if department:
+            query += " AND department = ?"
+            params.append(department)
 
-    # Add user filtering for non-admin users
-    if current_user['role'] != 'admin':
-        if current_user['role'] == 'manager':
-            # HR managers can see all departments, other managers see only their department
-            if current_user['department'] == 'hr':
-                # HR managers can see all documents
-                pass
+        # Add user filtering for non-admin users
+        if current_user['role'] != 'admin':
+            if current_user['role'] == 'manager':
+                # HR managers can see all departments, other managers see only their department
+                if current_user['department'] == 'hr':
+                    # HR managers can see all documents
+                    pass
+                else:
+                    # Other managers see only their department documents
+                    query += " AND department = ?"
+                    params.append(current_user['department'])
             else:
-                # Other managers see only their department documents
-                query += " AND department = ?"
-                params.append(current_user['department'])
-        else:
-            # Regular employees see only their own uploads
-            query += " AND uploaded_by = ?"
-            params.append(current_user['email'])
+                # Regular employees see only their own uploads
+                query += " AND uploaded_by = ?"
+                params.append(current_user['email'])
 
-    # Count total
-    count_query = query.replace("SELECT *", "SELECT COUNT(*)")
-    cursor.execute(count_query, params)
-    total_count = cursor.fetchone()[0]
+        # Count total
+        count_query = query.replace("SELECT *", "SELECT COUNT(*)")
+        cursor.execute(count_query, params)
+        total_count = cursor.fetchone()[0]
 
-    # Add sorting
-    sort_mapping = {
-        "uploaded_at_desc": "uploaded_at DESC",
-        "uploaded_at_asc": "uploaded_at ASC", 
-        "name_asc": "original_name ASC",
-        "name_desc": "original_name DESC",
-        "priority_desc": "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END",
-        "department_asc": "department ASC"
-    }
-    order_clause = sort_mapping.get(sort_by, "uploaded_at DESC")
+        # Add sorting
+        sort_mapping = {
+            "uploaded_at_desc": "uploaded_at DESC",
+            "uploaded_at_asc": "uploaded_at ASC", 
+            "name_asc": "original_name ASC",
+            "name_desc": "original_name DESC",
+            "priority_desc": "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END",
+            "department_asc": "department ASC"
+        }
+        order_clause = sort_mapping.get(sort_by, "uploaded_at DESC")
 
-    # Add pagination
-    query += f" ORDER BY {order_clause} LIMIT ? OFFSET ?"
-    params.extend([page_size, (page - 1) * page_size])
+        # Add pagination
+        query += f" ORDER BY {order_clause} LIMIT ? OFFSET ?"
+        params.extend([page_size, (page - 1) * page_size])
 
-    cursor.execute(query, params)
-    documents = cursor.fetchall()
-    conn.close()
+        cursor.execute(query, params)
+        documents = cursor.fetchall()
+        conn.close()
 
-    # Format documents
-    formatted_docs = []
-    for doc in documents:
-        formatted_docs.append({
-            'doc_id': doc[1],
-            'original_name': doc[2],
-            'file_size': doc[4],
-            'file_type': doc[5],
-            'uploaded_by': doc[6],
-            'uploaded_at': doc[7],
-            'batch_name': doc[8],
-            'extracted_text': doc[9],
-            'document_type': doc[10],
-            'department': doc[11],
-            'priority': doc[12],
-            'processing_status': doc[13],
-            'review_status': doc[14],
-            'risk_score': doc[18] if len(doc) > 18 else 0.0,
-            'confidentiality_percent': doc[19] if len(doc) > 19 else 0.0,
-            'sentiment': doc[20] if len(doc) > 20 else 'neutral',
-            'summary': doc[21] if len(doc) > 21 else '',
-            'key_phrases': doc[22] if len(doc) > 22 else '[]',
-            'entities': doc[23] if len(doc) > 23 else '{}',
-            'routed_to': doc[24] if len(doc) > 24 else '',
-            'routing_reason': doc[25] if len(doc) > 25 else ''
-        })
+        # Format documents
+        formatted_docs = []
+        for doc in documents:
+            formatted_docs.append({
+                'doc_id': doc[1],
+                'original_name': doc[2],
+                'file_size': doc[4],
+                'file_type': doc[5],
+                'uploaded_by': doc[6],
+                'uploaded_at': doc[7],
+                'batch_name': doc[8],
+                'extracted_text': doc[9],
+                'document_type': doc[10],
+                'department': doc[11],
+                'priority': doc[12],
+                'processing_status': doc[13],
+                'review_status': doc[14],
+                'reviewed_by': doc[15] if len(doc) > 15 else None,
+                'reviewed_at': doc[16] if len(doc) > 16 else None,
+                'review_comments': doc[17] if len(doc) > 17 else None,
+                'risk_score': doc[18] if len(doc) > 18 else 0.0,
+                'confidentiality_percent': doc[19] if len(doc) > 19 else 0.0,
+                'sentiment': doc[20] if len(doc) > 20 else 'neutral',
+                'summary': doc[21] if len(doc) > 21 else '',
+                'key_phrases': doc[22] if len(doc) > 22 else '[]',
+                'entities': doc[23] if len(doc) > 23 else '{}',
+                'routed_to': doc[24] if len(doc) > 24 else '',
+                'routing_reason': doc[25] if len(doc) > 25 else ''
+            })
 
-    return {
-        'documents': formatted_docs,
-        'total_count': total_count,
-        'page': page,
-        'page_size': page_size
-    }
+        return {
+            'documents': formatted_docs,
+            'total_count': total_count,
+            'page': page,
+            'page_size': page_size
+        }
+    
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        print(f"Get documents error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load documents")
 
 @app.get("/api/documents/{doc_id}")
 async def get_document(doc_id: str, current_user: dict = Depends(get_current_user)):
@@ -828,50 +829,69 @@ async def get_review_documents(
     if current_user['role'] not in ['manager', 'admin']:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
 
-    query = "SELECT * FROM documents WHERE 1=1"
-    params = []
+        query = "SELECT * FROM documents WHERE 1=1"
+        params = []
 
-    # Filter by department for managers
-    if current_user['role'] == 'manager':
-        query += " AND department = ?"
-        params.append(current_user['department'])
+        # Filter by department for managers (HR managers can see all)
+        if current_user['role'] == 'manager':
+            if current_user['department'] != 'hr':
+                query += " AND department = ?"
+                params.append(current_user['department'])
 
-    if search:
-        query += " AND (original_name LIKE ? OR extracted_text LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%"])
+        if search:
+            query += " AND (original_name LIKE ? OR extracted_text LIKE ?)"
+            params.extend([f"%{search}%", f"%{search}%"])
 
-    if review_status:
-        query += " AND review_status = ?"
-        params.append(review_status)
+        if review_status:
+            query += " AND review_status = ?"
+            params.append(review_status)
 
-    query += " ORDER BY uploaded_at DESC"
+        query += " ORDER BY uploaded_at DESC"
 
-    cursor.execute(query, params)
-    documents = cursor.fetchall()
-    conn.close()
+        cursor.execute(query, params)
+        documents = cursor.fetchall()
+        conn.close()
 
-    formatted_docs = []
-    for doc in documents:
-        formatted_docs.append({
-            'doc_id': doc[1],
-            'original_name': doc[2],
-            'file_size': doc[4],
-            'file_type': doc[5],
-            'uploaded_by': doc[6],
-'uploaded_at': doc[7],
-            'batch_name': doc[8],
-            'extracted_text': doc[9],
-            'document_type': doc[10],
-            'department': doc[11],
-            'priority': doc[12],
-            'processing_status': doc[13],
-            'review_status': doc[14]
-        })
+        formatted_docs = []
+        for doc in documents:
+            formatted_docs.append({
+                'doc_id': doc[1],
+                'original_name': doc[2],
+                'file_size': doc[4],
+                'file_type': doc[5],
+                'uploaded_by': doc[6],
+                'uploaded_at': doc[7],
+                'batch_name': doc[8],
+                'extracted_text': doc[9],
+                'document_type': doc[10],
+                'department': doc[11],
+                'priority': doc[12],
+                'processing_status': doc[13],
+                'review_status': doc[14],
+                'reviewed_by': doc[15] if len(doc) > 15 else None,
+                'reviewed_at': doc[16] if len(doc) > 16 else None,
+                'review_comments': doc[17] if len(doc) > 17 else None,
+                'risk_score': doc[18] if len(doc) > 18 else 0.0,
+                'confidentiality_percent': doc[19] if len(doc) > 19 else 0.0,
+                'sentiment': doc[20] if len(doc) > 20 else 'neutral',
+                'summary': doc[21] if len(doc) > 21 else '',
+                'key_phrases': doc[22] if len(doc) > 22 else '[]',
+                'entities': doc[23] if len(doc) > 23 else '{}',
+                'routed_to': doc[24] if len(doc) > 24 else '',
+                'routing_reason': doc[25] if len(doc) > 25 else ''
+            })
 
-    return {'documents': formatted_docs}
+        return {'documents': formatted_docs}
+    
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        print(f"Get review documents error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load review documents")
 
 @app.post("/api/review-document/{doc_id}")
 async def review_document(
@@ -882,51 +902,59 @@ async def review_document(
     if current_user['role'] not in ['manager', 'admin']:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
 
-    # Get document details before updating
-    cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
-    document = cursor.fetchone()
-    
-    if not document:
+        # Get document details before updating
+        cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
+        document = cursor.fetchone()
+        
+        if not document:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Update review status
+        new_status = 'approved' if review.action == 'approve' else 'rejected'
+        cursor.execute('''
+            UPDATE documents 
+            SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comments = ?
+            WHERE doc_id = ?
+        ''', (new_status, current_user['email'], datetime.now().isoformat(), review.comments, doc_id))
+
+        # Send notification to the person who uploaded the document
+        uploader_email = document[6]  # uploaded_by field
+        doc_name = document[2]  # original_name field
+        department = document[11]  # department field
+        
+        # Create email notification using the correct schema
+        subject = f"Document Review: {doc_name} - {new_status.upper()}"
+        body = f"""
+        Your document "{doc_name}" has been {new_status} by {current_user['full_name']} ({current_user['email']}).
+        
+        Review Comments: {review.comments or 'No comments provided'}
+        
+        Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        
+        You can view the document details in the IDCR system.
+        """
+        
+        cursor.execute('''
+            INSERT INTO email_notifications 
+            (doc_id, sent_by, received_by, subject, body_preview, email_type, status, document_name, department, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (doc_id, current_user['email'], uploader_email, subject, body[:200] + "..." if len(body) > 200 else body, 'document_review', 'sent', doc_name, department, document[12]))
+
+        conn.commit()
         conn.close()
-        raise HTTPException(status_code=404, detail="Document not found")
 
-    # Update review status
-    new_status = 'approved' if review.action == 'approve' else 'rejected'
-    cursor.execute('''
-        UPDATE documents 
-        SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comments = ?
-        WHERE doc_id = ?
-    ''', (new_status, current_user['email'], datetime.now().isoformat(), review.comments, doc_id))
-
-    # Send notification to the person who uploaded the document
-    uploader_email = document[6]  # uploaded_by field
-    doc_name = document[2]  # original_name field
+        return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
     
-    # Create email notification
-    subject = f"Document Review: {doc_name} - {new_status.upper()}"
-    body = f"""
-    Your document "{doc_name}" has been {new_status} by {current_user['email']}.
-    
-    Review Comments: {review.comments or 'No comments provided'}
-    
-    Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-    
-    You can view the document details in the IDCR system.
-    """
-    
-    cursor.execute('''
-        INSERT INTO email_notifications 
-        (from_email, to_email, subject, body_html, notification_type, doc_id, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (current_user['email'], uploader_email, subject, body, 'document_review', doc_id, 'sent'))
-
-    conn.commit()
-    conn.close()
-
-    return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        print(f"Review document error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Review failed. Please try again.")
 
 @app.get("/api/email-notifications")
 async def get_email_notifications(current_user: dict = Depends(get_current_user)):

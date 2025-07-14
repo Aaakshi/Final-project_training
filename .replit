@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Complete IDCR System with Microservices"
+runButton = "Complete IDCR System"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -166,19 +166,15 @@ args = "python main.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python Final-project_training/microservices/classification/app/main.py"
+args = "python microservices/classification/app/main.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python Final-project_training/microservices/routing_engine/app/main.py"
+args = "python microservices/content_analysis/app/main.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python Final-project_training/microservices/content_analysis/app/main.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python Final-project_training/microservices/workflow_integration/app/main.py"
+args = "python microservices/routing_engine/app/main.py"
 
 [[workflows.workflow]]
 name = "Frontend Server"
