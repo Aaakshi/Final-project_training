@@ -1310,7 +1310,7 @@
                             '<p style="margin: 0 0 8px 0; color: #666; font-size: 14px;">' +
                             '<strong>From:</strong> ' + (notif.sent_by_name || notif.sent_by) + '<br>' +
                             '<strong>To:</strong> ' + (notif.received_by_name || notif.received_by) + '<br>' +
-                            '<strong>Type:</strong> ' + (notif.notification_type || notif.email_type || 'General') +
+                            '<strong>Type:</strong> ' + (notif.email_type || 'General') +
                             '</p>' +
                             '<p style="margin: 0; color: #555; font-size: 13px; line-height: 1.4;">' + 
                             (notif.body_preview ? notif.body_preview.substring(0, 200) + '...' : 'No content') + 
