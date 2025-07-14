@@ -71,9 +71,12 @@ def init_database():
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
     
+    # Drop and recreate users table to fix any schema issues
+    cursor.execute('DROP TABLE IF EXISTS users')
+    
     # Create users table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
+        CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
