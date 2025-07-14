@@ -140,7 +140,13 @@ def init_database():
         ("Lisa HR", "hr@company.com", "hr123", "hr", "manager"),
         ("Tom Finance", "finance@company.com", "finance123", "finance", "manager"),
         ("Alice Legal", "legal@company.com", "legal123", "legal", "manager"),
-        ("Bob IT", "it@company.com", "it123", "it", "manager")
+        ("Bob IT", "it@company.com", "it123", "it", "manager"),
+        # Additional demo users matching HTML login buttons
+        ("HR Manager", "hr.manager@company.com", "password123", "hr", "manager"),
+        ("HR Employee", "hr.employee@company.com", "password123", "hr", "employee"),
+        ("Finance Manager", "finance.manager@company.com", "password123", "finance", "manager"),
+        ("Legal Manager", "legal.manager@company.com", "password123", "legal", "manager"),
+        ("General Employee", "general.employee@company.com", "password123", "administration", "employee")
     ]
     
     for full_name, email, password, department, role in demo_users:
