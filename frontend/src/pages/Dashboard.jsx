@@ -1,35 +1,54 @@
 
 import React, { useState, useEffect } from 'react';
-import { Row, Col, Card, Statistic, Table, Tag, Progress, Space, Typography } from 'antd';
+import { Card, Row, Col, Statistic, Table, Tag, Space, Typography, Alert, Spin } from 'antd';
 import {
   FileTextOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
-  TrendingUpOutlined,
+  ExclamationCircleOutlined,
+  UploadOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
-import { statsService, documentService } from '../services/apiService.js';
+import { authService } from '../services/apiService.js';
 
 const { Title } = Typography;
 
-function Dashboard() {
+const Dashboard = () => {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [recentDocuments, setRecentDocuments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
     try {
-      const [statsData, documentsData] = await Promise.all([
-        statsService.getDashboardStats(),
-        documentService.getAll({ limit: 10, sort_by: 'uploaded_at_desc' })
-      ]);
+      setLoading(true);
       
+      // Fetch user info
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
+
+      // Fetch stats
+      const response = await fetch('/api/stats', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      const statsData = await response.json();
       setStats(statsData);
-      setRecentDocuments(documentsData.documents || []);
+
+      // Fetch recent documents
+      const docsResponse = await fetch('/api/documents?limit=5', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      const docsData = await docsResponse.json();
+      setRecentDocuments(docsData.documents || []);
+
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -37,68 +56,66 @@ function Dashboard() {
     }
   };
 
-  const columns = [
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'approved': return 'success';
+      case 'rejected': return 'error';
+      case 'pending': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const documentColumns = [
     {
       title: 'Document Name',
-      dataIndex: 'filename',
-      key: 'filename',
+      dataIndex: 'original_name',
+      key: 'name',
       ellipsis: true,
     },
     {
-      title: 'Type',
-      dataIndex: 'document_type',
-      key: 'document_type',
-      render: (type) => (
-        <Tag color={getTypeColor(type)}>
-          {type?.toUpperCase() || 'UNKNOWN'}
-        </Tag>
-      ),
-    },
-    {
       title: 'Department',
-      dataIndex: 'assigned_department',
-      key: 'assigned_department',
-      render: (dept) => dept || 'Unassigned',
+      dataIndex: 'department',
+      key: 'department',
+      render: (dept) => <Tag color="blue">{dept}</Tag>,
     },
     {
       title: 'Status',
-      dataIndex: 'status',
+      dataIndex: 'approval_status',
       key: 'status',
       render: (status) => (
         <Tag color={getStatusColor(status)}>
-          {status?.toUpperCase() || 'PENDING'}
+          {status || 'Pending'}
         </Tag>
       ),
     },
+    {
+      title: 'Uploaded',
+      dataIndex: 'uploaded_at',
+      key: 'uploaded',
+      render: (date) => new Date(date).toLocaleDateString(),
+    },
   ];
 
-  const getTypeColor = (type) => {
-    const colors = {
-      legal: 'red',
-      hr: 'blue',
-      finance: 'green',
-      it: 'orange',
-      marketing: 'purple',
-    };
-    return colors[type?.toLowerCase()] || 'default';
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      processed: 'success',
-      pending: 'warning',
-      failed: 'error',
-    };
-    return colors[status?.toLowerCase()] || 'default';
-  };
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2} style={{ marginBottom: 24 }}>
-        Dashboard Overview
-      </Title>
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div>
+        <Title level={2}>Welcome back, {user?.full_name}!</Title>
+        <p className="text-gray-600">
+          Here's what's happening with your documents today.
+        </p>
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      {/* Statistics Cards */}
+      <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
@@ -109,18 +126,16 @@ function Dashboard() {
             />
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Processed"
-              value={stats.processed_documents || 0}
+              title="Approved"
+              value={stats.approved_documents || 0}
               prefix={<CheckCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
@@ -131,74 +146,112 @@ function Dashboard() {
             />
           </Card>
         </Col>
-
         <Col xs={24} sm={12} lg={6}>
           <Card>
             <Statistic
-              title="Processing Rate"
-              value={stats.processing_rate || 0}
-              suffix="%"
-              prefix={<TrendingUpOutlined />}
-              valueStyle={{ color: '#722ed1' }}
+              title="Rejected"
+              value={stats.rejected_documents || 0}
+              prefix={<ExclamationCircleOutlined />}
+              valueStyle={{ color: '#ff4d4f' }}
             />
           </Card>
         </Col>
       </Row>
 
+      {/* Recent Activity */}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
           <Card 
             title="Recent Documents" 
-            loading={loading}
             extra={<a href="/documents">View All</a>}
           >
             <Table
-              columns={columns}
               dataSource={recentDocuments}
-              rowKey="id"
+              columns={documentColumns}
               pagination={false}
+              rowKey="id"
               size="small"
             />
           </Card>
         </Col>
-
+        
         <Col xs={24} lg={8}>
-          <Space direction="vertical" style={{ width: '100%' }} size={16}>
-            <Card title="Document Types Distribution">
-              {stats.document_types && Object.entries(stats.document_types).map(([type, count]) => (
-                <div key={type} style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ textTransform: 'capitalize' }}>{type}</span>
-                    <span>{count}</span>
-                  </div>
-                  <Progress 
-                    percent={Math.round((count / stats.total_documents) * 100)} 
-                    size="small"
-                    strokeColor={getTypeColor(type)}
-                  />
-                </div>
-              ))}
-            </Card>
+          <Card title="Quick Actions">
+            <Space direction="vertical" size="middle" className="w-full">
+              <Card.Grid 
+                style={{ width: '100%', textAlign: 'center' }}
+                className="cursor-pointer hover:bg-blue-50"
+                onClick={() => window.location.href = '/upload'}
+              >
+                <UploadOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+                <div className="mt-2">Upload Documents</div>
+              </Card.Grid>
+              
+              <Card.Grid 
+                style={{ width: '100%', textAlign: 'center' }}
+                className="cursor-pointer hover:bg-green-50"
+                onClick={() => window.location.href = '/documents'}
+              >
+                <FileTextOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
+                <div className="mt-2">View Documents</div>
+              </Card.Grid>
+              
+              <Card.Grid 
+                style={{ width: '100%', textAlign: 'center' }}
+                className="cursor-pointer hover:bg-purple-50"
+                onClick={() => window.location.href = '/analytics'}
+              >
+                <TeamOutlined style={{ fontSize: '24px', color: '#722ed1' }} />
+                <div className="mt-2">View Analytics</div>
+              </Card.Grid>
+            </Space>
+          </Card>
 
-            <Card title="Department Workload">
-              {stats.departments && Object.entries(stats.departments).map(([dept, count]) => (
-                <div key={dept} style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span>{dept}</span>
-                    <span>{count}</span>
-                  </div>
-                  <Progress 
-                    percent={Math.round((count / stats.total_documents) * 100)} 
-                    size="small"
-                  />
-                </div>
-              ))}
-            </Card>
-          </Space>
+          {/* System Status */}
+          <Card title="System Status" className="mt-4">
+            <Space direction="vertical" className="w-full">
+              <div className="flex justify-between items-center">
+                <span>Classification Service</span>
+                <Tag color="success">Online</Tag>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Routing Engine</span>
+                <Tag color="success">Online</Tag>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Content Analysis</span>
+                <Tag color="success">Online</Tag>
+              </div>
+            </Space>
+          </Card>
         </Col>
       </Row>
+
+      {/* Role-specific alerts */}
+      {user?.role === 'admin' && (
+        <Alert
+          message="Admin Notice"
+          description="System performance is optimal. All microservices are running smoothly."
+          type="info"
+          showIcon
+          closable
+        />
+      )}
+      
+      {user?.role === 'manager' && stats.pending_documents > 0 && (
+        <Alert
+          message="Pending Approvals"
+          description={`You have ${stats.pending_documents} documents waiting for approval.`}
+          type="warning"
+          showIcon
+          action={
+            <a href="/documents">Review Now</a>
+          }
+          closable
+        />
+      )}
     </div>
   );
-}
+};
 
 export default Dashboard;

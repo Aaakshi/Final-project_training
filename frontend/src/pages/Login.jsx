@@ -1,160 +1,109 @@
-
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, message, Space } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { Card, Form, Input, Button, Alert, Typography } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { authService } from '../services/apiService.js';
 
 const { Title, Text } = Typography;
 
-function Login({ onLogin }) {
+const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (values) => {
     setLoading(true);
+    setError('');
+
     try {
-      let response;
-      if (isRegister) {
-        response = await authService.register(values);
-        message.success('Registration successful! Please login.');
-        setIsRegister(false);
-      } else {
-        response = await authService.login(values);
-        message.success('Login successful!');
-        onLogin(response.user, response.token);
-      }
+      const response = await authService.login(values);
+      onLogin(response.user, response.access_token);
     } catch (error) {
-      const errorMessage = error.response?.data?.message || 
-        (isRegister ? 'Registration failed' : 'Login failed');
-      message.error(errorMessage);
+      setError(error.response?.data?.detail || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px',
-    }}>
-      <Card
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-          borderRadius: 12,
-        }}
-      >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <div style={{ textAlign: 'center' }}>
-            <Title level={2} style={{ marginBottom: 8 }}>
-              {isRegister ? 'Create Account' : 'Welcome Back'}
-            </Title>
-            <Text type="secondary">
-              {isRegister 
-                ? 'Create your account to get started' 
-                : 'Sign in to your account'
-              }
-            </Text>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Title level={2} className="text-gray-800">
+            IDCR System
+          </Title>
+          <Text className="text-gray-600">
+            Intelligent Document Classifier & Router
+          </Text>
+        </div>
+
+        <Card className="shadow-xl">
+          <Title level={3} className="text-center mb-6">
+            Sign In
+          </Title>
+
+          {error && (
+            <Alert
+              message={error}
+              type="error"
+              showIcon
+              className="mb-4"
+            />
+          )}
 
           <Form
-            name={isRegister ? 'register' : 'login'}
+            name="login"
             onFinish={handleSubmit}
             layout="vertical"
-            requiredMark={false}
+            size="large"
           >
-            {isRegister && (
-              <Form.Item
-                name="name"
-                label="Full Name"
-                rules={[{ required: true, message: 'Please enter your name' }]}
-              >
-                <Input 
-                  prefix={<UserOutlined />} 
-                  placeholder="Enter your full name"
-                  size="large"
-                />
-              </Form.Item>
-            )}
-
             <Form.Item
-              name="email"
               label="Email"
+              name="username"
               rules={[
-                { required: true, message: 'Please enter your email' },
-                { type: 'email', message: 'Please enter a valid email' }
+                { required: true, message: 'Please input your email!' },
+                { type: 'email', message: 'Please enter a valid email!' }
               ]}
             >
               <Input 
-                prefix={<MailOutlined />} 
-                placeholder="Enter your email"
-                size="large"
+                prefix={<UserOutlined />} 
+                placeholder="Enter your email" 
               />
             </Form.Item>
 
             <Form.Item
-              name="password"
               label="Password"
-              rules={[
-                { required: true, message: 'Please enter your password' },
-                { min: 6, message: 'Password must be at least 6 characters' }
-              ]}
+              name="password"
+              rules={[{ required: true, message: 'Please input your password!' }]}
             >
-              <Input.Password
-                prefix={<LockOutlined />}
-                placeholder="Enter your password"
-                size="large"
+              <Input.Password 
+                prefix={<LockOutlined />} 
+                placeholder="Enter your password" 
               />
             </Form.Item>
 
-            {isRegister && (
-              <Form.Item
-                name="department"
-                label="Department"
-                rules={[{ required: true, message: 'Please enter your department' }]}
-              >
-                <Input 
-                  placeholder="Enter your department"
-                  size="large"
-                />
-              </Form.Item>
-            )}
-
             <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                className="w-full h-12 text-base font-medium"
                 loading={loading}
-                block
-                size="large"
-                style={{ marginTop: 8 }}
               >
-                {isRegister ? 'Create Account' : 'Sign In'}
+                Sign In
               </Button>
             </Form.Item>
           </Form>
 
-          <div style={{ textAlign: 'center' }}>
-            <Text>
-              {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
-              <Button 
-                type="link" 
-                onClick={() => setIsRegister(!isRegister)}
-                style={{ padding: 0 }}
-              >
-                {isRegister ? 'Sign In' : 'Create Account'}
-              </Button>
-            </Text>
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <Text className="text-sm text-gray-600 block mb-2">Demo Accounts:</Text>
+            <div className="space-y-1 text-xs">
+              <div><strong>Admin:</strong> admin@company.com / admin123</div>
+              <div><strong>Manager:</strong> manager@company.com / manager123</div>
+              <div><strong>Employee:</strong> employee@company.com / employee123</div>
+            </div>
           </div>
-        </Space>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
-}
+};
 
 export default Login;

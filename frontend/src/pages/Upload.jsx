@@ -1,59 +1,41 @@
 
 import React, { useState } from 'react';
 import { 
-  Upload as AntUpload, Card, Button, Typography, Space, 
-  Progress, List, Tag, message, Row, Col 
+  Card, 
+  Upload, 
+  Button, 
+  Typography, 
+  Row, 
+  Col, 
+  Alert, 
+  Progress,
+  List,
+  Tag,
+  Space,
+  message,
+  Modal,
+  Select,
 } from 'antd';
 import {
-  InboxOutlined,
   UploadOutlined,
+  InboxOutlined,
   FileTextOutlined,
   DeleteOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
-import { documentService } from '../services/apiService.js';
 
-const { Dragger } = AntUpload;
 const { Title, Text } = Typography;
+const { Dragger } = Upload;
+const { Option } = Select;
 
-function Upload() {
+const UploadPage = () => {
   const [fileList, setFileList] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-
-  const uploadProps = {
-    name: 'files',
-    multiple: true,
-    fileList,
-    beforeUpload: (file) => {
-      const isValidType = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'text/plain',
-        'image/jpeg',
-        'image/png'
-      ].includes(file.type);
-
-      if (!isValidType) {
-        message.error(`${file.name} is not a supported file type`);
-        return false;
-      }
-
-      const isLt10M = file.size / 1024 / 1024 < 10;
-      if (!isLt10M) {
-        message.error('File must be smaller than 10MB');
-        return false;
-      }
-
-      return false; // Prevent automatic upload
-    },
-    onChange: (info) => {
-      setFileList(info.fileList);
-    },
-    onDrop: (e) => {
-      console.log('Dropped files', e.dataTransfer.files);
-    },
-  };
+  const [selectedPriority, setSelectedPriority] = useState('medium');
+  const [uploadResults, setUploadResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
 
   const handleUpload = async () => {
     if (fileList.length === 0) {
@@ -64,183 +46,273 @@ function Upload() {
     setUploading(true);
     setUploadProgress(0);
 
+    const formData = new FormData();
+    fileList.forEach((file) => {
+      formData.append('files', file.originFileObj);
+    });
+    formData.append('priority', selectedPriority);
+
     try {
-      const formData = new FormData();
-      fileList.forEach((file) => {
-        formData.append('files', file.originFileObj);
+      const response = await fetch('/api/bulk-upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: formData,
       });
 
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      const response = await documentService.bulkUpload(formData);
+      const data = await response.json();
       
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      message.success(`Successfully uploaded ${response.uploaded_count} files`);
-      
-      if (response.failed_count > 0) {
-        message.warning(`${response.failed_count} files failed to upload`);
+      if (response.ok) {
+        setUploadResults(data.results || []);
+        setShowResults(true);
+        setFileList([]);
+        message.success(`Successfully uploaded ${data.results?.length || 0} files`);
+      } else {
+        message.error(data.detail || 'Upload failed');
       }
-
-      setFileList([]);
-      setUploadProgress(0);
     } catch (error) {
       message.error('Upload failed. Please try again.');
-      setUploadProgress(0);
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
-  const handleRemoveFile = (file) => {
-    const newFileList = fileList.filter(item => item.uid !== file.uid);
-    setFileList(newFileList);
+  const uploadProps = {
+    name: 'files',
+    multiple: true,
+    fileList,
+    beforeUpload: (file) => {
+      // Check file type
+      const allowedTypes = [
+        'application/pdf',
+        'text/plain',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'image/jpeg',
+        'image/png',
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        message.error(`${file.name} is not a supported file type`);
+        return false;
+      }
+
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        message.error(`${file.name} is too large. Maximum size is 10MB`);
+        return false;
+      }
+
+      setFileList(prev => [...prev, {
+        uid: file.uid,
+        name: file.name,
+        status: 'done',
+        originFileObj: file,
+      }]);
+      
+      return false; // Prevent automatic upload
+    },
+    onRemove: (file) => {
+      setFileList(prev => prev.filter(item => item.uid !== file.uid));
+    },
   };
 
-  const getFileIcon = (file) => {
-    const fileType = file.type || file.originFileObj?.type;
-    if (fileType?.includes('pdf')) return '📄';
-    if (fileType?.includes('word')) return '📝';
-    if (fileType?.includes('image')) return '🖼️';
-    return '📄';
+  const getResultIcon = (status) => {
+    switch (status) {
+      case 'success': return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+      case 'error': return <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />;
+      default: return <FileTextOutlined />;
+    }
   };
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={2} style={{ marginBottom: 24 }}>
-        Upload Documents
-      </Title>
+    <div className="space-y-6">
+      <div>
+        <Title level={2}>Upload Documents</Title>
+        <Text className="text-gray-600">
+          Upload multiple documents for automatic classification and routing.
+        </Text>
+      </div>
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} lg={16}>
-          <Card title="Drag & Drop Files" style={{ marginBottom: 24 }}>
-            <Dragger {...uploadProps} style={{ padding: '40px 24px' }}>
-              <p className="ant-upload-drag-icon">
-                <InboxOutlined style={{ fontSize: 48, color: '#1890ff' }} />
-              </p>
-              <p className="ant-upload-text">
-                Click or drag files to this area to upload
-              </p>
-              <p className="ant-upload-hint">
-                Support for PDF, Word documents, images, and text files. 
-                Maximum file size: 10MB per file.
-              </p>
-            </Dragger>
-          </Card>
+      {/* Upload Configuration */}
+      <Card title="Upload Settings">
+        <Row gutter={[16, 16]} align="middle">
+          <Col span={8}>
+            <Text strong>Priority Level:</Text>
+          </Col>
+          <Col span={16}>
+            <Select
+              value={selectedPriority}
+              onChange={setSelectedPriority}
+              style={{ width: 200 }}
+            >
+              <Option value="low">
+                <Tag color="green">Low Priority</Tag>
+              </Option>
+              <Option value="medium">
+                <Tag color="orange">Medium Priority</Tag>
+              </Option>
+              <Option value="high">
+                <Tag color="red">High Priority</Tag>
+              </Option>
+            </Select>
+          </Col>
+        </Row>
+      </Card>
 
-          {fileList.length > 0 && (
-            <Card title={`Selected Files (${fileList.length})`}>
-              <List
-                dataSource={fileList}
-                renderItem={(file) => (
-                  <List.Item
-                    actions={[
-                      <Button
-                        type="link"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleRemoveFile(file)}
-                      >
-                        Remove
-                      </Button>
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={<span style={{ fontSize: 24 }}>{getFileIcon(file)}</span>}
-                      title={file.name}
-                      description={
-                        <Space>
-                          <Text type="secondary">
-                            {(file.size / 1024).toFixed(2)} KB
-                          </Text>
-                          <Tag>{file.type?.split('/')[1] || 'unknown'}</Tag>
-                        </Space>
-                      }
+      {/* File Upload Area */}
+      <Card title="Select Files">
+        <Dragger {...uploadProps} style={{ padding: '20px' }}>
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
+          </p>
+          <p className="ant-upload-text text-lg">
+            Click or drag files to this area to upload
+          </p>
+          <p className="ant-upload-hint">
+            Support for multiple files. Accepted formats: PDF, DOC, DOCX, TXT, JPG, PNG
+            <br />
+            Maximum file size: 10MB per file
+          </p>
+        </Dragger>
+
+        {fileList.length > 0 && (
+          <div className="mt-4">
+            <Alert
+              message={`${fileList.length} file(s) selected`}
+              type="info"
+              showIcon
+              className="mb-4"
+            />
+            
+            <List
+              size="small"
+              dataSource={fileList}
+              renderItem={(file) => (
+                <List.Item
+                  actions={[
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => uploadProps.onRemove(file)}
                     />
-                  </List.Item>
-                )}
-              />
-
-              {uploading && (
-                <div style={{ marginTop: 16 }}>
-                  <Text>Uploading files...</Text>
-                  <Progress percent={uploadProgress} status="active" />
-                </div>
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<FileTextOutlined />}
+                    title={file.name}
+                    description={`${(file.originFileObj.size / 1024).toFixed(1)} KB`}
+                  />
+                </List.Item>
               )}
+            />
+          </div>
+        )}
+      </Card>
 
-              <div style={{ marginTop: 16, textAlign: 'center' }}>
-                <Space>
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<UploadOutlined />}
-                    loading={uploading}
-                    onClick={handleUpload}
-                  >
-                    Upload {fileList.length} File{fileList.length > 1 ? 's' : ''}
-                  </Button>
-                  <Button
-                    size="large"
-                    onClick={() => setFileList([])}
-                    disabled={uploading}
-                  >
-                    Clear All
-                  </Button>
-                </Space>
-              </div>
-            </Card>
+      {/* Upload Actions */}
+      <Card>
+        <Space>
+          <Button
+            type="primary"
+            icon={<UploadOutlined />}
+            onClick={handleUpload}
+            loading={uploading}
+            disabled={fileList.length === 0}
+            size="large"
+          >
+            {uploading ? 'Uploading...' : `Upload ${fileList.length} Files`}
+          </Button>
+          
+          <Button
+            onClick={() => setFileList([])}
+            disabled={fileList.length === 0 || uploading}
+          >
+            Clear All
+          </Button>
+        </Space>
+
+        {uploading && (
+          <div className="mt-4">
+            <Progress 
+              percent={uploadProgress} 
+              status="active"
+              strokeColor="#1890ff"
+            />
+          </div>
+        )}
+      </Card>
+
+      {/* Upload Instructions */}
+      <Card title="Instructions">
+        <div className="space-y-3">
+          <div>
+            <Text strong>📁 Supported File Types:</Text>
+            <div className="ml-4 mt-1">
+              <Tag>PDF</Tag>
+              <Tag>DOC/DOCX</Tag>
+              <Tag>TXT</Tag>
+              <Tag>JPG/PNG</Tag>
+            </div>
+          </div>
+          
+          <div>
+            <Text strong>⚡ Automatic Processing:</Text>
+            <ul className="ml-4 mt-1 space-y-1">
+              <li>• Documents are automatically classified by department</li>
+              <li>• Content is extracted and analyzed</li>
+              <li>• Files are routed to appropriate managers for approval</li>
+              <li>• Email notifications are sent to relevant stakeholders</li>
+            </ul>
+          </div>
+          
+          <div>
+            <Text strong>🏷️ Priority Levels:</Text>
+            <ul className="ml-4 mt-1 space-y-1">
+              <li>• <Tag color="red">High</Tag> - Urgent documents requiring immediate attention</li>
+              <li>• <Tag color="orange">Medium</Tag> - Standard processing time</li>
+              <li>• <Tag color="green">Low</Tag> - Non-urgent, can be processed later</li>
+            </ul>
+          </div>
+        </div>
+      </Card>
+
+      {/* Results Modal */}
+      <Modal
+        title="Upload Results"
+        open={showResults}
+        onCancel={() => setShowResults(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setShowResults(false)}>
+            Close
+          </Button>
+        ]}
+        width={700}
+      >
+        <List
+          dataSource={uploadResults}
+          renderItem={(result) => (
+            <List.Item>
+              <List.Item.Meta
+                avatar={getResultIcon(result.status)}
+                title={result.filename}
+                description={
+                  <div>
+                    <div>Status: {result.status}</div>
+                    {result.department && <div>Department: <Tag color="blue">{result.department}</Tag></div>}
+                    {result.message && <div className="text-gray-600">{result.message}</div>}
+                  </div>
+                }
+              />
+            </List.Item>
           )}
-        </Col>
-
-        <Col xs={24} lg={8}>
-          <Card title="Upload Guidelines">
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <div>
-                <Title level={5}>Supported File Types:</Title>
-                <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  <li>PDF Documents (.pdf)</li>
-                  <li>Word Documents (.doc, .docx)</li>
-                  <li>Text Files (.txt)</li>
-                  <li>Images (.jpg, .png)</li>
-                </ul>
-              </div>
-
-              <div>
-                <Title level={5}>File Requirements:</Title>
-                <ul style={{ margin: 0, paddingLeft: 20 }}>
-                  <li>Maximum size: 10MB per file</li>
-                  <li>Multiple files supported</li>
-                  <li>Files will be automatically classified</li>
-                  <li>Processing typically takes 1-2 minutes</li>
-                </ul>
-              </div>
-
-              <div>
-                <Title level={5}>What Happens Next:</Title>
-                <ol style={{ margin: 0, paddingLeft: 20 }}>
-                  <li>Files are uploaded and stored securely</li>
-                  <li>Content analysis extracts key information</li>
-                  <li>Documents are automatically classified</li>
-                  <li>Routing engine assigns to departments</li>
-                  <li>Notifications sent to relevant teams</li>
-                </ol>
-              </div>
-            </Space>
-          </Card>
-        </Col>
-      </Row>
+        />
+      </Modal>
     </div>
   );
-}
+};
 
-export default Upload;
+export default UploadPage;
