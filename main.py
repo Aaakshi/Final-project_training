@@ -839,7 +839,7 @@ async def get_review_documents(
             # HR managers can see all departments
             if current_user['department'] != 'hr':
                 query += " AND department = ?"
-                params.append(```python
+                params.append("python")
 current_user['department'])
         else:
             # Regular employees can only see their own uploaded documents
