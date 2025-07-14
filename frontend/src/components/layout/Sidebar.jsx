@@ -1,80 +1,87 @@
 
 import React from 'react';
 import { Layout, Menu } from 'antd';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined,
   FileTextOutlined,
   UploadOutlined,
   BarChartOutlined,
   SettingOutlined,
-  BellOutlined,
-  LogoutOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
-import { useLocation, useNavigate } from 'react-router-dom';
 
 const { Sider } = Layout;
 
-const Sidebar = ({ collapsed, user, onLogout }) => {
-  const location = useLocation();
-  const navigate = useNavigate();
+const menuItems = [
+  {
+    key: '/dashboard',
+    icon: <DashboardOutlined />,
+    label: 'Dashboard',
+  },
+  {
+    key: '/documents',
+    icon: <FileTextOutlined />,
+    label: 'Documents',
+  },
+  {
+    key: '/upload',
+    icon: <UploadOutlined />,
+    label: 'Upload',
+  },
+  {
+    key: '/analytics',
+    icon: <BarChartOutlined />,
+    label: 'Analytics',
+  },
+  {
+    key: '/settings',
+    icon: <SettingOutlined />,
+    label: 'Settings',
+  },
+];
 
-  const menuItems = [
-    {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: 'Dashboard',
-    },
-    {
-      key: '/documents',
-      icon: <FileTextOutlined />,
-      label: 'Documents',
-    },
-    {
-      key: '/upload',
-      icon: <UploadOutlined />,
-      label: 'Upload',
-    },
-    {
-      key: '/analytics',
-      icon: <BarChartOutlined />,
-      label: 'Analytics',
-    },
-    {
-      key: '/settings',
-      icon: <SettingOutlined />,
-      label: 'Settings',
-    },
-  ];
+function Sidebar({ collapsed }) {
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleMenuClick = ({ key }) => {
-    if (key === 'logout') {
-      onLogout();
-    } else {
-      navigate(key);
-    }
+    navigate(key);
   };
 
   return (
-    <Sider
-      trigger={null}
-      collapsible
+    <Sider 
+      trigger={null} 
+      collapsible 
       collapsed={collapsed}
       theme="dark"
       width={240}
-      style={{
-        overflow: 'auto',
-        height: '100vh',
-        position: 'fixed',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 1000,
-      }}
     >
-      <div className="flex items-center justify-center h-16 bg-blue-900">
-        <div className="text-white font-bold text-lg">
-          {collapsed ? 'IDCR' : 'IDCR System'}
-        </div>
+      <div style={{
+        height: 64,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        padding: collapsed ? 0 : '0 16px',
+        background: 'rgba(255, 255, 255, 0.1)',
+        margin: '16px 8px',
+        borderRadius: 6,
+        transition: 'all 0.2s',
+      }}>
+        <FolderOpenOutlined style={{ 
+          color: '#1890ff', 
+          fontSize: 24,
+          marginRight: collapsed ? 0 : 8 
+        }} />
+        {!collapsed && (
+          <span style={{ 
+            color: '#fff', 
+            fontSize: 16, 
+            fontWeight: 600 
+          }}>
+            IDCR System
+          </span>
+        )}
       </div>
       
       <Menu
@@ -83,33 +90,10 @@ const Sidebar = ({ collapsed, user, onLogout }) => {
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={handleMenuClick}
-        style={{ borderRight: 0 }}
+        style={{ border: 'none' }}
       />
-
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        <Menu
-          theme="dark"
-          mode="inline"
-          items={[
-            {
-              key: 'logout',
-              icon: <LogoutOutlined />,
-              label: collapsed ? null : 'Logout',
-            },
-          ]}
-          onClick={handleMenuClick}
-        />
-        
-        {!collapsed && user && (
-          <div className="text-white text-xs mt-2 p-2 bg-gray-800 rounded">
-            <div className="font-medium">{user.full_name}</div>
-            <div className="text-gray-400">{user.email}</div>
-            <div className="text-gray-400 capitalize">{user.role} • {user.department}</div>
-          </div>
-        )}
-      </div>
     </Sider>
   );
-};
+}
 
 export default Sidebar;

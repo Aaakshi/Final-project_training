@@ -1,63 +1,43 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Card, 
-  Table, 
-  Button, 
-  Input, 
-  Select, 
-  Space, 
-  Tag, 
-  Modal, 
-  Typography, 
-  Row, 
-  Col,
-  message,
-  Popconfirm,
-  Tooltip,
-  Divider
+  Table, Card, Input, Select, Button, Tag, Space, 
+  Drawer, Descriptions, Typography, message, Modal,
+  Row, Col 
 } from 'antd';
 import {
   SearchOutlined,
   EyeOutlined,
-  CheckOutlined,
-  CloseOutlined,
+  DeleteOutlined,
   DownloadOutlined,
-  FilterOutlined,
-  ReloadOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
+import { documentService } from '../services/apiService.js';
 
-const { Title } = Typography;
+const { Search } = Input;
 const { Option } = Select;
+const { Title, Text } = Typography;
 
-const Documents = () => {
-  const [loading, setLoading] = useState(false);
+function Documents() {
   const [documents, setDocuments] = useState([]);
-  const [filteredDocuments, setFilteredDocuments] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDepartment, setSelectedDepartment] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const [loading, setLoading] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [previewVisible, setPreviewVisible] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [filters, setFilters] = useState({
+    search: '',
+    department: '',
+    sort_by: 'uploaded_at_desc'
+  });
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
-
-  useEffect(() => {
-    filterDocuments();
-  }, [documents, searchTerm, selectedDepartment, selectedStatus]);
+  }, [filters]);
 
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/documents', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      const data = await response.json();
-      setDocuments(data.documents || []);
+      const response = await documentService.getAll(filters);
+      setDocuments(response.documents || []);
     } catch (error) {
       message.error('Failed to fetch documents');
     } finally {
@@ -65,274 +45,207 @@ const Documents = () => {
     }
   };
 
-  const filterDocuments = () => {
-    let filtered = documents;
-
-    if (searchTerm) {
-      filtered = filtered.filter(doc => 
-        doc.original_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.department?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (selectedDepartment) {
-      filtered = filtered.filter(doc => doc.department === selectedDepartment);
-    }
-
-    if (selectedStatus) {
-      filtered = filtered.filter(doc => 
-        (doc.approval_status || 'pending').toLowerCase() === selectedStatus.toLowerCase()
-      );
-    }
-
-    setFilteredDocuments(filtered);
-  };
-
-  const handleApprove = async (documentId) => {
+  const handleView = async (documentId) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (response.ok) {
-        message.success('Document approved successfully');
-        fetchDocuments();
-      } else {
-        message.error('Failed to approve document');
-      }
+      const document = await documentService.getById(documentId);
+      setSelectedDocument(document);
+      setDrawerVisible(true);
     } catch (error) {
-      message.error('Failed to approve document');
+      message.error('Failed to load document details');
     }
   };
 
-  const handleReject = async (documentId) => {
+  const handleDelete = (documentId) => {
+    Modal.confirm({
+      title: 'Delete Document',
+      content: 'Are you sure you want to delete this document?',
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await documentService.delete(documentId);
+          message.success('Document deleted successfully');
+          fetchDocuments();
+        } catch (error) {
+          message.error('Failed to delete document');
+        }
+      },
+    });
+  };
+
+  const handleReview = async (documentId, reviewData) => {
     try {
-      const response = await fetch(`/api/documents/${documentId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (response.ok) {
-        message.success('Document rejected successfully');
-        fetchDocuments();
-      } else {
-        message.error('Failed to reject document');
-      }
+      await documentService.review(documentId, reviewData);
+      message.success('Document reviewed successfully');
+      fetchDocuments();
+      setDrawerVisible(false);
     } catch (error) {
-      message.error('Failed to reject document');
+      message.error('Failed to review document');
     }
-  };
-
-  const handlePreview = (document) => {
-    setSelectedDocument(document);
-    setPreviewVisible(true);
   };
 
   const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'approved': return 'success';
-      case 'rejected': return 'error';
-      case 'pending': return 'warning';
-      default: return 'default';
-    }
+    const colors = {
+      processed: 'success',
+      pending: 'warning',
+      failed: 'error',
+      reviewing: 'processing',
+    };
+    return colors[status?.toLowerCase()] || 'default';
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'high': return 'red';
-      case 'medium': return 'orange';
-      case 'low': return 'green';
-      default: return 'default';
-    }
+  const getTypeColor = (type) => {
+    const colors = {
+      legal: 'red',
+      hr: 'blue',
+      finance: 'green',
+      it: 'orange',
+      marketing: 'purple',
+    };
+    return colors[type?.toLowerCase()] || 'default';
   };
-
-  const departments = [...new Set(documents.map(doc => doc.department).filter(Boolean))];
-  const statuses = ['pending', 'approved', 'rejected'];
 
   const columns = [
     {
-      title: 'Document Name',
-      dataIndex: 'original_name',
-      key: 'name',
+      title: 'Document',
+      dataIndex: 'filename',
+      key: 'filename',
       ellipsis: true,
-      render: (text, record) => (
-        <Button 
-          type="link" 
-          onClick={() => handlePreview(record)}
-          className="p-0 h-auto"
-        >
-          {text}
-        </Button>
+      render: (filename, record) => (
+        <Space>
+          <FileTextOutlined />
+          <Text strong>{filename}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Type',
+      dataIndex: 'document_type',
+      key: 'document_type',
+      render: (type) => (
+        <Tag color={getTypeColor(type)}>
+          {type?.toUpperCase() || 'UNKNOWN'}
+        </Tag>
       ),
     },
     {
       title: 'Department',
-      dataIndex: 'department',
-      key: 'department',
-      render: (dept) => dept ? <Tag color="blue">{dept}</Tag> : '-',
-      filters: departments.map(dept => ({ text: dept, value: dept })),
-      onFilter: (value, record) => record.department === value,
+      dataIndex: 'assigned_department',
+      key: 'assigned_department',
+      render: (dept) => dept || 'Unassigned',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        <Tag color={getStatusColor(status)}>
+          {status?.toUpperCase() || 'PENDING'}
+        </Tag>
+      ),
     },
     {
       title: 'Priority',
       dataIndex: 'priority',
       key: 'priority',
-      render: (priority) => (
-        <Tag color={getPriorityColor(priority)}>
-          {priority || 'Medium'}
-        </Tag>
-      ),
+      render: (priority) => {
+        const color = priority === 'urgent' ? 'red' : priority === 'high' ? 'orange' : 'default';
+        return <Tag color={color}>{priority?.toUpperCase() || 'NORMAL'}</Tag>;
+      },
     },
     {
-      title: 'Status',
-      dataIndex: 'approval_status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>
-          {status || 'Pending'}
-        </Tag>
-      ),
-      filters: statuses.map(status => ({ 
-        text: status.charAt(0).toUpperCase() + status.slice(1), 
-        value: status 
-      })),
-      onFilter: (value, record) => (record.approval_status || 'pending').toLowerCase() === value,
-    },
-    {
-      title: 'Uploaded By',
-      dataIndex: 'uploaded_by',
-      key: 'uploaded_by',
-      ellipsis: true,
-    },
-    {
-      title: 'Upload Date',
+      title: 'Uploaded',
       dataIndex: 'uploaded_at',
       key: 'uploaded_at',
       render: (date) => new Date(date).toLocaleDateString(),
-      sorter: (a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at),
     },
     {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Preview">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
-              onClick={() => handlePreview(record)}
-              size="small"
-            />
-          </Tooltip>
-          
-          {(!record.approval_status || record.approval_status === 'pending') && (
-            <>
-              <Tooltip title="Approve">
-                <Popconfirm
-                  title="Are you sure you want to approve this document?"
-                  onConfirm={() => handleApprove(record.id)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button 
-                    type="text" 
-                    icon={<CheckOutlined />} 
-                    className="text-green-600 hover:text-green-700"
-                    size="small"
-                  />
-                </Popconfirm>
-              </Tooltip>
-              
-              <Tooltip title="Reject">
-                <Popconfirm
-                  title="Are you sure you want to reject this document?"
-                  onConfirm={() => handleReject(record.id)}
-                  okText="Yes"
-                  cancelText="No"
-                >
-                  <Button 
-                    type="text" 
-                    icon={<CloseOutlined />} 
-                    className="text-red-600 hover:text-red-700"
-                    size="small"
-                  />
-                </Popconfirm>
-              </Tooltip>
-            </>
-          )}
-          
-          <Tooltip title="Download">
-            <Button 
-              type="text" 
-              icon={<DownloadOutlined />} 
-              size="small"
-              onClick={() => window.open(`/api/documents/${record.id}/download`)}
-            />
-          </Tooltip>
+        <Space>
+          <Button
+            type="link"
+            icon={<EyeOutlined />}
+            onClick={() => handleView(record.id)}
+          >
+            View
+          </Button>
+          <Button
+            type="link"
+            icon={<DownloadOutlined />}
+            href={`/api/documents/${record.id}/download`}
+            target="_blank"
+          >
+            Download
+          </Button>
+          <Button
+            type="link"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id)}
+          >
+            Delete
+          </Button>
         </Space>
       ),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Title level={2}>Documents</Title>
-        <p className="text-gray-600">
-          Manage and review all uploaded documents.
-        </p>
-      </div>
+    <div style={{ padding: '24px' }}>
+      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
+        <Col>
+          <Title level={2}>Document Management</Title>
+        </Col>
+        <Col>
+          <Button type="primary" href="/upload">
+            Upload Documents
+          </Button>
+        </Col>
+      </Row>
 
-      {/* Filters */}
-      <Card>
-        <Row gutter={[16, 16]} align="middle">
+      <Card style={{ marginBottom: 16 }}>
+        <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8}>
-            <Input
+            <Search
               placeholder="Search documents..."
-              prefix={<SearchOutlined />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
               allowClear
+              onSearch={(value) => setFilters(prev => ({ ...prev, search: value }))}
+              style={{ width: '100%' }}
             />
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Select
-              placeholder="Select Department"
-              value={selectedDepartment}
-              onChange={setSelectedDepartment}
+              placeholder="Filter by department"
               allowClear
               style={{ width: '100%' }}
+              onChange={(value) => setFilters(prev => ({ ...prev, department: value || '' }))}
             >
-              {departments.map(dept => (
-                <Option key={dept} value={dept}>{dept}</Option>
-              ))}
+              <Option value="hr">HR</Option>
+              <Option value="finance">Finance</Option>
+              <Option value="legal">Legal</Option>
+              <Option value="it">IT</Option>
+              <Option value="marketing">Marketing</Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Select
-              placeholder="Select Status"
-              value={selectedStatus}
-              onChange={setSelectedStatus}
-              allowClear
+              defaultValue="uploaded_at_desc"
               style={{ width: '100%' }}
+              onChange={(value) => setFilters(prev => ({ ...prev, sort_by: value }))}
             >
-              {statuses.map(status => (
-                <Option key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1)}
-                </Option>
-              ))}
+              <Option value="uploaded_at_desc">Newest First</Option>
+              <Option value="uploaded_at_asc">Oldest First</Option>
+              <Option value="filename_asc">Name A-Z</Option>
+              <Option value="filename_desc">Name Z-A</Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={4}>
             <Button 
-              icon={<ReloadOutlined />} 
+              icon={<SearchOutlined />} 
               onClick={fetchDocuments}
-              loading={loading}
+              style={{ width: '100%' }}
             >
               Refresh
             </Button>
@@ -340,95 +253,99 @@ const Documents = () => {
         </Row>
       </Card>
 
-      {/* Documents Table */}
       <Card>
         <Table
           columns={columns}
-          dataSource={filteredDocuments}
+          dataSource={documents}
           rowKey="id"
           loading={loading}
           pagination={{
+            total: documents.length,
             pageSize: 10,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} of ${total} documents`,
+            showTotal: (total) => `Total ${total} documents`,
           }}
-          scroll={{ x: 800 }}
         />
       </Card>
 
-      {/* Document Preview Modal */}
-      <Modal
+      <Drawer
         title="Document Details"
-        open={previewVisible}
-        onCancel={() => setPreviewVisible(false)}
-        footer={[
-          <Button key="close" onClick={() => setPreviewVisible(false)}>
-            Close
-          </Button>,
-          <Button 
-            key="download" 
-            type="primary" 
-            icon={<DownloadOutlined />}
-            onClick={() => window.open(`/api/documents/${selectedDocument?.id}/download`)}
-          >
-            Download
-          </Button>,
-        ]}
-        width={800}
+        placement="right"
+        size="large"
+        onClose={() => setDrawerVisible(false)}
+        open={drawerVisible}
       >
         {selectedDocument && (
-          <div className="space-y-4">
-            <Row gutter={[16, 16]}>
-              <Col span={12}>
-                <strong>Name:</strong> {selectedDocument.original_name}
-              </Col>
-              <Col span={12}>
-                <strong>Department:</strong> {selectedDocument.department || '-'}
-              </Col>
-              <Col span={12}>
-                <strong>Priority:</strong> 
-                <Tag color={getPriorityColor(selectedDocument.priority)} className="ml-2">
-                  {selectedDocument.priority || 'Medium'}
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            <Descriptions title="Document Information" bordered column={1}>
+              <Descriptions.Item label="Filename">
+                {selectedDocument.filename}
+              </Descriptions.Item>
+              <Descriptions.Item label="Type">
+                <Tag color={getTypeColor(selectedDocument.document_type)}>
+                  {selectedDocument.document_type?.toUpperCase() || 'UNKNOWN'}
                 </Tag>
-              </Col>
-              <Col span={12}>
-                <strong>Status:</strong> 
-                <Tag color={getStatusColor(selectedDocument.approval_status)} className="ml-2">
-                  {selectedDocument.approval_status || 'Pending'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Department">
+                {selectedDocument.assigned_department || 'Unassigned'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Status">
+                <Tag color={getStatusColor(selectedDocument.status)}>
+                  {selectedDocument.status?.toUpperCase() || 'PENDING'}
                 </Tag>
-              </Col>
-              <Col span={12}>
-                <strong>Uploaded By:</strong> {selectedDocument.uploaded_by}
-              </Col>
-              <Col span={12}>
-                <strong>Upload Date:</strong> {new Date(selectedDocument.uploaded_at).toLocaleString()}
-              </Col>
-            </Row>
-            
-            <Divider />
-            
-            <div>
-              <strong>Content Preview:</strong>
-              <div className="mt-2 p-3 bg-gray-50 rounded max-h-60 overflow-y-auto">
-                {selectedDocument.extracted_text || 'No text content available'}
-              </div>
-            </div>
-            
-            {selectedDocument.summary && (
-              <div>
-                <strong>AI Summary:</strong>
-                <div className="mt-2 p-3 bg-blue-50 rounded">
-                  {selectedDocument.summary}
+              </Descriptions.Item>
+              <Descriptions.Item label="Priority">
+                {selectedDocument.priority || 'Normal'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Uploaded">
+                {new Date(selectedDocument.uploaded_at).toLocaleString()}
+              </Descriptions.Item>
+              <Descriptions.Item label="File Size">
+                {selectedDocument.file_size ? `${(selectedDocument.file_size / 1024).toFixed(2)} KB` : 'Unknown'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            {selectedDocument.content && (
+              <Card title="Document Content" size="small">
+                <div style={{ 
+                  maxHeight: 300, 
+                  overflow: 'auto', 
+                  padding: 16,
+                  background: '#f5f5f5',
+                  borderRadius: 4,
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {selectedDocument.content}
                 </div>
-              </div>
+              </Card>
             )}
-          </div>
+
+            <Space>
+              <Button
+                type="primary"
+                onClick={() => handleReview(selectedDocument.id, { status: 'approved' })}
+              >
+                Approve
+              </Button>
+              <Button
+                onClick={() => handleReview(selectedDocument.id, { status: 'rejected' })}
+              >
+                Reject
+              </Button>
+              <Button
+                href={`/api/documents/${selectedDocument.id}/download`}
+                target="_blank"
+                icon={<DownloadOutlined />}
+              >
+                Download
+              </Button>
+            </Space>
+          </Space>
         )}
-      </Modal>
+      </Drawer>
     </div>
   );
-};
+}
 
 export default Documents;

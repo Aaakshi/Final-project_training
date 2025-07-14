@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Start IDCR App"
+runButton = "Complete IDCR System"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -247,54 +247,6 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd frontend && npm run dev"
-
-[[workflows.workflow]]
-name = "IDCR Full Stack"
-author = 44313974
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd frontend && npm run dev"
-
-[[workflows.workflow]]
-name = "Start React Frontend"
-author = 44313974
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd frontend && npm install && npm run build && cd .. && python main.py"
-
-[[workflows.workflow]]
-name = "Development Mode"
-author = 44313974
-mode = "parallel"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd frontend && npm install && npm run build"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python main.py"
-
-[[workflows.workflow]]
-name = "Start IDCR App"
-author = 44313974
-mode = "sequential"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd frontend && npm install && npm run build && cd .. && python main.py"
-
-[[ports]]
-localPort = 443
-externalPort = 4200
 
 [[ports]]
 localPort = 3000

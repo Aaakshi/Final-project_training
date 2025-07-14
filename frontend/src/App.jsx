@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Layout, ConfigProvider } from 'antd';
-import theme from './themes/theme.js';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Layout, Spin } from 'antd';
 import Sidebar from './components/layout/Sidebar.jsx';
 import Header from './components/layout/Header.jsx';
 import Login from './pages/Login.jsx';
@@ -10,83 +10,84 @@ import Documents from './pages/Documents.jsx';
 import Upload from './pages/Upload.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Settings from './pages/Settings.jsx';
-import './index.css';
+import { authService } from './services/apiService.js';
 
 const { Content } = Layout;
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const location = useLocation();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('currentUser');
-
-    if (token && user) {
-      setIsAuthenticated(true);
-      setCurrentUser(JSON.parse(user));
-    }
+    checkAuthStatus();
   }, []);
 
-  const handleLogin = (userData) => {
-    setIsAuthenticated(true);
-    setCurrentUser(userData);
-    localStorage.setItem('token', userData.token || 'demo-token');
-    localStorage.setItem('currentUser', JSON.stringify(userData));
+  const checkAuthStatus = async () => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleLogin = (userData, token) => {
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('user', JSON.stringify(userData));
+    setUser(userData);
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    setCurrentUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('currentUser');
+    authService.logout();
+    setUser(null);
   };
 
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <ConfigProvider theme={theme}>
-        <Login onLogin={handleLogin} />
-      </ConfigProvider>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <ConfigProvider theme={theme}>
-      <Layout style={{ minHeight: '100vh' }}>
-        <Sidebar 
-          collapsed={sidebarCollapsed}
-          currentPath={location.pathname}
+    <Layout style={{ minHeight: '100vh' }}>
+      <Sidebar collapsed={collapsed} />
+      <Layout>
+        <Header 
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+          user={user}
+          onLogout={handleLogout}
         />
-        <Layout>
-          <Header 
-            user={currentUser}
-            onLogout={handleLogout}
-            onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
-            collapsed={sidebarCollapsed}
-          />
-          <Content style={{ 
-            margin: '24px 16px',
-            padding: 24,
-            minHeight: 280,
-            background: '#fff',
-            borderRadius: 8
-          }}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard user={currentUser} />} />
-              <Route path="/documents" element={<Documents user={currentUser} />} />
-              <Route path="/upload" element={<Upload user={currentUser} />} />
-              <Route path="/analytics" element={<Analytics user={currentUser} />} />
-              <Route path="/settings" element={<Settings user={currentUser} />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Content>
-        </Layout>
+        <Content style={{ margin: '16px', overflow: 'initial' }}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/documents" element={<Documents />} />
+            <Route path="/upload" element={<Upload />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </Content>
       </Layout>
-    </ConfigProvider>
+    </Layout>
   );
 }
 

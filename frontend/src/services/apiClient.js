@@ -1,81 +1,57 @@
-// API configuration
-const API_BASE_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000/api' 
-  : '/api';
 
-class ApiClient {
-  constructor() {
-    this.baseURL = API_BASE_URL;
-  }
+import axios from 'axios';
+import { message } from 'antd';
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const token = localStorage.getItem('token');
+const apiClient = axios.create({
+  baseURL: '/api',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    try {
-      const response = await fetch(url, config);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json();
-      }
-
-      return await response.text();
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
+// Request interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  get(endpoint, options = {}) {
-    return this.request(endpoint, { method: 'GET', ...options });
+// Response interceptor
+apiClient.interceptors.response.use(
+  (response) => {
+    return response.data;
+  },
+  (error) => {
+    const { response } = error;
+    
+    if (response?.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+      message.error('Session expired. Please login again.');
+    } else if (response?.status >= 500) {
+      message.error('Server error. Please try again later.');
+    } else if (response?.status >= 400) {
+      const errorMessage = response.data?.message || 'An error occurred';
+      message.error(errorMessage);
+    }
+    
+    return Promise.reject(error);
   }
+);
 
-  post(endpoint, data, options = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-      ...options,
-    });
-  }
-
-  put(endpoint, data, options = {}) {
-    return this.request(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-      ...options,
-    });
-  }
-
-  delete(endpoint, options = {}) {
-    return this.request(endpoint, { method: 'DELETE', ...options });
-  }
-
-  upload(endpoint, formData, options = {}) {
-    return this.request(endpoint, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        // Don't set Content-Type for FormData, let browser set it with boundary
-        ...options.headers,
-      },
-    });
-  }
-}
-
-const apiClient = new ApiClient();
-export default apiClient;
-export { ApiClient };
+export default {
+  get: (url, config) => apiClient.get(url, config),
+  post: (url, data, config) => apiClient.post(url, data, config),
+  put: (url, data, config) => apiClient.put(url, data, config),
+  delete: (url, config) => apiClient.delete(url, config),
+  patch: (url, data, config) => apiClient.patch(url, data, config),
+};

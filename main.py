@@ -18,7 +18,7 @@ import requests
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -391,7 +391,11 @@ def send_email_notification(doc_info: dict, recipient_dept: str, target_email: s
         print(f"Failed to send email: {str(e)}")
         return False
 
-# Routes - removed problematic redirect
+# Routes
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    with open("index.html", "r") as file:
+        return HTMLResponse(content=file.read())
 
 @app.post("/api/register")
 async def register_user(user: UserRegister):
@@ -768,7 +772,7 @@ async def get_documents(
             'page': 1,
             'page_size': len(formatted_docs)
         }
-
+    
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -886,7 +890,7 @@ async def get_review_documents(
             })
 
         return {'documents': formatted_docs}
-
+    
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -909,7 +913,7 @@ async def review_document(
         # Get document details before updating
         cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
         document = cursor.fetchone()
-
+        
         if not document:
             conn.close()
             raise HTTPException(status_code=404, detail="Document not found")
@@ -926,19 +930,19 @@ async def review_document(
         uploader_email = document[6]  # uploaded_by field
         doc_name = document[2]  # original_name field
         department = document[11]  # department field
-
+        
         # Create email notification using the correct schema
         subject = f"Document Review: {doc_name} - {new_status.upper()}"
         body = f"""
         Your document "{doc_name}" has been {new_status} by {current_user['full_name']} ({current_user['email']}).
-
+        
         Review Comments: {review.comments or 'No comments provided'}
-
+        
         Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
+        
         You can view the document details in the IDCR system.
         """
-
+        
         cursor.execute('''
             INSERT INTO email_notifications 
             (doc_id, sent_by, received_by, subject, body_preview, email_type, status, document_name, department, priority)
@@ -949,7 +953,7 @@ async def review_document(
         conn.close()
 
         return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
-
+    
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -1121,36 +1125,6 @@ async def health_check():
             health_status["microservices"][service_name] = "unreachable"
 
     return health_status
-
-# Serve React frontend static files
-try:
-    app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
-except:
-    print("Assets directory not found - frontend may not be built")
-
-# Serve React app for all frontend routes
-@app.get("/")
-async def read_root():
-    """Serve the React app"""
-    try:
-        return FileResponse("frontend/dist/index.html")
-    except Exception as e:
-        print(f"Error serving React app: {e}")
-        raise HTTPException(status_code=404, detail="Frontend not found - please build the React app first")
-
-@app.get("/{path:path}")
-async def serve_react_app(path: str):
-    """Serve React app for all frontend routes (SPA routing)"""
-    # Check if it's an API route
-    if path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-
-    # For all other routes, serve the React app
-    try:
-        return FileResponse("frontend/dist/index.html")
-    except:
-        # Fallback to the old HTML file if React build doesn't exist
-        return FileResponse("index.html")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
