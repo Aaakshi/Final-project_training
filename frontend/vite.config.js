@@ -1,1 +1,0 @@
-// Vite config removed - using standalone HTML file instead
