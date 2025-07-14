@@ -824,10 +824,6 @@ async def get_review_documents(
     review_status: str = "",
     current_user: dict = Depends(get_current_user)
 ):
-    # Only managers and admins can review documents
-    if current_user['role'] not in ['manager', 'admin']:
-        raise HTTPException(status_code=403, detail="Access denied")
-
     try:
         conn = sqlite3.connect(DATABASE_FILE)
         cursor = conn.cursor()
@@ -835,11 +831,20 @@ async def get_review_documents(
         query = "SELECT * FROM documents WHERE 1=1"
         params = []
 
-        # Filter by department for managers (HR managers can see all)
-        if current_user['role'] == 'manager':
+        # Role-based filtering
+        if current_user['role'] == 'admin':
+            # Admin can see all documents
+            pass
+        elif current_user['role'] == 'manager':
+            # All managers can see documents in their department
+            # HR managers can see all departments
             if current_user['department'] != 'hr':
                 query += " AND department = ?"
                 params.append(current_user['department'])
+        else:
+            # Regular employees can only see their own uploaded documents
+            query += " AND uploaded_by = ?"
+            params.append(current_user['email'])
 
         if search:
             query += " AND (original_name LIKE ? OR extracted_text LIKE ?)"
