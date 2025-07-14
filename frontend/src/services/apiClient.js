@@ -1,15 +1,16 @@
-
 const API_BASE_URL = 'http://localhost:5000';
 
 class ApiClient {
   constructor() {
-    this.baseURL = API_BASE_URL;
+    this.baseURL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+      ? 'http://localhost:5000/api' 
+      : '/api';
   }
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = localStorage.getItem('token');
-    
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -21,16 +22,16 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         return await response.json();
       }
-      
+
       return await response.text();
     } catch (error) {
       console.error('API request failed:', error);
