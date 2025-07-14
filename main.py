@@ -839,7 +839,8 @@ async def get_review_documents(
             # HR managers can see all departments
             if current_user['department'] != 'hr':
                 query += " AND department = ?"
-                params.append(current_user['department'])
+                params.append(```python
+current_user['department'])
         else:
             # Regular employees can only see their own uploaded documents
             query += " AND uploaded_by = ?"
@@ -1124,6 +1125,25 @@ async def health_check():
             health_status["microservices"][service_name] = "unreachable"
 
     return health_status
+
+# Serve React frontend static files
+app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
+
+# Serve React app for all frontend routes
+@app.get("/")
+async def read_root():
+    """Serve the React app"""
+    return FileResponse("frontend/dist/index.html")
+
+@app.get("/{path:path}")
+async def serve_react_app(path: str):
+    """Serve React app for all frontend routes (SPA routing)"""
+    # Check if it's an API route
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+
+    # For all other routes, serve the React app
+    return FileResponse("frontend/dist/index.html")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
