@@ -284,6 +284,10 @@ task = "shell.exec"
 args = "cd frontend && npm run dev"
 
 [[ports]]
+localPort = 443
+externalPort = 4200
+
+[[ports]]
 localPort = 3000
 externalPort = 80
 
