@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Development Mode"
+runButton = "Start IDCR App"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -282,6 +282,15 @@ args = "cd frontend && npm install && npm run build"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python main.py"
+
+[[workflows.workflow]]
+name = "Start IDCR App"
+author = 44313974
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && npm install && npm run build && cd .. && python main.py"
 
 [[ports]]
 localPort = 443
