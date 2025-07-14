@@ -591,6 +591,39 @@
             margin: 30px 0;
             border-radius: 2px;
         }
+
+        .priority-high { color: #e74c3c; }
+        .priority-medium { color: #f39c12; }
+        .priority-low { color: #27ae60; }
+
+        .status-btn {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .status-btn.approved {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .status-btn.rejected {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .status-btn.pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .review-status-container {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -848,7 +881,7 @@
 
                 <div class="charts-section">
                     <div class="chart-container">
-                        <div class="chart-title">Processing Trends Over Time</div>
+                        <div class="chart-title">Document Processing Trends</div>
                         <canvas id="statsLineChart" width="400" height="200"></canvas>
                     </div>
                     <div class="chart-container">
@@ -1082,23 +1115,40 @@
 
         function displayReviewDocuments(documents) {
             const grid = document.getElementById('reviewDocumentsGrid');
-            if (!grid) return;
+            if (!documents || documents.length === 0) {
+                grid.innerHTML = '<div class="no-data">No documents found for review</div>';
+                return;
+            }
 
             grid.innerHTML = documents.map(doc => {
-                const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
-                const department = doc.department || 'general';
-                const priority = doc.priority || 'medium';
-                const reviewStatus = doc.review_status || 'pending';
+                let statusButton = '';
+                let statusClass = '';
+
+                if (doc.review_status === 'approved') {
+                    statusButton = '<span class="status-btn approved">✓ Approved</span>';
+                    statusClass = 'approved';
+                } else if (doc.review_status === 'rejected') {
+                    statusButton = '<span class="status-btn rejected">✗ Rejected</span>';
+                    statusClass = 'rejected';
+                } else {
+                    statusButton = '<span class="status-btn pending">⏳ Pending</span>';
+                    statusClass = 'pending';
+                }
 
                 return `
-                    <div class="document-card priority-${priority}" onclick="showDocumentDetails('${doc.doc_id}')">
-                        <h3><i class="fas fa-file-alt"></i> ${doc.original_name}</h3>
-                        <p><strong>Department:</strong> <span class="badge badge-${department}">${department.toUpperCase()}</span></p>
-                        <p><strong>Uploaded by:</strong> ${doc.uploaded_by}</p>
-                        <p><strong>Date:</strong> ${uploadDate}</p>
-                        <p><strong>Priority:</strong> <span class="badge priority-${priority}">${priority.toUpperCase()}</span></p>
-                        <p><strong>Type:</strong> ${doc.document_type || 'Unknown'}</p>
-                        <p><strong>Review Status:</strong> <span class="badge ${reviewStatus === 'approved' ? 'badge-success' : reviewStatus === 'rejected' ? 'badge-danger' : 'badge-warning'}">${reviewStatus.toUpperCase()}</span></p>
+                    <div class="document-card" onclick="showDocumentDetails('${doc.doc_id}')">
+                        <div class="document-icon">
+                            <i class="fas fa-file-${getFileIcon(doc.file_type)}"></i>
+                        </div>
+                        <div class="document-info">
+                            <h3>${doc.original_name}</h3>
+                            <p><strong>Department:</strong> ${doc.department}</p>
+                            <p><strong>Priority:</strong> <span class="priority-${doc.priority}">${doc.priority}</span></p>
+                            <p><strong>Uploaded:</strong> ${new Date(doc.uploaded_at).toLocaleDateString()}</p>
+                            <div class="review-status-container">
+                                ${statusButton}
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -1241,14 +1291,6 @@
             }
 
             container.innerHTML = notifications.map(notif => {
-                let statusColor = '#4CAF50';
-                let statusText = 'Active';
-
-                if (notif.status === 'inactive') {
-                    statusColor = '#f44336';
-                    statusText = 'Inactive';
-                }
-
                 let approvalButtons = '';
                 // Add approval/rejection status buttons on the left for document review notifications
                 if (notif.email_type === 'document_review' || notif.notification_type === 'document_review') {
@@ -1277,9 +1319,6 @@
                             '</p>' +
                             '</div>' +
                             '<div style="text-align: right; min-width: 120px; margin-left: 15px;">' +
-                            '<div style="background: ' + statusColor + '; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-bottom: 8px;">' +
-                            statusText +
-                            '</div>' +
                             '<small style="color: #888; font-size: 11px;">' + new Date(notif.sent_at).toLocaleDateString() + '</small>' +
                             '</div>' +
                             '</div>' +
