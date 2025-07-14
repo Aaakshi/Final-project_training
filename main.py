@@ -391,10 +391,7 @@ def send_email_notification(doc_info: dict, recipient_dept: str, target_email: s
         print(f"Failed to send email: {str(e)}")
         return False
 
-# Routes
-@app.get("/", response_class=RedirectResponse)
-async def read_root():
-    return RedirectResponse(url="http://0.0.0.0:5005", status_code=302)
+# Routes - removed problematic redirect
 
 @app.post("/api/register")
 async def register_user(user: UserRegister):
@@ -1137,9 +1134,9 @@ async def read_root():
     """Serve the React app"""
     try:
         return FileResponse("frontend/dist/index.html")
-    except:
-        # Fallback to the old HTML file if React build doesn't exist
-        return FileResponse("index.html")
+    except Exception as e:
+        print(f"Error serving React app: {e}")
+        raise HTTPException(status_code=404, detail="Frontend not found - please build the React app first")
 
 @app.get("/{path:path}")
 async def serve_react_app(path: str):
