@@ -665,7 +665,7 @@ async def bulk_upload_documents(
 @app.get("/api/documents")
 async def get_documents(
     page: int = 1,
-    page_size: int = 50,  # Increased to show more documents
+    page_size: int = 1000,  # Show more documents per page
     search: str = "",
     status: str = "",
     doc_type: str = "",
@@ -729,9 +729,8 @@ async def get_documents(
         }
         order_clause = sort_mapping.get(sort_by, "uploaded_at DESC")
 
-        # Add pagination
-        query += f" ORDER BY {order_clause} LIMIT ? OFFSET ?"
-        params.extend([page_size, (page - 1) * page_size])
+        # Add sorting without pagination to show all documents
+        query += f" ORDER BY {order_clause}"
 
         cursor.execute(query, params)
         documents = cursor.fetchall()
@@ -770,8 +769,8 @@ async def get_documents(
         return {
             'documents': formatted_docs,
             'total_count': total_count,
-            'page': page,
-            'page_size': page_size
+            'page': 1,
+            'page_size': len(formatted_docs)
         }
     
     except Exception as e:

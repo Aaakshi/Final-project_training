@@ -1045,6 +1045,7 @@
 
                 if (response.ok) {
                     displayDocuments(data.documents);
+                    console.log(`Loaded ${data.documents.length} documents out of ${data.total_count} total`);
                 } else {
                     showToast('Failed to load documents', 'error');
                 }
@@ -1077,11 +1078,32 @@
         }
 
         async function loadReviewDocuments() {
-            await loadDocuments();
-            const documents = document.getElementById('documentsGrid').innerHTML;
-            const reviewGrid = document.getElementById('reviewDocumentsGrid');
-            if (reviewGrid) {
-                reviewGrid.innerHTML = documents;
+            try {
+                const search = document.getElementById('reviewSearchInput') ? document.getElementById('reviewSearchInput').value : '';
+                const reviewStatus = document.getElementById('reviewStatusFilter') ? document.getElementById('reviewStatusFilter').value : '';
+
+                const params = new URLSearchParams({
+                    search: search,
+                    review_status: reviewStatus
+                });
+
+                const response = await fetch('/api/review-documents?' + params.toString(), {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayReviewDocuments(data.documents);
+                    console.log(`Loaded ${data.documents.length} review documents`);
+                } else {
+                    showToast('Failed to load review documents', 'error');
+                }
+            } catch (error) {
+                console.error('Load review documents error:', error);
+                showToast('Failed to load review documents', 'error');
             }
         }
 
