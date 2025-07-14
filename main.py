@@ -109,7 +109,14 @@ def init_database():
             review_status TEXT DEFAULT 'pending',
             reviewed_by TEXT,
             reviewed_at TIMESTAMP,
-            review_comments TEXT
+            review_comments TEXT,
+            risk_score REAL DEFAULT 0.0,
+            sentiment TEXT DEFAULT 'neutral',
+            summary TEXT,
+            key_phrases TEXT,
+            entities TEXT,
+            routed_to TEXT,
+            routing_reason TEXT
         )
     ''')
     
@@ -173,6 +180,38 @@ def get_password_hash(password: str) -> str:
 
 # Initialize database on startup
 init_database()
+
+# Migrate database to add new columns if they don't exist
+def migrate_database():
+    conn = sqlite3.connect(DATABASE_FILE)
+    cursor = conn.cursor()
+    
+    # Check if new columns exist, if not add them
+    cursor.execute("PRAGMA table_info(documents)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    new_columns = [
+        ('risk_score', 'REAL DEFAULT 0.0'),
+        ('sentiment', 'TEXT DEFAULT "neutral"'),
+        ('summary', 'TEXT'),
+        ('key_phrases', 'TEXT'),
+        ('entities', 'TEXT'),
+        ('routed_to', 'TEXT'),
+        ('routing_reason', 'TEXT')
+    ]
+    
+    for column_name, column_def in new_columns:
+        if column_name not in columns:
+            try:
+                cursor.execute(f'ALTER TABLE documents ADD COLUMN {column_name} {column_def}')
+                print(f"Added column: {column_name}")
+            except Exception as e:
+                print(f"Column {column_name} might already exist: {str(e)}")
+    
+    conn.commit()
+    conn.close()
+
+migrate_database()
 
 # Pydantic models
 class UserRegister(BaseModel):
@@ -272,16 +311,35 @@ def classify_document(text: str, filename: str) -> tuple:
     else:
         return 'general', 'administration', 'low'
 
-def send_email_notification(doc_info: dict, recipient_dept: str):
+def get_department_email(department: str) -> str:
+    """Get the appropriate email for a department based on existing users"""
+    department_emails = {
+        'hr': 'hr.manager@company.com',
+        'finance': 'finance.manager@company.com',
+        'legal': 'legal.manager@company.com',
+        'it': 'it@company.com',
+        'sales': 'manager@company.com',
+        'marketing': 'manager@company.com',
+        'operations': 'manager@company.com',
+        'support': 'manager@company.com',
+        'procurement': 'manager@company.com',
+        'product': 'manager@company.com',
+        'administration': 'admin@company.com',
+        'executive': 'admin@company.com',
+        'general': 'admin@company.com'
+    }
+    return department_emails.get(department, 'admin@company.com')
+
+def send_email_notification(doc_info: dict, recipient_dept: str, target_email: str = None, sender_email: str = None):
     try:
-        smtp_server = smtplib.SMTP(EMAIL_CONFIG['smtp_server'], EMAIL_CONFIG['smtp_port'])
-        smtp_server.starttls()
-        smtp_server.login(EMAIL_CONFIG['email'], EMAIL_CONFIG['password'])
+        if not target_email:
+            target_email = get_department_email(recipient_dept)
         
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_CONFIG['email']
-        msg['To'] = f"{recipient_dept}@company.com"
-        msg['Subject'] = f"New Document Routed: {doc_info['original_name']}"
+        if not sender_email:
+            sender_email = EMAIL_CONFIG['email']
+        
+        # Mock email sending (since we don't have real SMTP configured)
+        subject = f"New Document Routed: {doc_info['original_name']}"
         
         body = f"""
         A new document has been automatically routed to your department.
@@ -291,13 +349,12 @@ def send_email_notification(doc_info: dict, recipient_dept: str):
         Priority: {doc_info['priority']}
         Uploaded by: {doc_info['uploaded_by']}
         Upload time: {doc_info['uploaded_at']}
+        Department: {doc_info['department']}
+        Summary: {doc_info.get('summary', 'No summary available')}
+        Routing Reason: {doc_info.get('routing_reason', 'Automatically routed based on classification')}
         
         Please review this document in the IDCR system.
         """
-        
-        msg.attach(MIMEText(body, 'plain'))
-        smtp_server.send_message(msg)
-        smtp_server.quit()
         
         # Log email notification
         conn = sqlite3.connect(DATABASE_FILE)
@@ -308,9 +365,9 @@ def send_email_notification(doc_info: dict, recipient_dept: str):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             doc_info['doc_id'], 
-            EMAIL_CONFIG['email'], 
-            f"{recipient_dept}@company.com",
-            msg['Subject'],
+            sender_email, 
+            target_email,
+            subject,
             body[:200] + "..." if len(body) > 200 else body,
             doc_info['original_name'],
             recipient_dept,
@@ -319,7 +376,7 @@ def send_email_notification(doc_info: dict, recipient_dept: str):
         conn.commit()
         conn.close()
         
-        print(f"Email sent to {recipient_dept} department")
+        print(f"Email notification logged for {target_email} in {recipient_dept} department")
         return True
     except Exception as e:
         print(f"Failed to send email: {str(e)}")
@@ -495,6 +552,8 @@ async def bulk_upload_documents(
                 
                 if analysis_response.status_code == 200:
                     analysis_data = analysis_response.json()
+                else:
+                    analysis_data = {}
             except Exception as e:
                 print(f"Content analysis service error: {str(e)}")
                 analysis_data = {}
@@ -517,6 +576,8 @@ async def bulk_upload_documents(
                 
                 if routing_response.status_code == 200:
                     routing_data = routing_response.json()
+                else:
+                    routing_data = {}
             except Exception as e:
                 print(f"Routing engine service error: {str(e)}")
                 routing_data = {}
@@ -528,18 +589,46 @@ async def bulk_upload_documents(
             analysis_data = {}
             routing_data = {}
         
+        # Store content analysis data in database
+        risk_score = analysis_data.get('risk_score', 0.0)
+        sentiment = analysis_data.get('sentiment', 'neutral')
+        summary = analysis_data.get('summary', '')
+        key_phrases = json.dumps(analysis_data.get('key_phrases', []))
+        entities = json.dumps(analysis_data.get('entities', {}))
+        
+        # Get target email for routing
+        target_email = get_department_email(department)
+        
+        # Send email notification with routing
+        doc_info = {
+            'doc_id': doc_id,
+            'original_name': file.filename,
+            'document_type': doc_type,
+            'priority': priority,
+            'uploaded_by': current_user['full_name'],
+            'uploaded_at': datetime.now().isoformat(),
+            'department': department,
+            'summary': summary,
+            'routing_reason': routing_data.get('routing_reason', 'Document automatically routed based on classification')
+        }
+        
+        # Send notification to department
+        send_email_notification(doc_info, department, target_email, current_user['email'])
+        
         # Save to database
         conn = sqlite3.connect(DATABASE_FILE)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO documents 
             (doc_id, original_name, file_path, file_size, file_type, uploaded_by, 
-             batch_name, extracted_text, document_type, department, priority, processing_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             batch_name, extracted_text, document_type, department, priority, processing_status,
+             risk_score, sentiment, summary, key_phrases, entities, routed_to, routing_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             doc_id, file.filename, str(file_path), file.size, file_extension,
             current_user['email'], batch_name, extracted_text, doc_type, 
-            department, priority, 'classified'
+            department, priority, 'classified', risk_score, sentiment, summary,
+            key_phrases, entities, target_email, routing_data.get('routing_reason', '')
         ))
         conn.commit()
         conn.close()
@@ -662,7 +751,14 @@ async def get_documents(
             'department': doc[11],
             'priority': doc[12],
             'processing_status': doc[13],
-            'review_status': doc[14]
+            'review_status': doc[14],
+            'risk_score': doc[18] if len(doc) > 18 else 0.0,
+            'sentiment': doc[19] if len(doc) > 19 else 'neutral',
+            'summary': doc[20] if len(doc) > 20 else '',
+            'key_phrases': doc[21] if len(doc) > 21 else '[]',
+            'entities': doc[22] if len(doc) > 22 else '{}',
+            'routed_to': doc[23] if len(doc) > 23 else '',
+            'routing_reason': doc[24] if len(doc) > 24 else ''
         })
     
     return {
@@ -700,7 +796,14 @@ async def get_document(doc_id: str, current_user: dict = Depends(get_current_use
         'review_status': doc[14],
         'reviewed_by': doc[15],
         'reviewed_at': doc[16],
-        'review_comments': doc[17]
+        'review_comments': doc[17],
+        'risk_score': doc[18] if len(doc) > 18 else 0.0,
+        'sentiment': doc[19] if len(doc) > 19 else 'neutral',
+        'summary': doc[20] if len(doc) > 20 else '',
+        'key_phrases': doc[21] if len(doc) > 21 else '[]',
+        'entities': doc[22] if len(doc) > 22 else '{}',
+        'routed_to': doc[23] if len(doc) > 23 else '',
+        'routing_reason': doc[24] if len(doc) > 24 else ''
     }
 
 @app.get("/api/review-documents")

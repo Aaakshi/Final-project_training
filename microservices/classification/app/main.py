@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 import sys
@@ -10,6 +9,7 @@ import hashlib
 import PyPDF2
 import docx
 import tempfile
+import uuid
 
 app = FastAPI(title="Classification Service")
 
@@ -296,13 +296,109 @@ def classify_document_locally(content: str, filename: str):
 async def root():
     return {"message": "Classification Service is running", "service": "classification"}
 
-@app.post("/classify", response_model=ClassificationResponse)
-async def classify_document(file: UploadFile = File(...)):
-    """Classify uploaded document"""
+@app.post("/classify-text")
+async def classify_text(request: ClassificationRequest):
+    """Classify document based on text content"""
     try:
+        content_lower = request.content.lower()
+        filename_lower = request.filename.lower()
+
+        # Enhanced classification logic with comprehensive keywords
+        # HR Keywords
+        hr_keywords = ["hr", "human resources", "employee relations", "talent acquisition", "recruitment", 
+                      "onboarding", "performance management", "compensation & benefits", "payroll", 
+                      "employee engagement", "training & development", "succession planning", 
+                      "workforce planning", "hr policies", "diversity & inclusion", "labor relations", 
+                      "employee retention", "hris", "benefits administration", "workplace safety", 
+                      "employee", "personnel", "hiring", "training", "performance", "benefits", 
+                      "leave", "vacation", "sick leave", "maternity", "paternity", "disciplinary", 
+                      "termination", "resignation", "promotion", "performance review", "appraisal", 
+                      "job description", "organizational chart", "employee handbook", "workplace policy", 
+                      "harassment", "diversity", "inclusion", "staff", "workforce", "compensation"]
+
+        # Finance Keywords
+        finance_keywords = ["finance", "financial", "accounting", "invoice", "receipt", "payment", 
+                           "billing", "budget", "expense", "revenue", "profit", "loss", "tax", 
+                           "audit", "financial statement", "balance sheet", "income statement", 
+                           "cash flow", "accounts payable", "accounts receivable", "procurement", 
+                           "purchase order", "vendor", "supplier", "cost", "pricing", "quote", 
+                           "estimate", "contract value", "financial analysis", "roi", "investment"]
+
+        # Legal Keywords  
+        legal_keywords = ["legal", "law", "contract", "agreement", "terms", "conditions", "clause", 
+                         "litigation", "compliance", "regulation", "policy", "procedure", "lawsuit", 
+                         "settlement", "damages", "liability", "intellectual property", "copyright", 
+                         "trademark", "patent", "confidentiality", "non-disclosure", "nda", 
+                         "terms of service", "privacy policy", "legal notice", "attorney", "lawyer"]
+
+        # IT Keywords
+        it_keywords = ["it", "information technology", "software", "hardware", "system", "network", 
+                      "security", "cybersecurity", "database", "server", "cloud", "infrastructure", 
+                      "technical", "programming", "development", "application", "platform", 
+                      "integration", "api", "maintenance", "support", "troubleshooting", "bug", 
+                      "feature", "requirement", "specification", "architecture", "deployment"]
+
+        # General Keywords
+        general_keywords = ["general", "misc", "other", "administrative", "office", "facility", 
+                           "maintenance", "general inquiry", "information", "announcement", 
+                           "notification", "memo", "correspondence", "communication"]
+
+        # Classification logic
+        hr_score = sum(1 for keyword in hr_keywords if keyword in content_lower or keyword in filename_lower)
+        finance_score = sum(1 for keyword in finance_keywords if keyword in content_lower or keyword in filename_lower)
+        legal_score = sum(1 for keyword in legal_keywords if keyword in content_lower or keyword in filename_lower)
+        it_score = sum(1 for keyword in it_keywords if keyword in content_lower or keyword in filename_lower)
+
+        # Determine classification
+        scores = {
+            'hr_document': (hr_score, 'hr'),
+            'invoice': (finance_score, 'finance'), 
+            'contract': (legal_score, 'legal'),
+            'it_document': (it_score, 'it'),
+            'general': (0, 'administration')
+        }
+
+        # Find highest scoring category
+        best_match = max(scores.items(), key=lambda x: x[1][0])
+        doc_type, (score, department) = best_match
+
+        # Determine priority based on keywords
+        high_priority_keywords = ["urgent", "immediate", "asap", "critical", "emergency", "high priority"]
+        medium_priority_keywords = ["important", "priority", "attention", "review"]
+
+        priority = "low"
+        if any(keyword in content_lower for keyword in high_priority_keywords):
+            priority = "high"
+        elif any(keyword in content_lower for keyword in medium_priority_keywords):
+            priority = "medium"
+
+        # If no clear classification, default to general
+        if score == 0:
+            doc_type = "general"
+            department = "administration"
+
+        return {
+            "doc_type": doc_type,
+            "department": department,
+            "confidence": min(score / 5.0, 1.0),  # Normalize confidence score
+            "priority": priority,
+            "extracted_text": request.content[:1000],
+            "page_count": 1,
+            "language": "en",
+            "tags": [doc_type, department, priority],
+            "priority_keywords": high_priority_keywords if priority == "high" else medium_priority_keywords if priority == "medium" else []
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Classification failed: {str(e)}")
+
+@app.post("/classify")
+async def classify_document(file: UploadFile = File(...)):
+    """Classify uploaded document file"""
+    try:
+        # Read file content
         content = await file.read()
-        filename = file.filename.lower()
-        
+
         # Extract text based on file type
         text_content = ""
         if file.content_type == 'application/pdf':
@@ -310,7 +406,7 @@ async def classify_document(file: UploadFile = File(...)):
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
                     tmp_file.write(content)
                     tmp_file.flush()
-                    
+
                     with open(tmp_file.name, 'rb') as pdf_file:
                         pdf_reader = PyPDF2.PdfReader(pdf_file)
                         text_parts = []
@@ -320,13 +416,13 @@ async def classify_document(file: UploadFile = File(...)):
                 os.unlink(tmp_file.name)
             except Exception as e:
                 text_content = f"PDF document: {file.filename}"
-        
+
         elif file.content_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
             try:
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
                     tmp_file.write(content)
                     tmp_file.flush()
-                    
+
                     doc = docx.Document(tmp_file.name)
                     paragraphs = []
                     for para in doc.paragraphs[:50]:
@@ -336,28 +432,26 @@ async def classify_document(file: UploadFile = File(...)):
                 os.unlink(tmp_file.name)
             except Exception as e:
                 text_content = f"DOCX document: {file.filename}"
-        
+
         elif file.content_type.startswith('text/'):
             text_content = content.decode('utf-8', errors='ignore')
         else:
             text_content = content.decode('utf-8', errors='ignore')[:5000]
 
-        # Classify the document
-        result = classify_document_locally(text_content, filename)
-        
-        return ClassificationResponse(**result)
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Classification failed: {str(e)}")
+        # Create classification request
+        request = ClassificationRequest(
+            content=text_content,
+            filename=file.filename or "unknown",
+            file_type=file.content_type or "txt"
+        )
 
-@app.post("/classify-text", response_model=ClassificationResponse)
-async def classify_text(request: ClassificationRequest):
-    """Classify document from text content"""
-    try:
-        result = classify_document_locally(request.content, request.filename)
-        return ClassificationResponse(**result)
+        # Use the text classification function
+        classification_result = await classify_text(request)
+
+        return classification_result
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Classification failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File classification failed: {str(e)}")
 
 @app.get("/ping")
 async def ping():

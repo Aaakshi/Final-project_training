@@ -2134,6 +2134,207 @@
             }
         }
 
+        async function reviewDocument(docId) {
+            try {
+                const response = await fetch('/api/documents/' + docId, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const doc = await response.json();
+                        showReviewModal(doc);
+                    } else {
+                        showToast('Failed to load document for review - invalid server response', 'error');
+                    }
+                } else {
+                    showToast('Failed to load document for review', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching document for review:', error);
+                showToast('Error loading document for review - network error', 'error');
+            }
+        }
+
+        function showReviewModal(doc) {
+            const uploadedBy = doc.uploaded_by || 'General Employee';
+            const uploadDate = new Date(doc.uploaded_at).toLocaleString();
+            const priority = doc.priority || 'medium';
+            const status = doc.processing_status || 'pending';
+            const docType = doc.document_type || 'general';
+            const department = doc.department || 'general';
+            const fileSize = formatFileSize(doc.file_size);
+            const riskScore = ((doc.risk_score || 0) * 100).toFixed(1);
+            const sentiment = doc.sentiment || 'neutral';
+            const summary = doc.summary || 'No summary available';
+            const routedTo = doc.routed_to || 'Not routed';
+            const routingReason = doc.routing_reason || 'No routing information';
+            
+            // Parse key phrases and entities
+            let keyPhrases = [];
+            let entities = {};
+            try {
+                keyPhrases = JSON.parse(doc.key_phrases || '[]');
+                entities = JSON.parse(doc.entities || '{}');
+            } catch (e) {
+                console.warn('Error parsing analysis data:', e);
+            }
+
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-file-search"></i> Review Document: ${doc.original_name}</h2>
+                        <span class="close" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+                            <!-- Basic Information -->
+                            <div class="info-section">
+                                <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                    <i class="fas fa-info-circle"></i> Document Information
+                                </h3>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Uploaded By:</label>
+                                        <span>${uploadedBy}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Upload Date:</label>
+                                        <span>${uploadDate}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Document Type:</label>
+                                        <span class="status-badge doc-type-${docType}">${docType.replace('_', ' ')}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Department:</label>
+                                        <span class="department-badge dept-${department}">${department.toUpperCase()}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Priority:</label>
+                                        <span class="priority-${priority}">${priority}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Status:</label>
+                                        <span class="status-badge status-${status}">${status}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>File Size:</label>
+                                        <span>${fileSize}</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>File Type:</label>
+                                        <span>${doc.file_type.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Content Analysis -->
+                            <div class="info-section">
+                                <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                    <i class="fas fa-chart-line"></i> Content Analysis
+                                </h3>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <label>Confidentiality Risk:</label>
+                                        <span style="color: ${riskScore > 50 ? 'var(--danger-color)' : riskScore > 25 ? 'var(--warning-color)' : 'var(--success-color)'}; font-weight: 600;">
+                                            ${riskScore}%
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Sentiment:</label>
+                                        <span class="status-badge status-${sentiment}" style="background: ${sentiment === 'positive' ? 'var(--green-100)' : sentiment === 'negative' ? 'var(--red-100)' : 'var(--gray-100)'}; color: ${sentiment === 'positive' ? 'var(--green-600)' : sentiment === 'negative' ? 'var(--red-600)' : 'var(--gray-600)'};">
+                                            ${sentiment.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div class="info-item">
+                                        <label>Routed To:</label>
+                                        <span>${routedTo}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary Section -->
+                        <div style="margin-top: 32px;">
+                            <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                <i class="fas fa-file-alt"></i> Document Summary
+                            </h3>
+                            <div style="background: var(--blue-50); padding: 20px; border-radius: var(--border-radius); border-left: 4px solid var(--primary-color); margin-bottom: 20px;">
+                                <p style="margin: 0; color: var(--gray-700); line-height: 1.6;">${summary}</p>
+                            </div>
+                        </div>
+
+                        <!-- Routing Information -->
+                        <div style="margin-top: 24px;">
+                            <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                <i class="fas fa-route"></i> Routing Information
+                            </h3>
+                            <div style="background: var(--gray-50); padding: 20px; border-radius: var(--border-radius); border: 1px solid var(--gray-200);">
+                                <p style="margin: 0; color: var(--gray-700); line-height: 1.6;">${routingReason}</p>
+                            </div>
+                        </div>
+
+                        <!-- Key Phrases -->
+                        ${keyPhrases.length > 0 ? `
+                        <div style="margin-top: 24px;">
+                            <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                <i class="fas fa-tags"></i> Key Phrases
+                            </h3>
+                            <div class="tags-container">
+                                ${keyPhrases.slice(0, 10).map(phrase => `<span class="tag">${phrase}</span>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Extracted Entities -->
+                        ${entities.names && entities.names.length > 0 ? `
+                        <div style="margin-top: 24px;">
+                            <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                <i class="fas fa-user-friends"></i> Detected Names
+                            </h3>
+                            <div class="tags-container">
+                                ${entities.names.slice(0, 5).map(name => `<span class="tag" style="background: var(--green-500);">${name}</span>`).join('')}
+                            </div>
+                        </div>
+                        ` : ''}
+
+                        <!-- Document Content -->
+                        <div style="margin-top: 32px;">
+                            <h3 style="color: var(--primary-color); margin-bottom: 16px; border-bottom: 2px solid var(--gray-200); padding-bottom: 8px;">
+                                <i class="fas fa-file-text"></i> Document Content
+                            </h3>
+                            <div class="extracted-text" style="max-height: 300px; overflow-y: auto;">
+                                ${(doc.extracted_text || 'No content available').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div style="margin-top: 32px; text-align: center; display: flex; gap: 16px; justify-content: center;">
+                            <button class="btn btn-success btn-lg" onclick="submitReview('${doc.doc_id}', 'approve'); this.parentElement.parentElement.parentElement.parentElement.remove();">
+                                <i class="fas fa-check"></i> Approve Document
+                            </button>
+                            <button class="btn btn-danger btn-lg" onclick="submitReview('${doc.doc_id}', 'reject'); this.parentElement.parentElement.parentElement.parentElement.remove();">
+                                <i class="fas fa-times"></i> Reject Document
+                            </button>
+                            <button class="btn btn-secondary btn-lg" onclick="this.parentElement.parentElement.parentElement.parentElement.remove();">
+                                <i class="fas fa-eye"></i> Close Review
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+        }
+
         function displayDocuments(documents) {
             const tbody = document.getElementById('documentsTableBody');
             tbody.innerHTML = documents.map(doc => {
@@ -2152,7 +2353,10 @@
                     '<td><span class="priority-' + priority + '">' + priority + '</span></td>' +
                     '<td>' + uploadedBy + '</td>' +
                     '<td>' + uploadDate + '</td>' +
-                    '<td><button class="btn btn-sm" onclick="viewDocument(\'' + doc.doc_id + '\')"><i class="fas fa-eye"></i> View</button></td>' +
+                    '<td>' +
+                        '<button class="btn btn-sm" onclick="viewDocument(\'' + doc.doc_id + '\')" style="margin-right: 8px;"><i class="fas fa-eye"></i> View</button>' +
+                        '<button class="btn btn-sm btn-secondary" onclick="reviewDocument(\'' + doc.doc_id + '\')"><i class="fas fa-file-search"></i> Review</button>' +
+                    '</td>' +
                     '</tr>';
             }).join('');
         }
