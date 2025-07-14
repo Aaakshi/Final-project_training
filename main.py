@@ -474,6 +474,7 @@ async def bulk_upload_documents(
                 doc_type, department, priority = classify_document(extracted_text, file.filename)
             
             # 2. Content Analysis Service
+            analysis_data = {}
             try:
                 analysis_response = requests.post(
                     "http://localhost:8003/analyze",
@@ -485,13 +486,14 @@ async def bulk_upload_documents(
                     timeout=30
                 )
                 
-                analysis_data = {}
                 if analysis_response.status_code == 200:
                     analysis_data = analysis_response.json()
-            except:
+            except Exception as e:
+                print(f"Content analysis service error: {str(e)}")
                 analysis_data = {}
             
             # 3. Routing Engine Service
+            routing_data = {}
             try:
                 routing_response = requests.post(
                     "http://localhost:8002/route",
@@ -507,16 +509,18 @@ async def bulk_upload_documents(
                     timeout=30
                 )
                 
-                routing_data = {}
                 if routing_response.status_code == 200:
                     routing_data = routing_response.json()
-            except:
+            except Exception as e:
+                print(f"Routing engine service error: {str(e)}")
                 routing_data = {}
             
         except Exception as e:
             print(f"Microservice error: {str(e)}")
             # Fallback to local processing
             doc_type, department, priority = classify_document(extracted_text, file.filename)
+            analysis_data = {}
+            routing_data = {}
         
         # Save to database
         conn = sqlite3.connect(DATABASE_FILE)
@@ -570,6 +574,7 @@ async def get_documents(
     status: str = "",
     doc_type: str = "",
     department: str = "",
+    sort_by: str = "uploaded_at_desc",
     current_user: dict = Depends(get_current_user)
 ):
     conn = sqlite3.connect(DATABASE_FILE)
@@ -598,9 +603,16 @@ async def get_documents(
     # Add user filtering for non-admin users
     if current_user['role'] != 'admin':
         if current_user['role'] == 'manager':
-            query += " AND (uploaded_by = ? OR department = ?)"
-            params.extend([current_user['email'], current_user['department']])
+            # HR managers can see all departments, other managers see only their department
+            if current_user['department'] == 'hr':
+                # HR managers can see all documents
+                pass
+            else:
+                # Other managers see only their department documents
+                query += " AND department = ?"
+                params.append(current_user['department'])
         else:
+            # Regular employees see only their own uploads
             query += " AND uploaded_by = ?"
             params.append(current_user['email'])
     
@@ -609,8 +621,19 @@ async def get_documents(
     cursor.execute(count_query, params)
     total_count = cursor.fetchone()[0]
     
+    # Add sorting
+    sort_mapping = {
+        "uploaded_at_desc": "uploaded_at DESC",
+        "uploaded_at_asc": "uploaded_at ASC", 
+        "name_asc": "original_name ASC",
+        "name_desc": "original_name DESC",
+        "priority_desc": "CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END",
+        "department_asc": "department ASC"
+    }
+    order_clause = sort_mapping.get(sort_by, "uploaded_at DESC")
+    
     # Add pagination
-    query += " ORDER BY uploaded_at DESC LIMIT ? OFFSET ?"
+    query += f" ORDER BY {order_clause} LIMIT ? OFFSET ?"
     params.extend([page_size, (page - 1) * page_size])
     
     cursor.execute(query, params)

@@ -1325,6 +1325,14 @@
                                 <option value="completed">Completed</option>
                                 <option value="failed">Failed</option>
                             </select>
+                            <select id="sortBy" onchange="loadDocuments()">
+                                <option value="uploaded_at_desc">Newest First</option>
+                                <option value="uploaded_at_asc">Oldest First</option>
+                                <option value="name_asc">Name A-Z</option>
+                                <option value="name_desc">Name Z-A</option>
+                                <option value="priority_desc">High Priority First</option>
+                                <option value="department_asc">Department A-Z</option>
+                            </select>
                             <select id="typeFilter" onchange="loadDocuments()">
                                 <option value="">All Types</option>
                                 <option value="invoice">Invoice</option>
@@ -1544,6 +1552,10 @@
             if (token) {
                 authToken = token;
                 checkAuth();
+            } else {
+                // Ensure we show login form if no token
+                document.getElementById('authContainer').classList.remove('hidden');
+                document.getElementById('mainContainer').classList.add('hidden');
             }
         };
 
@@ -1714,6 +1726,7 @@
             function updateUIForRole(user) {
                 const reviewNav = document.getElementById('reviewNavBtn');
                 const notificationsNav = document.getElementById('notificationsNavBtn');
+                const deptFilter = document.getElementById('deptFilter');
 
                 // Show review tab only for HR, Legal, Finance managers and admins
                 const canReviewDepartments = ['hr', 'legal', 'finance'];
@@ -1726,6 +1739,15 @@
 
                 // Show notifications tab for all users
                 notificationsNav.style.display = 'block';
+
+                // Limit department filter for non-HR managers
+                if (user.role === 'manager' && user.department !== 'hr' && user.role !== 'admin') {
+                    // Disable department filter for non-HR managers (they can only see their department)
+                    if (deptFilter) {
+                        deptFilter.value = user.department;
+                        deptFilter.disabled = true;
+                    }
+                }
             }
 
             updateUIForRole(currentUser);
@@ -2035,6 +2057,7 @@
             const status = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : '';
             const type = document.getElementById('typeFilter') ? document.getElementById('typeFilter').value : '';
             const department = document.getElementById('deptFilter') ? document.getElementById('deptFilter').value : '';
+            const sortBy = document.getElementById('sortBy') ? document.getElementById('sortBy').value : 'uploaded_at_desc';
 
             try {
                 const params = new URLSearchParams({
@@ -2043,7 +2066,8 @@
                     search: search,
                     status: status,
                     doc_type: type,
-                    department: department
+                    department: department,
+                    sort_by: sortBy
                 });
 
                 const response = await fetch('/api/documents?' + params, {

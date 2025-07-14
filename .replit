@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "IDCR Frontend Server"
+runButton = "Complete IDCR System with Microservices"
 
 [[workflows.workflow]]
 name = "Run Demo"
@@ -191,6 +191,27 @@ args = "python main.py"
 
 [[workflows.workflow]]
 name = "IDCR Complete System"
+author = 44313974
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python microservices/classification/app/main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python microservices/content_analysis/app/main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python microservices/routing_engine/app/main.py"
+
+[[workflows.workflow]]
+name = "Complete IDCR System with Microservices"
 author = 44313974
 mode = "parallel"
 
