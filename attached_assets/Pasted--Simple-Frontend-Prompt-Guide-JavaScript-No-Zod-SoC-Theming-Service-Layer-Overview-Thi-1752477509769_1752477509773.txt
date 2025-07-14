@@ -1,0 +1,821 @@
+# Simple Frontend Prompt Guide (JavaScript, No Zod, SoC, Theming, Service Layer)
+
+## Overview
+This guide provides comprehensive prompts and patterns for generating modern React frontend components using a **simple, maintainable, and scalable JavaScript architecture**.
+
+> **Important:** All frontend code should be written in **JavaScript** (not TypeScript). Do not use TypeScript syntax, types, or interfaces anywhere in your code or prompts.
+
+## Architecture Principles
+
+### Core Philosophy
+- **Simplicity First**: No complex validation (Zod), no TypeScript, just clean JavaScript
+- **Separation of Concerns (SoC)**: Clear separation between UI, data, and API logic
+- **Centralized Theming**: Single theme file for easy customization
+- **Service Layer**: All API calls go through a dedicated service layer
+- **Reusable Components**: Atomic, composable components for rapid development
+- **Easy Maintenance**: Structure that's simple to modify and extend
+
+## Project Structure
+
+```
+src/
+├── components/           # Reusable UI components (Button, Card, Input, etc.)
+│   ├── ui/              # Base UI components
+│   └── layout/          # Layout components
+├── pages/               # Page-level components
+├── themes/              # Theme configuration
+│   └── theme.js         # Main theme file (colors, spacing, typography)
+├── services/            # API service layer
+│   ├── apiClient.js     # Axios wrapper for HTTP methods
+│   └── apiService.js    # API endpoint functions
+├── hooks/               # Custom React hooks
+├── utils/               # Utility functions
+├── App.js
+└── index.js
+```
+
+## Tech Stack
+
+### Core Technologies
+- **React 18** with JavaScript
+- **Vite** for build tooling
+- **Tailwind CSS** for styling
+- **Axios** for API calls (wrapped in apiClient)
+- **Lucide React** for icons
+- **React Hook Form** for simple form management (no Zod)
+
+### Key Patterns
+- **Theme System**: Centralized theme configuration
+- **Service Layer**: API client wrapper + service functions
+- **Component Composition**: Atomic design principles
+- **State Management**: React hooks (useState, useEffect, useContext)
+- **Toast Notifications**: Simple feedback system
+
+## Theme System
+
+### Main Theme File (`src/themes/theme.js`)
+
+```js
+const theme = {
+  colors: {
+    primary: '#007bff',
+    secondary: '#6c757d',
+    success: '#28a745',
+    danger: '#dc3545',
+    warning: '#ffc107',
+    info: '#17a2b8',
+    light: '#f8f9fa',
+    dark: '#343a40',
+    white: '#ffffff',
+    background: '#f8f9fa',
+    surface: '#ffffff',
+    text: {
+      primary: '#212529',
+      secondary: '#6c757d',
+      muted: '#6c757d',
+    },
+    border: '#dee2e6',
+  },
+  spacing: {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px',
+    xxl: '48px',
+  },
+  typography: {
+    fontFamily: {
+      sans: ['Inter', 'system-ui', 'sans-serif'],
+      mono: ['Monaco', 'Consolas', 'monospace'],
+    },
+    fontSize: {
+      xs: '12px',
+      sm: '14px',
+      base: '16px',
+      lg: '18px',
+      xl: '20px',
+      '2xl': '24px',
+      '3xl': '30px',
+    },
+    fontWeight: {
+      normal: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700',
+    },
+  },
+  borderRadius: {
+    sm: '4px',
+    md: '8px',
+    lg: '12px',
+    xl: '16px',
+  },
+  shadows: {
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+  },
+};
+
+export default theme;
+```
+
+### Using Theme in Components
+
+```js
+import React from 'react';
+import theme from '../themes/theme';
+
+function Button({ children, variant = 'primary', onClick, ...props }) {
+  const buttonStyles = {
+    padding: `${theme.spacing.sm} ${theme.spacing.md}`,
+    borderRadius: theme.borderRadius.md,
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: theme.typography.fontSize.base,
+    fontWeight: theme.typography.fontWeight.medium,
+    ...(variant === 'primary' && {
+      backgroundColor: theme.colors.primary,
+      color: theme.colors.white,
+    }),
+    ...(variant === 'secondary' && {
+      backgroundColor: theme.colors.secondary,
+      color: theme.colors.white,
+    }),
+    ...(variant === 'outline' && {
+      backgroundColor: 'transparent',
+      color: theme.colors.primary,
+      border: `1px solid ${theme.colors.primary}`,
+    }),
+  };
+
+  return (
+    <button style={buttonStyles} onClick={onClick} {...props}>
+      {children}
+    </button>
+  );
+}
+
+export default Button;
+```
+
+## Service Layer Architecture
+
+### API Client (`src/services/apiClient.js`)
+
+```js
+import axios from 'axios';
+
+const apiClient = axios.create({
+  baseURL: '/api', // or your API base URL
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor
+apiClient.interceptors.request.use(
+  (config) => {
+    // Add auth token if available
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor
+apiClient.interceptors.response.use(
+  (response) => {
+    return response.data;
+  },
+  (error) => {
+    // Handle common errors (401, 403, 500, etc.)
+    if (error.response?.status === 401) {
+      // Handle unauthorized
+      localStorage.removeItem('authToken');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default {
+  get: (url, config) => apiClient.get(url, config),
+  post: (url, data, config) => apiClient.post(url, data, config),
+  put: (url, data, config) => apiClient.put(url, data, config),
+  delete: (url, config) => apiClient.delete(url, config),
+  patch: (url, data, config) => apiClient.patch(url, data, config),
+};
+```
+
+### API Service (`src/services/apiService.js`)
+
+```js
+import apiClient from './apiClient';
+
+// Job-related API calls
+export const jobService = {
+  getAll: () => apiClient.get('/jobs'),
+  getById: (id) => apiClient.get(`/jobs/${id}`),
+  create: (data) => apiClient.post('/jobs', data),
+  update: (id, data) => apiClient.put(`/jobs/${id}`, data),
+  delete: (id) => apiClient.delete(`/jobs/${id}`),
+};
+
+// User-related API calls
+export const userService = {
+  getAll: () => apiClient.get('/users'),
+  getById: (id) => apiClient.get(`/users/${id}`),
+  create: (data) => apiClient.post('/users', data),
+  update: (id, data) => apiClient.put(`/users/${id}`, data),
+  delete: (id) => apiClient.delete(`/users/${id}`),
+};
+
+// Auth-related API calls
+export const authService = {
+  login: (credentials) => apiClient.post('/auth/login', credentials),
+  logout: () => apiClient.post('/auth/logout'),
+  register: (userData) => apiClient.post('/auth/register', userData),
+  getProfile: () => apiClient.get('/auth/profile'),
+};
+
+// Firecrawl-related API calls
+export const firecrawlService = {
+  scrapeLinkedIn: (data) => apiClient.post('/firecrawl/scrape-linkedin', data),
+  getCampaigns: () => apiClient.get('/firecrawl/campaigns'),
+  createCampaign: (data) => apiClient.post('/firecrawl/campaigns', data),
+  getCandidates: () => apiClient.get('/firecrawl/candidates'),
+  identifyCandidates: (jobId, data) => apiClient.post(`/firecrawl/identify-candidates/${jobId}`, data),
+};
+```
+
+## Component Architecture Patterns
+
+### 1. Basic Component Structure
+
+```jsx
+import React, { useState, useEffect } from 'react';
+import { useToast } from '../hooks/use-toast';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Input from '../components/ui/Input';
+import { jobService } from '../services/apiService';
+
+export function JobList() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const fetchJobs = async () => {
+    setLoading(true);
+    try {
+      const data = await jobService.getAll();
+      setJobs(data);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch jobs',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (jobId) => {
+    try {
+      await jobService.delete(jobId);
+      toast({
+        title: 'Success',
+        description: 'Job deleted successfully',
+        type: 'success',
+      });
+      fetchJobs(); // Refresh the list
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete job',
+        type: 'error',
+      });
+    }
+  };
+
+  const filteredJobs = jobs.filter(job =>
+    job.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Jobs</h1>
+        <Button variant="primary">Add New Job</Button>
+      </div>
+
+      <Card>
+        <div className="p-4">
+          <Input
+            placeholder="Search jobs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </Card>
+
+      {loading ? (
+        <div className="text-center py-8">Loading...</div>
+      ) : (
+        <div className="space-y-4">
+          {filteredJobs.map((job) => (
+            <Card key={job.id}>
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{job.title}</h3>
+                    <p className="text-sm text-gray-600">{job.company}</p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm">Edit</Button>
+                    <Button 
+                      variant="danger" 
+                      size="sm"
+                      onClick={() => handleDelete(job.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+          
+          {filteredJobs.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No jobs found
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### 2. Form Component Pattern
+
+```jsx
+import React, { useState } from 'react';
+import { useToast } from '../hooks/use-toast';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Input from '../components/ui/Input';
+import { jobService } from '../services/apiService';
+
+export function JobForm({ job, onSuccess, onCancel }) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    title: job?.title || '',
+    company: job?.company || '',
+    location: job?.location || '',
+    description: job?.description || '',
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Simple validation (no Zod)
+    if (!formData.title.trim() || !formData.company.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        type: 'error',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (job) {
+        await jobService.update(job.id, formData);
+        toast({
+          title: 'Success',
+          description: 'Job updated successfully',
+          type: 'success',
+        });
+      } else {
+        await jobService.create(formData);
+        toast({
+          title: 'Success',
+          description: 'Job created successfully',
+          type: 'success',
+        });
+      }
+      onSuccess?.();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Operation failed',
+        type: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  return (
+    <Card>
+      <div className="p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          {job ? 'Edit Job' : 'Create New Job'}
+        </h2>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Title *</label>
+              <Input
+                value={formData.title}
+                onChange={(e) => handleChange('title', e.target.value)}
+                placeholder="Job title"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Company *</label>
+              <Input
+                value={formData.company}
+                onChange={(e) => handleChange('company', e.target.value)}
+                placeholder="Company name"
+                required
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Location</label>
+            <Input
+              value={formData.location}
+              onChange={(e) => handleChange('location', e.target.value)}
+              placeholder="Job location"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => handleChange('description', e.target.value)}
+              placeholder="Job description"
+              className="w-full p-2 border rounded-md"
+              rows={4}
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={loading}>
+              {loading ? 'Saving...' : (job ? 'Update' : 'Create')}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Card>
+  );
+}
+```
+
+### 3. Tabbed Interface Pattern
+
+```jsx
+import React, { useState } from 'react';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+
+export function TabbedInterface() {
+  const [activeTab, setActiveTab] = useState('tab1');
+
+  const tabs = [
+    { id: 'tab1', label: 'Overview', content: <OverviewTab /> },
+    { id: 'tab2', label: 'Details', content: <DetailsTab /> },
+    { id: 'tab3', label: 'Settings', content: <SettingsTab /> },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {/* Tab Navigation */}
+      <div className="flex space-x-1 border-b">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 font-medium ${
+              activeTab === tab.id
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      <Card>
+        <div className="p-6">
+          {tabs.find(tab => tab.id === activeTab)?.content}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function OverviewTab() {
+  return <div>Overview content goes here</div>;
+}
+
+function DetailsTab() {
+  return <div>Details content goes here</div>;
+}
+
+function SettingsTab() {
+  return <div>Settings content goes here</div>;
+}
+```
+
+## Prompt Templates
+
+### 1. Basic Component Generation
+
+```
+Create a React component for [FEATURE_NAME] with the following requirements:
+
+**Tech Stack:**
+- React 18 with JavaScript (no TypeScript)
+- Custom UI components from components/ui/
+- Tailwind CSS for styling
+- Theme system from themes/theme.js
+- Service layer for API calls (no direct Axios)
+
+**Requirements:**
+- [LIST_SPECIFIC_REQUIREMENTS]
+- [FORM_FIELDS_IF_APPLICABLE]
+- [API_ENDPOINTS_TO_INTEGRATE]
+- [SIMPLE_VALIDATION_RULES]
+
+**Component Structure:**
+- Use the established patterns from the codebase
+- Do NOT use TypeScript or type annotations
+- Use theme variables for styling (colors, spacing, typography)
+- Implement loading states
+- Add error handling with toast notifications
+- Use responsive design with Tailwind classes
+- Follow the existing naming conventions
+
+**Service Layer Integration:**
+- Use apiService functions for all API calls
+- Do NOT call Axios directly in components
+- Handle errors through the service layer
+
+**UI/UX Requirements:**
+- [SPECIFIC_UI_REQUIREMENTS]
+- [LAYOUT_PREFERENCES]
+- [INTERACTION_PATTERNS]
+
+Please generate the complete component with all necessary imports, state management, and UI elements. Do not use TypeScript anywhere.
+```
+
+### 2. Complex Feature Component
+
+```
+Create a comprehensive React component for [FEATURE_NAME] with multiple tabs and advanced functionality:
+
+**Tech Stack:**
+- React 18 with JavaScript (no TypeScript)
+- Custom UI components from components/ui/
+- Tailwind CSS for styling
+- Theme system from themes/theme.js
+- Service layer for API calls
+- Simple form validation (no Zod)
+
+**Feature Requirements:**
+- [TAB_1_FUNCTIONALITY]
+- [TAB_2_FUNCTIONALITY]
+- [TAB_3_FUNCTIONALITY]
+- [DATA_MANAGEMENT_REQUIREMENTS]
+
+**Component Structure:**
+- Tabbed interface with [NUMBER] tabs
+- Each tab should have its own Card with appropriate content
+- Implement proper state management for each tab
+- Add loading states and progress indicators
+- Include data fetching and error handling
+- Use responsive grid layouts
+- Do NOT use TypeScript or type annotations
+- Use theme variables for consistent styling
+
+**Service Layer Integration:**
+- Use apiService functions for all API calls
+- Create new service functions if needed
+- Handle errors through the service layer
+
+**UI Patterns:**
+- Follow the established design patterns from the codebase
+- Use consistent spacing from theme
+- Implement simple form validation (no Zod)
+- Add status indicators
+- Include empty states for each tab
+
+**API Integration:**
+- [LIST_ALL_API_ENDPOINTS]
+- [ERROR_HANDLING_REQUIREMENTS]
+- [SUCCESS_NOTIFICATIONS]
+
+Please generate the complete component with all tabs, state management, and UI elements following the established patterns. Do not use TypeScript anywhere.
+```
+
+### 3. Form Component Generation
+
+```
+Create a React form component for [FORM_PURPOSE] with simple validation and submission handling:
+
+**Tech Stack:**
+- React 18 with JavaScript (no TypeScript)
+- Custom UI components from components/ui/
+- Theme system from themes/theme.js
+- Service layer for API calls
+- Simple validation (no Zod, just basic checks)
+
+**Form Requirements:**
+- [LIST_ALL_FORM_FIELDS]
+- [SIMPLE_VALIDATION_RULES]
+- [SUBMISSION_ENDPOINT]
+- [SUCCESS/ERROR_HANDLING]
+
+**Form Structure:**
+- Use simple validation (required fields, basic format checks)
+- Implement proper error display
+- Add loading states during submission
+- Include form reset functionality
+- Use responsive grid layout for fields
+- Do NOT use TypeScript or type annotations
+- Use theme variables for styling
+
+**Service Layer Integration:**
+- Use apiService functions for form submission
+- Handle errors through the service layer
+
+**UI Requirements:**
+- Clean, accessible form design using theme colors
+- Proper field grouping and spacing from theme
+- Clear error messages
+- Success/error notifications
+- Responsive layout
+
+Please generate the complete form component with simple validation, error handling, and proper UI structure. Do not use TypeScript or Zod anywhere.
+```
+
+### 4. Data Display Component
+
+```
+Create a React component for displaying [DATA_TYPE] in a table or list format:
+
+**Tech Stack:**
+- React 18 with JavaScript (no TypeScript)
+- Custom UI components from components/ui/
+- Tailwind CSS for styling
+- Theme system from themes/theme.js
+- Service layer for API calls
+
+**Data Requirements:**
+- [DATA_STRUCTURE_DEFINITION]
+- [COLUMNS_TO_DISPLAY]
+- [SORTING_REQUIREMENTS]
+- [FILTERING_OPTIONS]
+
+**Component Features:**
+- Data fetching with loading states
+- Error handling and empty states
+- Action buttons for each row
+- Status indicators
+- Responsive design
+- Search/filter functionality (if needed)
+- Do NOT use TypeScript or type annotations
+
+**Service Layer Integration:**
+- Use apiService functions for data fetching
+- Use apiService functions for actions (edit, delete, etc.)
+- Handle errors through the service layer
+
+**UI Patterns:**
+- Use Card wrapper with proper header
+- Implement responsive table/list layout
+- Add proper spacing and typography from theme
+- Include action buttons with appropriate variants
+- Use status indicators for different states
+
+**API Integration:**
+- [FETCH_ENDPOINT]
+- [ACTION_ENDPOINTS]
+- [ERROR_HANDLING]
+
+Please generate the complete component with data display, actions, and proper UI structure. Do not use TypeScript anywhere.
+```
+
+## Design System Guidelines
+
+### 1. Theme Usage
+- **Colors**: Always use `theme.colors.*` for consistent color scheme
+- **Spacing**: Use `theme.spacing.*` for consistent spacing
+- **Typography**: Use `theme.typography.*` for fonts and sizes
+- **Borders**: Use `theme.borderRadius.*` for consistent border radius
+- **Shadows**: Use `theme.shadows.*` for consistent shadows
+
+### 2. Component Variants
+- **Primary actions**: `variant="primary"`
+- **Secondary actions**: `variant="secondary"`
+- **Outline actions**: `variant="outline"`
+- **Danger actions**: `variant="danger"`
+
+### 3. Responsive Design
+- **Mobile-first**: Start with mobile layout, then add desktop styles
+- **Grid layouts**: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
+- **Flex layouts**: `flex flex-col md:flex-row`
+- **Spacing**: Use theme spacing variables
+
+### 4. Loading States
+```jsx
+{loading ? (
+  <div className="text-center py-8">Loading...</div>
+) : (
+  // Content
+)}
+```
+
+### 5. Error Handling
+```jsx
+try {
+  const data = await apiService.someFunction();
+  // Handle success
+} catch (error) {
+  toast({
+    title: 'Error',
+    description: error.message || 'Operation failed',
+    type: 'error',
+  });
+}
+```
+
+### 6. Empty States
+```jsx
+{data.length === 0 && (
+  <div className="text-center py-8 text-gray-500">
+    No data found. Start by creating something.
+  </div>
+)}
+```
+
+## Best Practices
+
+1. **JavaScript Only**: Do not use TypeScript, types, or interfaces
+2. **No Zod**: Use simple validation (required checks, basic format validation)
+3. **Service Layer**: All API calls go through the service layer
+4. **Theme System**: Use theme variables for all styling
+5. **Component Composition**: Build complex components from simple ones
+6. **Error Handling**: Comprehensive error handling with user feedback
+7. **Loading States**: Show loading indicators for async operations
+8. **Responsive Design**: Ensure components work on all screen sizes
+9. **Accessibility**: Use proper ARIA labels and semantic HTML
+10. **Performance**: Use proper React patterns (useEffect, useState, etc.)
+
+## Example Usage
+
+When generating components, use these prompts as templates and customize them based on specific requirements. The key is to maintain consistency with the existing codebase patterns while implementing the required functionality.
+
+For example, to create a new feature component:
+
+1. Use the "Complex Feature Component" template
+2. Replace placeholders with specific requirements
+3. Specify UI/UX requirements
+4. Include all necessary API endpoints
+5. Ensure all styling uses theme variables
+6. Use service layer for all API calls
+
+This approach ensures that generated components integrate seamlessly with the existing application architecture and maintain the established design patterns while being easy to modify and extend in the future. 
