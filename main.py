@@ -446,13 +446,17 @@ async def bulk_upload_documents(
         # Extract text
         extracted_text = extract_text_from_file(str(file_path), file_extension)
         
+        # Initialize variables to prevent UnboundLocalError
+        analysis_data = {}
+        routing_data = {}
+        
         # Use microservices for processing
         try:
             # 1. Classification Service
             import requests
             import json
             
-            with open(file_path, 'rb') as f:
+            try:
                 classification_response = requests.post(
                     "http://localhost:8001/classify-text",
                     json={
@@ -463,18 +467,21 @@ async def bulk_upload_documents(
                     },
                     timeout=30
                 )
-            
-            if classification_response.status_code == 200:
-                classification_data = classification_response.json()
-                doc_type = classification_data.get('doc_type', 'general_document')
-                department = classification_data.get('department', 'general')
-                priority = classification_data.get('priority', 'medium')
-            else:
+                
+                if classification_response.status_code == 200:
+                    classification_data = classification_response.json()
+                    doc_type = classification_data.get('doc_type', 'general_document')
+                    department = classification_data.get('department', 'general')
+                    priority = classification_data.get('priority', 'medium')
+                else:
+                    # Fallback to local classification
+                    doc_type, department, priority = classify_document(extracted_text, file.filename)
+            except Exception as e:
+                print(f"Classification service error: {str(e)}")
                 # Fallback to local classification
                 doc_type, department, priority = classify_document(extracted_text, file.filename)
             
             # 2. Content Analysis Service
-            analysis_data = {}
             try:
                 analysis_response = requests.post(
                     "http://localhost:8003/analyze",
@@ -493,7 +500,6 @@ async def bulk_upload_documents(
                 analysis_data = {}
             
             # 3. Routing Engine Service
-            routing_data = {}
             try:
                 routing_response = requests.post(
                     "http://localhost:8002/route",
