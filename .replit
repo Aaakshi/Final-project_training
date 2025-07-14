@@ -231,6 +231,18 @@ args = "python microservices/content_analysis/app/main.py"
 task = "shell.exec"
 args = "python microservices/routing_engine/app/main.py"
 
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python microservices/routing_engine/app/main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python microservices/routing_engine/app/main.py"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd frontend && npm run dev"
+
 [[workflows.workflow]]
 name = "Start Frontend Development"
 author = 44313974
