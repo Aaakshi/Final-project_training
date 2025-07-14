@@ -241,7 +241,7 @@ args = "python microservices/routing_engine/app/main.py"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && npm run dev"
+args = "cd "
 
 [[workflows.workflow]]
 name = "Start Frontend Development"
