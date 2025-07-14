@@ -71,7 +71,9 @@ def init_database():
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
     
-    # Drop and recreate users table to fix any schema issues
+    # Drop all tables to ensure clean state
+    cursor.execute('DROP TABLE IF EXISTS email_notifications')
+    cursor.execute('DROP TABLE IF EXISTS documents')
     cursor.execute('DROP TABLE IF EXISTS users')
     
     # Create users table
@@ -89,7 +91,7 @@ def init_database():
     
     # Create documents table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS documents (
+        CREATE TABLE documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_id TEXT UNIQUE NOT NULL,
             original_name TEXT NOT NULL,
@@ -113,7 +115,7 @@ def init_database():
     
     # Create email_notifications table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS email_notifications (
+        CREATE TABLE email_notifications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_id TEXT NOT NULL,
             sent_by TEXT NOT NULL,
@@ -141,19 +143,20 @@ def init_database():
         ("Bob IT", "it@company.com", "it123", "it", "manager")
     ]
     
-    # First, let's clear existing users to avoid conflicts
-    cursor.execute("DELETE FROM users")
-    
     for full_name, email, password, department, role in demo_users:
-        hashed_password = get_password_hash(password)
-        cursor.execute('''
-            INSERT INTO users (full_name, email, password_hash, department, role)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (full_name, email, hashed_password, department, role))
+        try:
+            hashed_password = get_password_hash(password)
+            cursor.execute('''
+                INSERT INTO users (full_name, email, password_hash, department, role)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (full_name, email, hashed_password, department, role))
+            print(f"Added user: {email}")
+        except Exception as e:
+            print(f"Error adding user {email}: {str(e)}")
     
     conn.commit()
     conn.close()
-    print("Database initialized with demo users")
+    print("Database initialized successfully with demo users")
 
 # Authentication functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -352,31 +355,52 @@ async def register_user(user: UserRegister):
 
 @app.post("/api/login")
 async def login_user(user: UserLogin):
-    conn = sqlite3.connect(DATABASE_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE email = ?", (user.email,))
-    db_user = cursor.fetchone()
-    conn.close()
-    
-    if not db_user or not verify_password(user.password, db_user[3]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {
-            "id": db_user[0],
-            "full_name": db_user[1],
-            "email": db_user[2],
-            "department": db_user[4],
-            "role": db_user[5]
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE email = ?", (user.email,))
+        db_user = cursor.fetchone()
+        conn.close()
+        
+        if not db_user:
+            print(f"User not found: {user.email}")
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        print(f"Found user: {db_user[1]} ({db_user[2]})")
+        
+        # Verify password
+        try:
+            password_valid = verify_password(user.password, db_user[3])
+            if not password_valid:
+                print(f"Password verification failed for user: {user.email}")
+                raise HTTPException(status_code=401, detail="Invalid email or password")
+        except Exception as e:
+            print(f"Password verification error for {user.email}: {str(e)}")
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        
+        print(f"Login successful for: {user.email}")
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": db_user[0],
+                "full_name": db_user[1],
+                "email": db_user[2],
+                "department": db_user[4],
+                "role": db_user[5]
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Login error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Login failed")
 
 @app.get("/api/me")
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
