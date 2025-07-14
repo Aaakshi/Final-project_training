@@ -18,7 +18,7 @@ import requests
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -392,10 +392,9 @@ def send_email_notification(doc_info: dict, recipient_dept: str, target_email: s
         return False
 
 # Routes
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=RedirectResponse)
 async def read_root():
-    with open("index.html", "r") as file:
-        return HTMLResponse(content=file.read())
+    return RedirectResponse(url="http://0.0.0.0:5005", status_code=302)
 
 @app.post("/api/register")
 async def register_user(user: UserRegister):
@@ -772,7 +771,7 @@ async def get_documents(
             'page': 1,
             'page_size': len(formatted_docs)
         }
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -890,7 +889,7 @@ async def get_review_documents(
             })
 
         return {'documents': formatted_docs}
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -913,7 +912,7 @@ async def review_document(
         # Get document details before updating
         cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
         document = cursor.fetchone()
-        
+
         if not document:
             conn.close()
             raise HTTPException(status_code=404, detail="Document not found")
@@ -930,19 +929,19 @@ async def review_document(
         uploader_email = document[6]  # uploaded_by field
         doc_name = document[2]  # original_name field
         department = document[11]  # department field
-        
+
         # Create email notification using the correct schema
         subject = f"Document Review: {doc_name} - {new_status.upper()}"
         body = f"""
         Your document "{doc_name}" has been {new_status} by {current_user['full_name']} ({current_user['email']}).
-        
+
         Review Comments: {review.comments or 'No comments provided'}
-        
+
         Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        
+
         You can view the document details in the IDCR system.
         """
-        
+
         cursor.execute('''
             INSERT INTO email_notifications 
             (doc_id, sent_by, received_by, subject, body_preview, email_type, status, document_name, department, priority)
@@ -953,7 +952,7 @@ async def review_document(
         conn.close()
 
         return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
