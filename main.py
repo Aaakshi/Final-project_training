@@ -15,6 +15,7 @@ import re
 
 import jwt
 import uvicorn
+import requests
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
@@ -126,9 +127,29 @@ def init_database():
         )
     ''')
     
+    # Insert demo users with proper password hashing
+    demo_users = [
+        ("John Admin", "admin@company.com", "admin123", "administration", "admin"),
+        ("Sarah Manager", "manager@company.com", "manager123", "hr", "manager"),
+        ("Mike Employee", "employee@company.com", "employee123", "finance", "employee"),
+        ("Lisa HR", "hr@company.com", "hr123", "hr", "manager"),
+        ("Tom Finance", "finance@company.com", "finance123", "finance", "manager"),
+        ("Alice Legal", "legal@company.com", "legal123", "legal", "manager"),
+        ("Bob IT", "it@company.com", "it123", "it", "manager")
+    ]
+    
+    for full_name, email, password, department, role in demo_users:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email = ?", (email,))
+        if cursor.fetchone()[0] == 0:
+            hashed_password = get_password_hash(password)
+            cursor.execute('''
+                INSERT INTO users (full_name, email, password_hash, department, role)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (full_name, email, hashed_password, department, role))
+    
     conn.commit()
     conn.close()
-    print("Database initialized")
+    print("Database initialized with demo users")
 
 # Initialize database on startup
 init_database()
@@ -388,9 +409,80 @@ async def bulk_upload_documents(
             content = await file.read()
             buffer.write(content)
         
-        # Extract text and classify
+        # Extract text
         extracted_text = extract_text_from_file(str(file_path), file_extension)
-        doc_type, department, priority = classify_document(extracted_text, file.filename)
+        
+        # Use microservices for processing
+        try:
+            # 1. Classification Service
+            import requests
+            import json
+            
+            with open(file_path, 'rb') as f:
+                classification_response = requests.post(
+                    "http://localhost:8001/classify-text",
+                    json={
+                        "doc_id": doc_id,
+                        "content": extracted_text,
+                        "filename": file.filename,
+                        "file_type": file_extension
+                    },
+                    timeout=30
+                )
+            
+            if classification_response.status_code == 200:
+                classification_data = classification_response.json()
+                doc_type = classification_data.get('doc_type', 'general_document')
+                department = classification_data.get('department', 'general')
+                priority = classification_data.get('priority', 'medium')
+            else:
+                # Fallback to local classification
+                doc_type, department, priority = classify_document(extracted_text, file.filename)
+            
+            # 2. Content Analysis Service
+            try:
+                analysis_response = requests.post(
+                    "http://localhost:8003/analyze",
+                    json={
+                        "doc_id": doc_id,
+                        "content": extracted_text,
+                        "filename": file.filename
+                    },
+                    timeout=30
+                )
+                
+                analysis_data = {}
+                if analysis_response.status_code == 200:
+                    analysis_data = analysis_response.json()
+            except:
+                analysis_data = {}
+            
+            # 3. Routing Engine Service
+            try:
+                routing_response = requests.post(
+                    "http://localhost:8002/route",
+                    json={
+                        "doc_id": doc_id,
+                        "doc_type": doc_type,
+                        "department": department,
+                        "priority": priority,
+                        "content_summary": analysis_data.get('summary', ''),
+                        "file_size": file.size,
+                        "user_department": current_user['department']
+                    },
+                    timeout=30
+                )
+                
+                routing_data = {}
+                if routing_response.status_code == 200:
+                    routing_data = routing_response.json()
+            except:
+                routing_data = {}
+            
+        except Exception as e:
+            print(f"Microservice error: {str(e)}")
+            # Fallback to local processing
+            doc_type, department, priority = classify_document(extracted_text, file.filename)
         
         # Save to database
         conn = sqlite3.connect(DATABASE_FILE)
@@ -424,7 +516,9 @@ async def bulk_upload_documents(
             'doc_id': doc_id,
             'type': doc_type,
             'department': department,
-            'priority': priority
+            'priority': priority,
+            'summary': analysis_data.get('summary', ''),
+            'routing_info': routing_data.get('routing_reason', '')
         })
     
     return {
@@ -767,7 +861,30 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    health_status = {
+        "main_service": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "microservices": {}
+    }
+    
+    # Check microservices
+    services = {
+        "classification": "http://localhost:8001/ping",
+        "routing_engine": "http://localhost:8002/ping", 
+        "content_analysis": "http://localhost:8003/ping"
+    }
+    
+    for service_name, url in services.items():
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                health_status["microservices"][service_name] = "healthy"
+            else:
+                health_status["microservices"][service_name] = "unhealthy"
+        except:
+            health_status["microservices"][service_name] = "unreachable"
+    
+    return health_status
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

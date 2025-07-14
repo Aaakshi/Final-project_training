@@ -178,16 +178,36 @@ def extract_key_phrases(content: str) -> List[str]:
 
 def generate_summary(content: str) -> str:
     """Generate a brief summary of the document"""
-    sentences = content.split('.')
+    sentences = [s.strip() for s in content.split('.') if s.strip()]
+    
+    if not sentences:
+        return "No content available for summary"
+    
     if len(sentences) <= 2:
         return content[:200] + "..." if len(content) > 200 else content
     
-    # Take first two sentences
-    summary = '. '.join(sentences[:2]).strip()
+    # Find the most informative sentences (containing key terms)
+    key_terms = ['request', 'document', 'policy', 'agreement', 'invoice', 'payment', 'employee', 'department', 'project', 'meeting', 'contract', 'budget', 'report', 'analysis', 'system', 'process']
+    
+    scored_sentences = []
+    for sentence in sentences[:10]:  # Limit to first 10 sentences
+        score = sum(1 for term in key_terms if term.lower() in sentence.lower())
+        scored_sentences.append((score, sentence))
+    
+    # Sort by score and take top sentences
+    scored_sentences.sort(key=lambda x: x[0], reverse=True)
+    
+    # Take top 2-3 sentences or first 2 if no high-scoring sentences
+    if scored_sentences[0][0] > 0:
+        summary_sentences = [s[1] for s in scored_sentences[:2]]
+    else:
+        summary_sentences = sentences[:2]
+    
+    summary = '. '.join(summary_sentences)
     if summary and not summary.endswith('.'):
         summary += '.'
     
-    return summary[:300] + "..." if len(summary) > 300 else summary
+    return summary[:400] + "..." if len(summary) > 400 else summary
 
 def detect_language(content: str) -> str:
     """Simple language detection"""
