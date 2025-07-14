@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout, ConfigProvider } from 'antd';
-import { theme } from './themes/theme.js';
+import theme from './themes/theme.js';
 import Sidebar from './components/layout/Sidebar.jsx';
 import Header from './components/layout/Header.jsx';
 import Login from './pages/Login.jsx';
