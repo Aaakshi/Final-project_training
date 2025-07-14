@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,7 +32,7 @@
             text-align: center;
             color: white;
             margin-bottom: 0;
-            background: linear-gradient(135deg, #4369b2 0%, #564ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 30px 20px;
             box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
             position: relative;
@@ -85,7 +86,7 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #4369b2, #564ba2);
+            background: linear-gradient(90deg, #667eea, #764ba2);
         }
 
         /* Main Application Layout */
@@ -105,7 +106,7 @@
             background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
             color: white;
             padding: 0;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.08);
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
             position: relative;
             transition: all 0.3s ease;
         }
@@ -127,7 +128,7 @@
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #4369b2 0%, #564ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -176,8 +177,8 @@
         }
 
         .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-right: 4px solid #4fd1c7;
             padding-left: 35px;
         }
 
@@ -188,7 +189,7 @@
             top: 0;
             bottom: 0;
             width: 4px;
-            background: #4299e1;
+            background: #4fd1c7;
         }
 
         .nav-item i {
@@ -306,7 +307,7 @@
             height: 4px;
         }
 
-        .stat-card.documents::before { background: linear-gradient(90deg, #4369b2, #564ba2); }
+        .stat-card.documents::before { background: linear-gradient(90deg, #667eea, #764ba2); }
         .stat-card.processed::before { background: linear-gradient(90deg, #48bb78, #38a169); }
         .stat-card.pending::before { background: linear-gradient(90deg, #ed8936, #dd6b20); }
         .stat-card.rate::before { background: linear-gradient(90deg, #9f7aea, #805ad5); }
@@ -329,7 +330,7 @@
             color: white;
         }
 
-        .stat-icon.documents { background: linear-gradient(135deg, #4369b2, #564ba2); }
+        .stat-icon.documents { background: linear-gradient(135deg, #667eea, #764ba2); }
         .stat-icon.processed { background: linear-gradient(135deg, #48bb78, #38a169); }
         .stat-icon.pending { background: linear-gradient(135deg, #ed8936, #dd6b20); }
         .stat-icon.rate { background: linear-gradient(135deg, #9f7aea, #805ad5); }
@@ -423,17 +424,24 @@
             border-collapse: collapse;
         }
 
+        .activity-table th,
+        .activity-table td {
+            text-align: left;
+            padding: 12px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
         .activity-table th {
             font-size: 12px;
             font-weight: 600;
-            color: #64748b;
+            color: #718096;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .activity-table td {
             font-size: 14px;
-            color: #1e293b;
+            color: #2d3748;
         }
 
         .activity-table tr:hover {
@@ -441,7 +449,7 @@
         }
 
         .document-link {
-            color: #64748b;
+            color: #667eea;
             text-decoration: none;
             font-weight: 500;
         }
@@ -576,7 +584,7 @@
         }
 
         .btn {
-            background: linear-gradient(135deg, #4369b2 0%, #564ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 12px 25px;
             border: none;
@@ -810,11 +818,11 @@
             .sidebar {
                 width: 250px;
             }
-
+            
             .dashboard-sections {
                 grid-template-columns: 1fr;
             }
-
+            
             .charts-section {
                 grid-template-columns: 1fr;
             }
@@ -827,19 +835,19 @@
                 z-index: 100;
                 transition: left 0.3s ease;
             }
-
+            
             .sidebar.mobile-open {
                 left: 0;
             }
-
+            
             .content-area {
                 margin-left: 0;
             }
-
+            
             .quick-stats {
                 grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             }
-
+            
             .documents-grid {
                 grid-template-columns: 1fr;
             }
@@ -931,7 +939,6 @@
         }
 
         /* Mobile menu toggle */
-        ```html
         .mobile-menu-toggle {
             display: none;
             position: fixed;
@@ -940,7 +947,8 @@
             z-index: 101;
             background: #667eea;
             color: white;
-            border: none,padding: 10px;
+            border: none;
+            padding: 10px;
             border-radius: 8px;
             cursor: pointer;
         }
@@ -1121,7 +1129,7 @@
                                         </div>
                                         <a href="#" class="card-action" onclick="showTab('documents')">View All</a>
                                     </div>
-
+                                    
                                     <table class="activity-table">
                                         <thead>
                                             <tr>
@@ -1165,7 +1173,7 @@
                                             Quick Actions
                                         </div>
                                     </div>
-
+                                    
                                     <div class="quick-actions">
                                         <button class="quick-action-btn" onclick="showTab('upload')">
                                             <i class="fas fa-upload"></i>
@@ -1187,7 +1195,7 @@
                                 </div>
                             </div>
 
-
+                            
                         </div>
                     </div>
 
@@ -1771,7 +1779,6 @@
                             '<p style="margin: 0 0 8px 0; color: #718096; font-size: 14px;">' +
                             '<strong>From:</strong> ' + (notif.sent_by_name || notif.sent_by) + '<br>' +
                             '<strong>To:</strong> ' + (notif.received_by_name || notif.received_by) + '<br>' +
-```javascript
                             '<strong>Type:</strong> ' + (notif.email_type || 'General') +
                             '</p>' +
                             '<p style="margin: 0; color: #4a5568; font-size: 13px; line-height: 1.4;">' + 
@@ -1832,8 +1839,8 @@
                 datasets: [{
                     label: 'Documents Processed',
                     data: [12, 19, 8, 15, 12, 20],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
                     tension: 0.4,
                     fill: true
                 }]
@@ -1871,11 +1878,11 @@
                 datasets: [{
                     data: [30, 25, 20, 15, 10],
                     backgroundColor: [
-                        '#3b82f6',
-                        '#10b981',
-                        '#dc2626',
-                        '#f59e0b',
-                        '#6366f1'
+                        '#667eea',
+                        '#48bb78',
+                        '#e53e3e',
+                        '#ed8936',
+                        '#9f7aea'
                     ],
                     borderWidth: 0
                 }]
@@ -1963,11 +1970,11 @@
                         datasets: [{
                             label: 'Documents Processed',
                             data: chartData.upload_trends.map(t => t.count),
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
                             tension: 0.4,
                             fill: true,
-                            pointBackgroundColor: '#3b82f6',
+                            pointBackgroundColor: '#667eea',
                             pointBorderColor: '#ffffff',
                             pointBorderWidth: 2,
                             pointRadius: 4
@@ -2017,11 +2024,11 @@
                         datasets: [{
                             data: deptValues,
                             backgroundColor: [
-                                '#3b82f6', // HR
-                                '#10b981', // Finance
-                                '#dc2626', // Legal
-                                '#f59e0b', // IT
-                                '#6366f1'  // Administration
+                                '#667eea', // HR
+                                '#48bb78', // Finance
+                                '#e53e3e', // Legal
+                                '#ed8936', // IT
+                                '#9f7aea'  // Administration
                             ],
                             borderWidth: 0,
                             hoverOffset: 4
@@ -2058,7 +2065,7 @@
                         datasets: [{
                             label: 'Document Count',
                             data: typeValues,
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: '#667eea',
                             borderRadius: 6,
                             borderSkipped: false,
                             hoverBackgroundColor: '#5a67d8'
@@ -2232,457 +2239,5 @@
             }
         }
     </script>
-    <style>
-        /* Sidebar Navigation */
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-    </style>
-        <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-        .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-    <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-     <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-    <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-     <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-        <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
-     <style>
-        .sidebar {
-            width: 280px;
-            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
-            color: white;
-            padding: 0;
-            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.08);
-            position: relative;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu {
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap:15px;
-            padding: 15px 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            width: 100%;
-            text-align: left;
-            position: relative;
-            margin-bottom: 2px;
-        }
-
-        .nav-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            padding-left: 35px;
-        }
-
-        .nav-item.active {
-            background: linear-gradient(90deg, #4a5568 0%, #2d3748 100%);
-            border-right: 4px solid #4299e1;
-            padding-left: 35px;
-        }
-
-        .nav-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: #4299e1;
-        }
-
-         .nav-item i {
-            font-size: 18px;
-            width: 20px;
-            text-align: center;
-        }
-    </style>
+</body>
+</html>
