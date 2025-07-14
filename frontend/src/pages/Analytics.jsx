@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
@@ -18,7 +17,7 @@ import {
 import {
   BarChartOutlined,
   PieChartOutlined,
-  TrendingUpOutlined,
+  RiseOutlined,
   TeamOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
@@ -69,7 +68,7 @@ const Analytics = () => {
           { department: 'Marketing', avgTime: '2.7 hours', efficiency: 82 },
         ],
       };
-      
+
       setAnalyticsData(mockData);
     } catch (error) {
       console.error('Failed to fetch analytics data:', error);
@@ -196,7 +195,7 @@ const Analytics = () => {
             Track document processing performance and system usage.
           </p>
         </div>
-        
+
         <Space>
           <Select
             value={selectedDepartment}
@@ -210,7 +209,7 @@ const Analytics = () => {
             <Option value="it">IT</Option>
             <Option value="marketing">Marketing</Option>
           </Select>
-          
+
           <Select
             value={selectedPeriod}
             onChange={setSelectedPeriod}
@@ -241,7 +240,7 @@ const Analytics = () => {
             <Statistic
               title="Approved"
               value={analyticsData.approvedDocuments}
-              prefix={<TrendingUpOutlined />}
+              prefix={<RiseOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />
           </Card>
@@ -289,7 +288,7 @@ const Analytics = () => {
             />
           </Card>
         </Col>
-        
+
         <Col xs={24} lg={10}>
           <Card title="Processing Efficiency" extra={<TeamOutlined />}>
             <Table
@@ -339,7 +338,7 @@ const Analytics = () => {
             </div>
           </Card>
         </Col>
-        
+
         <Col xs={24} lg={12}>
           <Card title="System Health">
             <div className="space-y-4">
