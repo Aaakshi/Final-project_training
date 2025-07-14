@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sys
@@ -161,22 +160,22 @@ def calculate_processing_time(base_time: str, priority: str, file_size: int = No
             max_days = int(max_time.split()[0])
         else:
             min_days = max_days = int(base_time.split()[0])
-        
+
         # Apply priority adjustment
         adjustment = PRIORITY_TIME_ADJUSTMENTS.get(priority, 1.0)
         min_days = max(1, int(min_days * adjustment))
         max_days = max(1, int(max_days * adjustment))
-        
+
         # File size adjustment (for large files)
         if file_size and file_size > 10 * 1024 * 1024:  # > 10MB
             min_days += 1
             max_days += 2
-        
+
         if min_days == max_days:
             return f"{min_days} business day{'s' if min_days > 1 else ''}"
         else:
             return f"{min_days}-{max_days} business days"
-    
+
     except:
         return base_time
 
@@ -185,66 +184,66 @@ def determine_escalation(priority: str, department: str, doc_type: str) -> bool:
     # High priority documents in critical departments need escalation
     critical_departments = ['legal', 'finance', 'executive']
     critical_doc_types = ['legal_document', 'financial_document', 'executive_document']
-    
+
     if priority == 'high' and (department in critical_departments or doc_type in critical_doc_types):
         return True
-    
+
     return False
 
 def generate_routing_reason(department: str, doc_type: str, priority: str, specializations: List[str]) -> str:
     """Generate human-readable routing reason"""
     reasons = []
-    
+
     # Department match
     if department != 'general':
         reasons.append(f"Document classified as {doc_type} matches {department} department expertise")
-    
+
     # Priority consideration
     if priority == 'high':
         reasons.append("High priority classification requires expedited processing")
     elif priority == 'low':
         reasons.append("Low priority allows for standard processing queue")
-    
+
     # Specialization match
     relevant_specs = [spec for spec in specializations if spec in doc_type.lower()]
     if relevant_specs:
         reasons.append(f"Team specializes in {', '.join(relevant_specs)}")
-    
+
     return ". ".join(reasons) if reasons else "Standard routing based on document classification"
 
 @app.get("/")
 async def root():
     return {"message": "Routing Engine Service is running", "service": "routing_engine"}
 
-@app.post("/route", response_model=RoutingResponse)
+@app.post("/route")
 async def route_document(request: RoutingRequest):
-    """Route document to appropriate department and assignee"""
+    """Route document to appropriate department based on classification"""
     try:
-        # Get department rule
+        # Get routing decision
         rule = DEPARTMENT_RULES.get(request.department, DEPARTMENT_RULES['general'])
-        
+
         # Determine final priority (could be boosted)
         original_priority = request.priority
         priority_levels = {'low': 1, 'medium': 2, 'high': 3}
         current_level = priority_levels.get(original_priority, 2)
         boosted_level = min(3, current_level + (rule.priority_boost - 1))
-        
+
         final_priority = {1: 'low', 2: 'medium', 3: 'high'}[boosted_level]
-        
+
         # Calculate processing time
         estimated_time = calculate_processing_time(
             rule.processing_time, 
             final_priority, 
             request.file_size
         )
-        
+
         # Determine escalation needs
         escalation_needed = determine_escalation(
             final_priority, 
             request.department, 
             request.doc_type
         )
-        
+
         # Generate routing reason
         routing_reason = generate_routing_reason(
             request.department, 
@@ -252,7 +251,34 @@ async def route_document(request: RoutingRequest):
             final_priority, 
             rule.specializations
         )
-        
+
+        # Determine recipient email based on department
+        department_emails = {
+            'hr': 'hr@company.com',
+            'finance': 'finance@company.com', 
+            'legal': 'legal@company.com',
+            'it': 'it@company.com',
+            'administration': 'admin@company.com'
+        }
+
+        recipient_email = department_emails.get(request.department, 'admin@company.com')
+
+        # Send notification to main application about routing
+        try:
+            import requests
+            notification_data = {
+                'doc_id': request.doc_id,
+                'type': 'document_routed',
+                'recipient': recipient_email,
+                'department': request.department,
+                'message': f"New {request.doc_type} document routed to {request.department} department",
+                'priority': final_priority
+            }
+            requests.post('http://localhost:5000/api/internal/email-notification', 
+                         json=notification_data, timeout=5)
+        except:
+            pass  # Don't fail routing if notification fails
+
         return RoutingResponse(
             doc_id=request.doc_id,
             assignee=rule.assignee,
@@ -263,7 +289,7 @@ async def route_document(request: RoutingRequest):
             routing_status="routed",
             escalation_needed=escalation_needed
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Routing failed: {str(e)}")
 
@@ -287,11 +313,11 @@ async def get_department_workload(department: str):
     rule = DEPARTMENT_RULES.get(department)
     if not rule:
         raise HTTPException(status_code=404, detail="Department not found")
-    
+
     # Mock workload data
     import random
     current_load = random.randint(5, rule.max_capacity - 5)
-    
+
     return {
         "department": department,
         "current_documents": current_load,
@@ -304,7 +330,7 @@ async def get_department_workload(department: str):
 async def bulk_route_documents(requests: List[RoutingRequest]):
     """Route multiple documents at once"""
     results = []
-    
+
     for request in requests:
         try:
             result = await route_document(request)
@@ -315,7 +341,7 @@ async def bulk_route_documents(requests: List[RoutingRequest]):
                 "error": str(e),
                 "routing_status": "failed"
             })
-    
+
     return {"results": results, "total_processed": len(results)}
 
 @app.get("/ping")
