@@ -983,12 +983,12 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
         pass
     elif current_user['role'] == 'manager':
         # Manager can see notifications for their department
-        query += " AND (e.department = ? OR e.sent_by = ? OR e.received_by = ?)"
-        params.extend([current_user['department'], current_user['email'], current_user['email']])
+        query += " AND (e.department = ? OR e.sent_by = ?)"
+        params.extend([current_user['department'], current_user['email']])
     else:
-        # Employee can see notifications sent by them OR received by them
-        query += " AND (e.sent_by = ? OR e.received_by = ?)"
-        params.extend([current_user['email'], current_user['email']])
+        # Employee can only see their own notifications
+        query += " AND e.sent_by = ?"
+        params.append(current_user['email'])
 
     query += " ORDER BY e.sent_at DESC LIMIT 50"
 
