@@ -1,0 +1,76 @@
+Product Requirements Document (PRD)
+Intelligent Document Classification and Routing (IDCR) System
+1. Executive Summary
+A comprehensive document management platform that automatically classifies, routes, and processes documents across different departments (HR, Finance, Legal, IT, Operations) with intelligent workflow automation and real-time notifications.
+
+2. Goals & Objectives
+Goals
+
+Reduce manual document sorting and routing
+Centralize document workflows with traceability
+Enable multi-department collaboration through automation
+Objectives
+
+Achieve 90%+ accuracy in document classification
+Reduce document processing time by 60%
+Support role-based access across departments
+3. Key Features
+3.1 Document Management
+
+Supports formats: PDF, DOC, DOCX, TXT
+Secure uploads with validation
+Metadata extraction (file name, type, date, size)
+Version control for tracking changes
+3.2 Rule-Based Classification
+
+Predefined rules determine document type and department.
+Confidence scoring (based on keyword presence and match strength)
+Priority flagging by content-type or keywords
+3.3 Department Routing
+
+Dynamic routing to departments (HR, Finance, Legal, IT, Operations)
+Custom routing rules per department
+Queue management per department
+3.4 Role-Based Access Control
+
+User roles: Admin, Manager, Employee, General User
+JWT-based authentication and token expiry
+Fine-grained permission management by department
+3.5 Workflow Automation
+
+Document status lifecycle: Uploaded → In Review → Approved/Rejected → Archived
+Manager review & approval system
+Audit logs with full trail of activity
+3.6 Notification System
+
+Email alerts via SMTP
+In-app real-time alerts (new document, approval, status update)
+Configurable notification rules by user or department
+4.Core Functional Features
+Feature Description
+
+Feature	Description
+Drag-and-Drop Upload	Enables drag-and-drop uploads with file validation and secure, metadata-based storage.
+Rule-Based Classification	Applies pre-defined rules on extracted content to identify document type, assign priority, and map to the appropriate department.
+Smart Routing	Automatically assigns and routes documents to the relevant department queues based on rule-based classification outcomes.
+Workflow Automation	Supports review, approval, rejection, and versioning workflows with status tracking.
+Asynchronous Notifications	Uses RabbitMQ to queue and dispatch email and in-app notifications for routing, review, and status updates.
+Role-Based Access Control (RBAC)	Provides secure access through user roles (Admin, Manager, Employee, General User) with department-specific restrictions.
+Search & Filtering	Enables full-text and metadata-based search with filters for department, status, and date range.
+Audit & Activity Logs	Captures all user actions and document lifecycle changes for traceability and compliance audits.
+5. System Architecture
+5.1 Architecture Overview
+The system follows a Microservices Architecture with loosely coupled, independently deployable services. It uses an API Gateway for routing requests and includes modular services for classification, routing, and notifications.
+
+5.2 Workflow Diagram
+
+
+
+5.3 Micro services Architecture
+
+Service Name	Description	Port Number
+Classification Microservice	Handles documen classification logic	8001
+Routing Microservice	Manages routing rules and assignments	8002
+Content Analysis Microservice	Performs text extraction and analysis	8003
+Workflow Integration Microservice	Manages document workflows and triggers	8004
+Frontend Web Application	User interface for all user roles	5000
