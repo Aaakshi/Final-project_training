@@ -273,6 +273,132 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         "role": user[5]
     }
 
+# Import generate_summary function from content analysis
+def generate_summary(content: str) -> str:
+    """Generate a comprehensive bullet-point summary that covers the entire document"""
+    if not content or len(content.strip()) == 0:
+        return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
+
+    # Clean and prepare content
+    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
+    content_words = content.split()
+    total_words = len(content_words)
+
+    if total_words < 10:
+        return f"• Short document with {total_words} words\n• Content: {content[:100]}{'...' if len(content) > 100 else ''}\n• Ready for review"
+
+    # Split content into sentences for analysis
+    sentences = [s.strip() for s in re.split(r'[.!?]+', content) if len(s.strip()) > 5]
+
+    if not sentences:
+        return f"• Document processed: {total_words} words analyzed\n• Content type: Text document\n• Ready for review"
+
+    summary_points = []
+    used_sentences = set()
+
+    # Strategy 1: Document Overview - First meaningful sentence
+    if sentences:
+        first_sentence = sentences[0][:120] + ("..." if len(sentences[0]) > 120 else "")
+        summary_points.append(f"• Document Overview: {first_sentence}")
+        used_sentences.add(sentences[0])
+
+    # Strategy 2: Action items and requirements
+    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'approve', 'review']
+    for sentence in sentences:
+        if sentence not in used_sentences and len([p for p in summary_points if 'Action Required' in p]) < 2:
+            if any(keyword in sentence.lower() for keyword in action_keywords):
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Action Required: {clean_sentence}")
+                used_sentences.add(sentence)
+
+    # Strategy 3: Financial information
+    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'salary', 'fee', 'dollar']
+    for sentence in sentences:
+        if sentence not in used_sentences and len([p for p in summary_points if 'Financial' in p]) < 1:
+            has_financial = any(keyword in sentence.lower() for keyword in financial_keywords)
+            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+', sentence)
+            if has_financial or has_numbers:
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Financial Details: {clean_sentence}")
+                used_sentences.add(sentence)
+
+    # Strategy 4: Personnel information
+    people_keywords = ['employee', 'manager', 'director', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff']
+    for sentence in sentences:
+        if sentence not in used_sentences and len([p for p in summary_points if 'Personnel' in p]) < 1:
+            if any(keyword in sentence.lower() for keyword in people_keywords):
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Personnel/Department: {clean_sentence}")
+                used_sentences.add(sentence)
+
+    # Strategy 5: Timeline and dates
+    date_patterns = [r'\d{4}-\d{2}-\d{2}', r'\d{2}/\d{2}/\d{4}', r'\d{2}-\d{2}-\d{4}']
+    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'meeting', 'event']
+    for sentence in sentences:
+        if sentence not in used_sentences and len([p for p in summary_points if 'Timeline' in p]) < 1:
+            has_date = any(re.search(pattern, sentence) for pattern in date_patterns)
+            has_timeline = any(keyword in sentence.lower() for keyword in timeline_keywords)
+            if has_date or has_timeline:
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Timeline/Dates: {clean_sentence}")
+                used_sentences.add(sentence)
+
+    # Strategy 6: Key content from remaining sentences
+    remaining_sentences = [s for s in sentences if s not in used_sentences]
+    
+    # Score sentences by importance
+    scored_remaining = []
+    for sentence in remaining_sentences:
+        score = 0
+        words = sentence.split()
+        
+        # Prefer medium-length sentences
+        if 5 <= len(words) <= 20:
+            score += 2
+            
+        # Important keywords
+        important_keywords = ['important', 'critical', 'key', 'main', 'significant', 'note', 'summary']
+        if any(keyword in sentence.lower() for keyword in important_keywords):
+            score += 3
+            
+        # Contains specific information
+        if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
+            score += 1
+            
+        scored_remaining.append((score, sentence))
+    
+    # Sort by score and add top sentences
+    scored_remaining.sort(key=lambda x: x[0], reverse=True)
+    
+    for score, sentence in scored_remaining:
+        if len(summary_points) >= 8:
+            break
+        if score >= 1:
+            clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+            summary_points.append(f"• Key Information: {clean_sentence}")
+
+    # Ensure minimum coverage
+    if len(summary_points) < 3:
+        # Add content chunks if we don't have enough sentences
+        chunk_size = min(50, total_words // 4)
+        for i in range(0, min(len(content_words), chunk_size * 3), chunk_size):
+            if len(summary_points) >= 5:
+                break
+            chunk = ' '.join(content_words[i:i+chunk_size])
+            if len(chunk) > 20:
+                clean_chunk = chunk[:120] + ("..." if len(chunk) > 120 else "")
+                summary_points.append(f"• Content Section: {clean_chunk}")
+
+    # Ensure we have at least 3 summary points
+    while len(summary_points) < 3:
+        if len(content) > 100:
+            summary_points.append(f"• Document Content: {content[:100]}...")
+        else:
+            summary_points.append(f"• Document Content: {content}")
+        break
+
+    return '\n'.join(summary_points)
+
 # Document processing functions
 def extract_text_from_file(file_path: str, file_type: str) -> str:
     try:

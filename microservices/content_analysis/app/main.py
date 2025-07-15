@@ -1,9 +1,5 @@
-` tags. I will pay close attention to indentation, structure, and completeness, and avoid any forbidden words or placeholders.
-
-```
-<replit_final_file>
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic importBaseModel
 import sys
 import os
 import uvicorn
