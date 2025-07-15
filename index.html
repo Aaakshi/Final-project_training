@@ -1670,6 +1670,28 @@
                     const modalContent = document.getElementById('documentDetails');
                     let modalHTML = `
                         <h2><i class="fas fa-file-alt"></i> ${doc.original_name}</h2>
+                        
+                        <!-- ML-Generated Summary Section - Prominently displayed at top -->
+                        <div style="margin: 20px 0; background: linear-gradient(135deg, #e6f3ff 0%, #f0f8ff 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6;">
+                            <h3 style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px; display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-robot"></i>
+                                AI-Generated Document Summary
+                            </h3>
+                            <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; font-size: 14px; line-height: 1.6; color: #374151;">
+                                ${doc.summary || 'AI summary is being generated. Please check back in a moment.'}
+                            </div>
+                            ${doc.key_phrases && doc.key_phrases !== '[]' ? `
+                                <div style="margin-top: 15px;">
+                                    <label style="font-weight: 600; color: #1e40af; font-size: 13px;">Key Phrases Detected:</label>
+                                    <div style="margin-top: 8px;">
+                                        ${JSON.parse(doc.key_phrases || '[]').slice(0, 5).map(phrase => 
+                                            `<span style="display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 12px; font-size: 11px; margin: 2px 4px 2px 0;">${phrase}</span>`
+                                        ).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+
                         <div style="margin: 20px 0;">
                             <p><strong>Uploaded by:</strong> ${doc.uploaded_by}</p>
                             <p><strong>Upload Date:</strong> ${new Date(doc.uploaded_at).toLocaleString()}</p>
@@ -1684,13 +1706,6 @@
                             <div class="confidentiality-bar">
                                 <div class="confidentiality-fill" style="width: ${confidentiality}%; background: ${confidentialityColor};"></div>
                                 <div class="confidentiality-text">${confidentiality}%</div>
-                            </div>
-                        </div>
-
-                        <div style="margin: 20px 0;">
-                            <label><strong>Summary:</strong></label>
-                            <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e2e8f0;">
-                                ${doc.summary || 'No summary available'}
                             </div>
                         </div>
 
