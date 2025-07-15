@@ -4,13 +4,13 @@ import secrets
 import sqlite3
 import smtplib
 import uuid
+import re
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from typing import List, Optional
 import json
-import re
 
 import jwt
 import uvicorn
@@ -753,56 +753,96 @@ def calculate_local_confidentiality_score(content: str) -> float:
     """Calculate confidentiality percentage based on document content"""
     content_lower = content.lower()
     
-    # Very High confidentiality keywords (40-60 points each)
+    # Very High confidentiality keywords (50-70 points each)
     very_high_conf_keywords = [
+        'confidential', 'classified', 'restricted', 'top secret', 'proprietary', 'trade secret',
         'salary', 'wages', 'compensation', 'payroll', 'bonus', 'ssn', 'social security',
-        'medical records', 'health information', 'confidential', 'classified', 'restricted',
-        'proprietary', 'trade secret', 'lawsuit', 'litigation', 'settlement', 'legal action'
+        'medical records', 'health information', 'personal information', 'credit card',
+        'bank account', 'financial records', 'tax information', 'lawsuit', 'litigation',
+        'settlement', 'legal action', 'merger', 'acquisition', 'strategic plan', 'sensitive',
+        'private', 'internal only', 'password', 'passcode', 'login credentials'
     ]
     
     # High confidentiality keywords (25-40 points each)
     high_conf_keywords = [
-        'private', 'internal only', 'sensitive', 'privileged', 'employee id', 'personnel file',
-        'hr record', 'performance review', 'disciplinary action', 'termination', 'contract',
-        'budget', 'financial', 'customer list', 'pricing strategy', 'strategic plan'
+        'privileged', 'employee id', 'personnel file', 'hr record', 'performance review',
+        'disciplinary action', 'termination', 'contract', 'agreement', 'budget', 'financial',
+        'customer list', 'pricing strategy', 'business plan', 'revenue', 'profit', 'loss',
+        'expense', 'cost', 'invoice', 'payment', 'billing', 'vendor', 'supplier',
+        'employment', 'hiring', 'recruitment', 'training', 'benefits', 'leave', 'vacation',
+        'sick leave', 'personal leave', 'promotion', 'demotion', 'resignation'
     ]
     
-    # Medium confidentiality keywords (15-25 points each)
+    # Medium confidentiality keywords (10-20 points each)
     medium_conf_keywords = [
         'employee', 'staff', 'personnel', 'hr', 'human resources', 'department', 'manager',
-        'project', 'budget', 'cost', 'revenue', 'client', 'customer', 'meeting notes', 'policy'
+        'supervisor', 'director', 'team', 'project', 'client', 'customer', 'meeting notes',
+        'policy', 'procedure', 'workflow', 'process', 'schedule', 'planning', 'strategy',
+        'report', 'analysis', 'review', 'evaluation', 'assessment', 'request', 'application',
+        'form', 'document', 'file', 'record', 'data', 'information'
     ]
+    
+    # Document type indicators (additional points based on document nature)
+    document_type_indicators = {
+        'request': 15, 'application': 15, 'form': 10, 'letter': 10, 'memo': 15,
+        'email': 10, 'message': 10, 'notification': 5, 'announcement': 5,
+        'policy': 20, 'procedure': 15, 'handbook': 20, 'manual': 15,
+        'contract': 40, 'agreement': 35, 'terms': 25, 'conditions': 20,
+        'report': 20, 'analysis': 25, 'review': 20, 'evaluation': 25,
+        'financial': 35, 'budget': 30, 'invoice': 30, 'receipt': 25,
+        'hr': 25, 'human resources': 25, 'personnel': 25, 'employee': 20
+    }
     
     score = 0.0
     
     # Check for very high confidentiality content
     for keyword in very_high_conf_keywords:
         if keyword in content_lower:
-            score += 50
+            score += 60
     
     # Check for high confidentiality content
     for keyword in high_conf_keywords:
         if keyword in content_lower:
-            score += 32
+            score += 35
     
     # Check for medium confidentiality content
     for keyword in medium_conf_keywords:
         if keyword in content_lower:
-            score += 20
+            score += 15
+    
+    # Check document type indicators
+    for indicator, points in document_type_indicators.items():
+        if indicator in content_lower:
+            score += points
     
     # Enhanced pattern matching for sensitive data
-    import re
     patterns = {
-        r'\b\d{3}-\d{2}-\d{4}\b': 60,  # SSN pattern
-        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 55,  # Credit card pattern
-        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 25,  # Money amounts
-        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 20,  # Email addresses
+        r'\b\d{3}-\d{2}-\d{4}\b': 70,  # SSN pattern
+        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 65,  # Credit card pattern
+        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 30,  # Money amounts
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 25,  # Email addresses
+        r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': 20,  # Phone numbers
+        r'\bEMP\d+\b|\bID[-\s]?\d+\b': 35,  # Employee IDs
+        r'\b(?:urgent|immediate|asap|priority|confidential|sensitive)\b': 25,  # Urgency indicators
+        r'\b(?:approve|approval|reject|denial|sign|signature)\b': 20,  # Action words
+        r'\b(?:deadline|due date|expire|expiration)\b': 15,  # Time sensitive
     }
     
     for pattern, points in patterns.items():
-        matches = re.findall(pattern, content)
+        matches = re.findall(pattern, content_lower)
         if matches:
-            score += points * min(len(matches), 3)
+            score += points * min(len(matches), 2)  # Cap at 2 matches per pattern
+    
+    # Content length and structure bonus
+    word_count = len(content.split())
+    if word_count > 100:
+        score += 10  # Longer documents tend to have more sensitive info
+    
+    # Check for personal requests or employee-specific content
+    personal_indicators = ['i am', 'i would like', 'i request', 'my', 'please', 'kindly', 'thank you']
+    personal_count = sum(1 for indicator in personal_indicators if indicator in content_lower)
+    if personal_count >= 2:
+        score += 20  # Personal requests are typically more confidential
     
     # Normalize score to percentage (0-100)
     normalized_score = min(100, max(0, score))

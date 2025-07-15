@@ -126,7 +126,7 @@ def calculate_risk_score(content: str, entities: dict) -> float:
 def calculate_confidentiality_score(content: str) -> float:
     """Calculate confidentiality percentage based on document content"""
     content_lower = content.lower()
-    
+
     # High confidentiality keywords (30-50 points each)
     high_conf_keywords = [
         'confidential', 'classified', 'proprietary', 'trade secret', 'nda', 'non-disclosure',
@@ -136,7 +136,7 @@ def calculate_confidentiality_score(content: str) -> float:
         'medical records', 'health information', 'performance review', 'disciplinary action',
         'legal action', 'lawsuit', 'settlement', 'merger', 'acquisition', 'strategic plan'
     ]
-    
+
     # Medium confidentiality keywords (10-20 points each)
     medium_conf_keywords = [
         'employee', 'staff', 'personnel', 'hr', 'human resources', 'department',
@@ -144,30 +144,30 @@ def calculate_confidentiality_score(content: str) -> float:
         'contract', 'agreement', 'vendor', 'client', 'customer', 'business plan',
         'meeting notes', 'discussion', 'strategy', 'policy', 'procedure'
     ]
-    
+
     # Low confidentiality keywords (5-10 points each)
     low_conf_keywords = [
         'public', 'announcement', 'press release', 'newsletter', 'general information',
         'training', 'workshop', 'seminar', 'event', 'schedule', 'calendar'
     ]
-    
+
     score = 0.0
-    
+
     # Check for high confidentiality content
     for keyword in high_conf_keywords:
         if keyword in content_lower:
             score += 35
-    
+
     # Check for medium confidentiality content
     for keyword in medium_conf_keywords:
         if keyword in content_lower:
             score += 15
-    
+
     # Check for low confidentiality content (reduces score)
     for keyword in low_conf_keywords:
         if keyword in content_lower:
             score -= 5
-    
+
     # Check for specific patterns that indicate confidentiality
     patterns = {
         r'\b\d{3}-\d{2}-\d{4}\b': 40,  # SSN pattern
@@ -177,21 +177,21 @@ def calculate_confidentiality_score(content: str) -> float:
         r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': 10,  # Phone numbers
         r'\bEMP\d+\b|\bID[-\s]?\d+\b': 25,  # Employee IDs
     }
-    
+
     for pattern, points in patterns.items():
         if re.search(pattern, content):
             score += points
-    
+
     # Document type indicators
     if any(indicator in content_lower for indicator in ['request for', 'application', 'leave', 'vacation']):
         score += 20
-    
+
     if any(indicator in content_lower for indicator in ['urgent', 'immediate', 'asap', 'priority']):
         score += 10
-    
+
     # Normalize score to percentage (0-100)
     normalized_score = min(100, max(0, score))
-    
+
     return normalized_score
 
 def generate_summary(content: str) -> str:
@@ -202,10 +202,10 @@ def generate_summary(content: str) -> str:
     # Clean content
     content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
     content_lower = content.lower()
-    
+
     # Extract key information first
     summary_points = []
-    
+
     # 1. Document Type and Purpose Analysis
     doc_purpose = ""
     if any(keyword in content_lower for keyword in ['request', 'application', 'asking', 'inquiry']):
@@ -220,84 +220,84 @@ def generate_summary(content: str) -> str:
         doc_purpose = "Report or analysis document"
     else:
         doc_purpose = "General business document"
-    
+
     summary_points.append(f"• Document Type: {doc_purpose}")
-    
+
     # 2. Key People and Departments
     people_mentioned = []
     dept_pattern = r'\b(?:hr|human resources|finance|legal|it|marketing|sales|operations|administration)\b'
     departments = list(set(re.findall(dept_pattern, content_lower)))
-    
+
     name_pattern = r'\b[A-Z][a-z]+ [A-Z][a-z]+\b'
     names = re.findall(name_pattern, content)
-    
+
     if names:
         people_mentioned = list(set(names))[:3]  # Limit to 3 names
-    
+
     people_info = []
     if people_mentioned:
         people_info.append(f"People: {', '.join(people_mentioned)}")
     if departments:
         people_info.append(f"Departments: {', '.join(departments).upper()}")
-    
+
     if people_info:
         summary_points.append(f"• Key Stakeholders: {' | '.join(people_info)}")
-    
+
     # 3. Main Requests or Actions - Enhanced for better extraction
     action_items = []
-    
+
     # Look for specific request patterns with better context
     if 'remote work' in content_lower or 'work from home' in content_lower:
         action_items.append("Request for remote work flexibility")
-    
+
     if 'leave balance' in content_lower or 'annual leave' in content_lower or 'vacation' in content_lower:
         action_items.append("Request for leave balance inquiry")
-    
+
     if 'training' in content_lower and ('nomina' in content_lower or 'enroll' in content_lower):
         action_items.append("Request for training enrollment")
-    
+
     if 'insurance' in content_lower and ('coverage' in content_lower or 'enrollment' in content_lower):
         action_items.append("Request for insurance information")
-    
+
     # Generic pattern matching as fallback
     request_patterns = [
         (r'request(?:ing)?\s+(?:for\s+)?(.{10,40}?)(?:\.|,|\n|and)', 'Request for'),
         (r'would like\s+(?:to\s+)?(.{10,40}?)(?:\.|,|\n)', 'Would like to'),
         (r'asking\s+(?:for\s+)?(.{10,40}?)(?:\.|,|\n)', 'Asking for'),
     ]
-    
+
     for pattern, prefix in request_patterns:
         matches = re.findall(pattern, content_lower, re.IGNORECASE)
         for match in matches[:2]:
             clean_match = match.strip()
             if len(clean_match) > 8 and clean_match not in str(action_items):
                 action_items.append(f"{prefix} {clean_match}")
-    
+
     if action_items:
         for i, item in enumerate(action_items[:3], 1):
             summary_points.append(f"• Request {i}: {item}")
-    
+
     # 4. Important Dates and Deadlines
     date_info = []
     timeline_info = []
-    
+
     # Find specific dates
     date_patterns = [
         r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b',
         r'\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b',
         r'\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b'
     ]
-    
+
     for pattern in date_patterns:
         dates = re.findall(pattern, content)
         date_info.extend(dates[:3])
-    
+
     # Look for timeline context
     if 'august' in content_lower and '2025' in content_lower:
         timeline_info.append("Starting August 2025")
     if 'september' in content_lower:
         timeline_info.append("September planning mentioned")
-    
+
     if date_info or timeline_info:
         date_summary = []
         if date_info:
@@ -305,7 +305,7 @@ def generate_summary(content: str) -> str:
         if timeline_info:
             date_summary.append(f"Timeline: {' | '.join(timeline_info[:2])}")
         summary_points.append(f"• Important Dates: {' | '.join(date_summary)}")
-    
+
     # 5. Key Topics and Categories
     topic_keywords = {
         'Remote Work': ['remote work', 'work from home', 'flexible work', 'home office'],
@@ -315,24 +315,24 @@ def generate_summary(content: str) -> str:
         'HR Policies': ['policy', 'procedure', 'hr', 'human resources'],
         'Performance': ['performance', 'review', 'evaluation', 'assessment']
     }
-    
+
     identified_topics = []
     for topic, keywords in topic_keywords.items():
         if any(keyword in content_lower for keyword in keywords):
             identified_topics.append(topic)
-    
+
     if identified_topics:
         summary_points.append(f"• Main Topics: {', '.join(identified_topics[:4])}")
-    
+
     # 6. Urgency and Priority Indicators
     urgency_keywords = ['urgent', 'immediate', 'asap', 'priority', 'critical', 'important']
     urgent_indicators = [keyword for keyword in urgency_keywords if keyword in content_lower]
-    
+
     if urgent_indicators:
         summary_points.append(f"• Priority Level: High - contains {', '.join(urgent_indicators[:3])}")
     else:
         summary_points.append(f"• Priority Level: Standard request")
-    
+
     # 7. Document Conclusion/Next Steps
     next_steps = []
     if 'please let me know' in content_lower:
@@ -341,17 +341,17 @@ def generate_summary(content: str) -> str:
         next_steps.append("May require additional documentation")
     if 'thank you' in content_lower:
         next_steps.append("Formal request submitted")
-    
+
     if next_steps:
         summary_points.append(f"• Next Steps: {' | '.join(next_steps[:2])}")
-    
+
     # Ensure we have meaningful content
     if len(summary_points) < 4:
         # Add content overview from first sentences
         sentences = [s.strip() for s in re.split(r'[.!?]+', content) if len(s.strip()) > 20]
         if sentences:
             summary_points.append(f"• Content Overview: {sentences[0][:80]}...")
-    
+
     return '\n'.join(summary_points[:8])
 
 @app.get("/")
