@@ -17,4 +17,7 @@ dependencies = [
     "passlib>=1.7.4",
     "docx>=0.2.4",
     "pytesseract>=0.3.13",
+    "textstat>=0.7.7",
+    "requests>=2.32.4",
+    "nltk>=3.9.1",
 ]

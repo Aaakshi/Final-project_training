@@ -529,7 +529,7 @@ async def bulk_upload_documents(
                         "doc_id": doc_id,
                         "content": extracted_text,
                         "filename": file.filename,
-                        "file_type": file_extension
+                        "file_type": file.extension
                     },
                     timeout=30
                 )
@@ -772,7 +772,7 @@ async def get_documents(
             'page': 1,
             'page_size': len(formatted_docs)
         }
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -841,8 +841,7 @@ async def get_review_documents(
             if current_user['department'] != 'hr':
                 query += " AND department = ?"
                 params.append(current_user['department'])
-        else:
-            # Regular employees can only see their own uploaded documents
+        else:# Regular employees can only see their own uploaded documents
             query += " AND uploaded_by = ?"
             params.append(current_user['email'])
 
@@ -890,7 +889,7 @@ async def get_review_documents(
             })
 
         return {'documents': formatted_docs}
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
@@ -913,7 +912,7 @@ async def review_document(
         # Get document details before updating
         cursor.execute('SELECT * FROM documents WHERE doc_id = ?', (doc_id,))
         document = cursor.fetchone()
-        
+
         if not document:
             conn.close()
             raise HTTPException(status_code=404, detail="Document not found")
@@ -930,19 +929,19 @@ async def review_document(
         uploader_email = document[6]  # uploaded_by field
         doc_name = document[2]  # original_name field
         department = document[11]  # department field
-        
+
         # Create email notification using the correct schema
         subject = f"Document Review: {doc_name} - {new_status.upper()}"
         body = f"""
         Your document "{doc_name}" has been {new_status} by {current_user['full_name']} ({current_user['email']}).
-        
+
         Review Comments: {review.comments or 'No comments provided'}
-        
+
         Reviewed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        
+
         You can view the document details in the IDCR system.
         """
-        
+
         cursor.execute('''
             INSERT INTO email_notifications 
             (doc_id, sent_by, received_by, subject, body_preview, email_type, status, document_name, department, priority)
@@ -953,7 +952,7 @@ async def review_document(
         conn.close()
 
         return {'message': f'Document {review.action}d successfully and notification sent to uploader'}
-    
+
     except Exception as e:
         if 'conn' in locals():
             conn.close()
