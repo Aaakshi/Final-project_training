@@ -231,239 +231,167 @@ def generate_summary(content: str) -> str:
         return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
 
     # Clean and prepare content
-    content = content.strip()
+    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
     content_words = content.split()
     total_words = len(content_words)
     
-    # Split content into sentences and clean them
+    # Split content into meaningful sentences
     sentences = []
-    for sent in content.replace('\n', '. ').split('.'):
+    
+    # First try splitting by periods, exclamation marks, and question marks
+    import re
+    sentence_endings = re.split(r'[.!?]+', content)
+    
+    for sent in sentence_endings:
         sent = sent.strip()
-        if len(sent) > 15 and len(sent.split()) >= 4:  # Meaningful sentences only
+        # Filter out very short or meaningless sentences
+        if len(sent) > 20 and len(sent.split()) >= 5:
             sentences.append(sent)
     
-    # If no good sentences, split by other punctuation
+    # If we don't have enough sentences, try splitting by line breaks
     if len(sentences) < 3:
-        for sent in content.replace('\n', '! ').split('!'):
+        line_sentences = content.split('\n')
+        for sent in line_sentences:
             sent = sent.strip()
-            if len(sent) > 15 and len(sent.split()) >= 4:
-                sentences.append(sent)
-        for sent in content.replace('\n', '? ').split('?'):
-            sent = sent.strip()
-            if len(sent) > 15 and len(sent.split()) >= 4:
+            if len(sent) > 20 and len(sent.split()) >= 5:
                 sentences.append(sent)
     
-    # If still no sentences, create from chunks
-    if len(sentences) < 2:
+    # Last resort: create chunks from the content
+    if len(sentences) < 3:
         words = content.split()
-        chunk_size = max(15, len(words) // 6)
+        chunk_size = max(20, len(words) // 8)
         for i in range(0, len(words), chunk_size):
             chunk = ' '.join(words[i:i+chunk_size])
-            if len(chunk) > 20:
+            if len(chunk) > 30:
                 sentences.append(chunk)
     
     summary_points = []
-    used_content = set()  # Track used content to avoid duplication
+    used_sentences = set()  # Track used sentences to avoid duplication
     
-    # 1. Document Overview/Purpose (from first 25%)
-    first_quarter = content[:len(content)//4]
-    first_sentences = [s for s in sentences if s in first_quarter][:5]
+    # Strategy: Create comprehensive summary by analyzing different aspects
     
-    purpose_keywords = ['purpose', 'objective', 'goal', 'aim', 'subject', 'regarding', 'about', 'concerning', 'overview', 'introduction']
-    purpose_found = False
+    # 1. Document Overview from beginning
+    if len(sentences) > 0:
+        first_sentence = sentences[0][:120] + ("..." if len(sentences[0]) > 120 else "")
+        summary_points.append(f"• Document Overview: {first_sentence}")
+        used_sentences.add(sentences[0])
     
-    for sentence in first_sentences:
-        if any(keyword in sentence.lower() for keyword in purpose_keywords):
-            clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-            summary_points.append(f"• Document Purpose: {clean_sentence}")
-            used_content.add(sentence.lower())
-            purpose_found = True
-            break
-    
-    if not purpose_found and first_sentences:
-        clean_sentence = first_sentences[0][:100] + ("..." if len(first_sentences[0]) > 100 else "")
-        summary_points.append(f"• Document Overview: {clean_sentence}")
-        used_content.add(first_sentences[0].lower())
-    
-    # 2. Key Content from Beginning (remaining first 25%)
-    remaining_first = [s for s in first_sentences if s.lower() not in used_content][:2]
-    for sentence in remaining_first:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Key Information: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 3. Action Items and Requirements
-    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'immediate', 'approve', 'review', 'apply', 'process']
-    action_sentences = []
-    
-    for sentence in sentences:
-        if sentence.lower() not in used_content:
-            if any(keyword in sentence.lower() for keyword in action_keywords):
-                action_sentences.append(sentence)
-    
-    for sentence in action_sentences[:2]:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Required Actions: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 4. Financial/Numerical Information
-    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'revenue', 'salary', 'fee', 'charge', 'dollar', 'money', 'fund']
+    # 2. Extract key information by categories
     import re
     
-    financial_sentences = []
+    # Action items and requirements
+    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'immediate', 'approve', 'review', 'apply', 'process']
+    action_count = 0
+    
     for sentence in sentences:
-        if sentence.lower() not in used_content:
+        if sentence not in used_sentences and action_count < 2:
+            if any(keyword in sentence.lower() for keyword in action_keywords):
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Action Required: {clean_sentence}")
+                used_sentences.add(sentence)
+                action_count += 1
+    
+    # Financial and numerical information
+    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'revenue', 'salary', 'fee', 'charge', 'dollar', 'money', 'fund']
+    financial_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and financial_count < 1:
             has_financial = any(keyword in sentence.lower() for keyword in financial_keywords)
-            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+|\d+ dollar', sentence)
+            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+|\d+ dollars?', sentence)
             if has_financial or has_numbers:
-                financial_sentences.append(sentence)
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Financial Details: {clean_sentence}")
+                used_sentences.add(sentence)
+                financial_count += 1
     
-    for sentence in financial_sentences[:1]:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Financial Details: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 5. Personnel and Departments
-    people_keywords = ['employee', 'manager', 'director', 'supervisor', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff', 'personnel', 'admin', 'worker', 'officer']
-    people_sentences = []
+    # Personnel and department information
+    people_keywords = ['employee', 'manager', 'director', 'supervisor', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff', 'personnel', 'admin']
+    people_count = 0
     
     for sentence in sentences:
-        if sentence.lower() not in used_content:
+        if sentence not in used_sentences and people_count < 1:
             if any(keyword in sentence.lower() for keyword in people_keywords):
-                people_sentences.append(sentence)
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Personnel/Department: {clean_sentence}")
+                used_sentences.add(sentence)
+                people_count += 1
     
-    for sentence in people_sentences[:1]:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Personnel/Departments: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 6. Dates and Timeline
-    date_patterns = [
-        r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
-        r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
-        r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
-        r'\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}',
-        r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}'
-    ]
-    
-    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'time', 'when', 'by', 'until', 'before', 'after', 'start', 'end', 'begin']
-    date_sentences = []
+    # Timeline and dates
+    date_patterns = [r'\d{4}-\d{2}-\d{2}', r'\d{2}/\d{2}/\d{4}', r'\d{2}-\d{2}-\d{4}']
+    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'time', 'when', 'by', 'until', 'before', 'after', 'start', 'end']
+    timeline_count = 0
     
     for sentence in sentences:
-        if sentence.lower() not in used_content:
+        if sentence not in used_sentences and timeline_count < 1:
             has_date = any(re.search(pattern, sentence, re.IGNORECASE) for pattern in date_patterns)
             has_timeline = any(keyword in sentence.lower() for keyword in timeline_keywords)
             if has_date or has_timeline:
-                date_sentences.append(sentence)
+                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+                summary_points.append(f"• Timeline/Dates: {clean_sentence}")
+                used_sentences.add(sentence)
+                timeline_count += 1
     
-    for sentence in date_sentences[:1]:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Timeline/Dates: {clean_sentence}")
-        used_content.add(sentence.lower())
+    # Fill with remaining important content to reach 6-8 bullet points
+    remaining_sentences = [s for s in sentences if s not in used_sentences]
     
-    # 7. Core Content from Middle Section (25%-75%)
-    middle_start = len(content) // 4
-    middle_end = 3 * len(content) // 4
-    middle_section = content[middle_start:middle_end]
-    middle_sentences = [s for s in sentences if s in middle_section and s.lower() not in used_content]
-    
-    # Score and select best middle content
-    scored_sentences = []
-    for sentence in middle_sentences:
+    # Score remaining sentences by importance
+    scored_remaining = []
+    for sentence in remaining_sentences:
         score = 0
         words = sentence.split()
         
-        # Length scoring
-        if 8 <= len(words) <= 25:
-            score += 3
-        
-        # Important keywords
-        important_keywords = ['important', 'critical', 'key', 'main', 'primary', 'significant', 'essential', 'major', 'note', 'attention']
-        if any(keyword in sentence.lower() for keyword in important_keywords):
+        # Prefer medium-length sentences
+        if 10 <= len(words) <= 30:
             score += 2
         
-        # Contains specifics
-        if re.search(r'\d+|[A-Z][a-z]+\s+[A-Z][a-z]+', sentence):
+        # Important keywords
+        important_keywords = ['important', 'critical', 'key', 'main', 'primary', 'significant', 'essential', 'note', 'attention', 'policy', 'procedure']
+        if any(keyword in sentence.lower() for keyword in important_keywords):
+            score += 3
+        
+        # Contains specifics (names, numbers, etc.)
+        if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
             score += 1
         
-        scored_sentences.append((score, sentence))
+        scored_remaining.append((score, sentence))
     
-    # Sort by score and take top sentences
-    scored_sentences.sort(key=lambda x: x[0], reverse=True)
-    for score, sentence in scored_sentences[:2]:
-        if score >= 2:
-            clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-            summary_points.append(f"• Core Content: {clean_sentence}")
-            used_content.add(sentence.lower())
+    # Sort by score and add top sentences
+    scored_remaining.sort(key=lambda x: x[0], reverse=True)
     
-    # 8. Process and Procedures
-    process_keywords = ['process', 'procedure', 'workflow', 'steps', 'method', 'approach', 'guidelines', 'instructions', 'protocol', 'policy', 'rule']
-    process_sentences = []
-    
-    for sentence in sentences:
-        if sentence.lower() not in used_content:
-            if any(keyword in sentence.lower() for keyword in process_keywords):
-                process_sentences.append(sentence)
-    
-    for sentence in process_sentences[:1]:
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Process/Procedures: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 9. Final Section Content (Last 25%)
-    final_section = content[3*len(content)//4:]
-    final_sentences = [s for s in sentences if s in final_section and s.lower() not in used_content]
-    
-    conclusion_keywords = ['conclusion', 'summary', 'result', 'outcome', 'decision', 'recommendation', 'next steps', 'follow up', 'finally', 'therefore', 'thus']
-    conclusion_found = False
-    
-    for sentence in final_sentences:
-        if any(keyword in sentence.lower() for keyword in conclusion_keywords):
-            clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-            summary_points.append(f"• Conclusion/Next Steps: {clean_sentence}")
-            used_content.add(sentence.lower())
-            conclusion_found = True
+    for score, sentence in scored_remaining:
+        if len(summary_points) >= 8:
             break
+        if score >= 2:  # Only include reasonably important sentences
+            clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+            summary_points.append(f"• Key Content: {clean_sentence}")
     
-    if not conclusion_found and final_sentences:
-        sentence = final_sentences[-1]  # Last meaningful sentence
-        clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-        summary_points.append(f"• Final Points: {clean_sentence}")
-        used_content.add(sentence.lower())
-    
-    # 10. Fill gaps if needed to ensure comprehensive coverage
-    if len(summary_points) < 6:
-        remaining_sentences = [s for s in sentences if s.lower() not in used_content]
-        # Score remaining sentences
-        for sentence in remaining_sentences[:4]:
-            if len(summary_points) >= 10:
-                break
-            clean_sentence = sentence[:100] + ("..." if len(sentence) > 100 else "")
-            summary_points.append(f"• Additional Content: {clean_sentence}")
-            used_content.add(sentence.lower())
-    
-    # Ensure we have at least 4 points
+    # If we still don't have enough points, add any remaining content
     if len(summary_points) < 4:
-        # Create from document chunks
-        chunk_size = max(30, total_words // 8)
-        for i in range(0, min(len(content_words), chunk_size * 6), chunk_size):
-            if len(summary_points) >= 8:
+        for sentence in remaining_sentences[:4]:
+            if len(summary_points) >= 6:
+                break
+            clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
+            summary_points.append(f"• Additional Information: {clean_sentence}")
+    
+    # Ensure we have a minimum number of summary points
+    if len(summary_points) < 3:
+        # Create summary from content chunks
+        chunk_size = max(50, total_words // 6)
+        for i in range(0, min(len(content_words), chunk_size * 4), chunk_size):
+            if len(summary_points) >= 5:
                 break
             chunk = ' '.join(content_words[i:i+chunk_size])
-            if len(chunk) > 30:
-                clean_chunk = chunk[:100] + ("..." if len(chunk) > 100 else "")
-                summary_points.append(f"• Section {len(summary_points)+1}: {clean_chunk}")
+            if len(chunk) > 40:
+                clean_chunk = chunk[:120] + ("..." if len(chunk) > 120 else "")
+                summary_points.append(f"• Content Section {len(summary_points)+1}: {clean_chunk}")
     
-    # Limit to 10 points maximum for readability
-    if len(summary_points) > 10:
-        summary_points = summary_points[:10]
-    
-    # Create final summary with proper formatting
+    # Create final summary
     final_summary = '\n'.join(summary_points)
     
-    # Final fallback if somehow no summary was created
-    if not summary_points or len(final_summary) < 50:
-        final_summary = f"• Document Overview: Content analyzed and processed\n• Word Count: {total_words} words\n• Document Status: Ready for review\n• Content Type: {content[:100]}{'...' if len(content) > 100 else ''}"
+    # Ensure we have a proper summary
+    if not summary_points or len(final_summary) < 30:
+        final_summary = f"• Document Type: {total_words} word document processed\n• Content Status: Ready for review\n• Summary: {content[:150]}{'...' if len(content) > 150 else ''}"
     
     return final_summary
 
