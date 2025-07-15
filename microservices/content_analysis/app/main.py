@@ -380,16 +380,26 @@ def generate_summary(content: str) -> str:
     else:
         summary = "Document contains structured content ready for review."
 
-    # Ensure reasonable length and add context
+    # Ensure reasonable length without adding extra text
     if len(summary) > 400:
         words = summary[:400].split()
         summary = ' '.join(words[:-1]) + "..."
     elif len(summary) < 50 and total_words > 20:
-        # If summary is too short but document has content, add more context
-        words = content.split()[:25]
-        summary = ' '.join(words) + "... - Document analysis completed."
+        # If summary is too short but document has content, add more context from actual content
+        words = content.split()[:30]
+        summary = ' '.join(words) + ("..." if len(content.split()) > 30 else ".")
     
-    return summary if summary else "Document successfully processed and analyzed for review."
+    # Clean up any formatting issues and ensure it's a proper summary
+    summary = summary.strip()
+    if not summary or len(summary) < 20:
+        # Last resort - create summary from first meaningful sentences
+        words = content.split()[:40]
+        if words:
+            summary = ' '.join(words) + ("..." if len(content.split()) > 40 else ".")
+        else:
+            summary = "Document successfully processed and ready for review."
+    
+    return summary
 
 def detect_language(content: str) -> str:
     """Simple language detection"""

@@ -608,9 +608,8 @@ async def bulk_upload_documents(
         if not summary or summary.strip() == '' or len(summary.strip()) < 20:
             # Generate a basic summary from the extracted text
             if extracted_text and len(extracted_text.strip()) > 50:
-                words = extracted_text.strip().split()[:30]
-                summary = ' '.join(words) + "..." if len(words) == 30 else ' '.join(words)
-                summary += " - Document processed and ready for review."
+                words = extracted_text.strip().split()[:35]
+                summary = ' '.join(words) + ("..." if len(extracted_text.strip().split()) > 35 else ".")
             else:
                 summary = f"Document '{file.filename}' processed successfully. Content classified as {doc_type} for {department} department."
         
