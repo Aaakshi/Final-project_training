@@ -1624,6 +1624,17 @@
                                     <canvas id="statsPriorityChart" width="300" height="300"></canvas>
                                 </div>
                             </div>
+
+                            <!-- Dashboard Charts (hidden, used only on dashboard tab) -->
+                            <div style="display: none;">
+                                <canvas id="trendChart"></canvas>
+                                <canvas id="departmentChart"></canvas>
+                                <canvas id="docTypesChart"></canvas>
+                                <canvas id="departmentsChart"></canvas>
+                                <canvas id="priorityChart"></canvas>
+                                <canvas id="trendsChart"></canvas>
+                                <canvas id="statsPieChart"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2165,12 +2176,54 @@
 
                     // Wait for Chart.js and create charts
                     await waitForChart();
-                    createCharts(stats);
+                    createStatisticsCharts(stats);
                 } else {
                     throw new Error('Failed to load stats');
                 }
             } catch (error) {
                 console.error('Error loading stats:', error);
+                // Use fallback local data for demo purposes
+                const fallbackStats = {
+                    total_documents: 6,
+                    processed_documents: 5,
+                    pending_documents: 1,
+                    processing_rate: 83,
+                    document_types: {
+                        'hr_document': 2,
+                        'financial_report': 1,
+                        'contract': 1,
+                        'it_document': 1,
+                        'marketing_document': 1
+                    },
+                    departments: {
+                        'hr': 2,
+                        'finance': 1,
+                        'legal': 1,
+                        'it': 1,
+                        'marketing': 1
+                    },
+                    priorities: {
+                        'high': 3,
+                        'medium': 2,
+                        'low': 1
+                    },
+                    upload_trends: [
+                        { date: '2024-01-01', count: 1 },
+                        { date: '2024-01-02', count: 2 },
+                        { date: '2024-01-03', count: 1 },
+                        { date: '2024-01-04', count: 1 },
+                        { date: '2024-01-05', count: 1 }
+                    ]
+                };
+                
+                // Update stats display with fallback data
+                document.getElementById('totalDocuments').textContent = fallbackStats.total_documents;
+                document.getElementById('processedDocuments').textContent = fallbackStats.processed_documents;
+                document.getElementById('pendingDocuments').textContent = fallbackStats.pending_documents;
+                document.getElementById('processingRate').textContent = fallbackStats.processing_rate + '%';
+
+                await waitForChart();
+                createStatisticsCharts(fallbackStats);
             }
         }
 
@@ -2384,203 +2437,208 @@
                     chart.destroy();
                 }
             });
-
-            // Check if we're on stats tab
-            const statsTab = document.getElementById('stats');
-            if (!statsTab || !statsTab.classList.contains('active')) {
-                return;
-            }
+            charts = {}; // Reset charts object
 
             // Wait for DOM to be ready
             setTimeout(() => {
+                // Use actual data
+                const chartData = {
+                    upload_trends: data.upload_trends || [],
+                    departments: data.departments || {},
+                    document_types: data.document_types || {},
+                    priorities: data.priorities || {}
+                };
 
-            // Create realistic sample data for demo
-            const sampleData = {
-                upload_trends: [
-                    { date: '2024-01-01', count: 12 },
-                    { date: '2024-01-02', count: 19 },
-                    { date: '2024-01-03', count: 8 },
-                    { date: '2024-01-04', count: 15 },
-                    { date: '2024-01-05', count: 12 },
-                    { date: '2024-01-06', count: 20 },
-                    { date: '2024-01-07', count: 16 }
-                ],
-                departments: {
-                    'HR': 25,
-                    'Finance': 35,
-                    'Legal': 20,
-                    'IT': 15,
-                    'Administration': 5
-                },
-                document_types: {
-                    'Invoice': 45,
-                    'Contract': 30,
-                    'Report': 25,
-                    'Policy': 15,
-                    'Memo': 10
-                },
-                priorities: {
-                    'High': 20,
-                    'Medium': 50,
-                    'Low': 30
-                }
-            };
-
-            // Use actual data if available, otherwise use sample data
-            const chartData = {
-                upload_trends: data.upload_trends || sampleData.upload_trends,
-                departments: data.departments || sampleData.departments,
-                document_types: data.document_types || sampleData.document_types,
-                priorities: data.priorities || sampleData.priorities
-            };
-
-            // Create charts with error handling
-            try {
-                const ctx1 = document.getElementById('statsTypeChart')?.getContext('2d');
-                const ctx2 = document.getElementById('statsDeptChart')?.getContext('2d');
-                const ctx3 = document.getElementById('statsLineChart')?.getContext('2d');
-
-                if (ctx1) {
-                    new Chart(ctx1, {
-                        type: 'bar',
-                        data: {
-                            labels: Object.keys(chartData.document_types),
-                            datasets: [{
-                                label: 'Document Count',
-                                data: Object.values(chartData.document_types),
-                                backgroundColor: '#3b82f6',
-                                borderRadius: 6,
-                                borderSkipped: false,
-                                hoverBackgroundColor: '#2563eb'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: {
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: {
-                                        color: '#718096',
-                                        stepSize: 10
-                                    }
+                // Create Document Types Chart
+                try {
+                    const ctx1 = document.getElementById('statsTypeChart');
+                    if (ctx1 && Object.keys(chartData.document_types).length > 0) {
+                        const ctx1Context = ctx1.getContext('2d');
+                        if (ctx1Context) {
+                            charts.statsType = new Chart(ctx1Context, {
+                                type: 'bar',
+                                data: {
+                                    labels: Object.keys(chartData.document_types).map(type => type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())),
+                                    datasets: [{
+                                        label: 'Document Count',
+                                        data: Object.values(chartData.document_types),
+                                        backgroundColor: [
+                                            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
+                                        ],
+                                        borderRadius: 6,
+                                        borderSkipped: false
+                                    }]
                                 },
-                                x: {
-                                    grid: { display: false },
-                                    ticks: { color: '#718096' }
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            grid: { color: '#e2e8f0' },
+                                            ticks: { color: '#718096' }
+                                        },
+                                        x: {
+                                            grid: { display: false },
+                                            ticks: { color: '#718096' }
+                                        }
+                                    }
                                 }
-                            }
+                            });
                         }
-                    });
+                    }
+                } catch (error) {
+                    console.log('Failed to create document types chart:', error.message);
                 }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
-            }
 
-            try {
-                if (ctx2) {
-                    new Chart(ctx2, {
-                        type: 'doughnut',
-                        data: {
-                            labels: Object.keys(chartData.departments),
-                            datasets: [{
-                                data: Object.values(chartData.departments),
-                                backgroundColor: [
-                                    '#3b82f6', // HR
-                                    '#10b981', // Finance
-                                    '#ef4444', // Legal
-                                    '#f59e0b', // IT
-                                    '#8b5cf6'  // Administration
-                                ],
-                                borderWidth: 0,
-                                hoverOffset: 4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 20,
-                                        usePointStyle: true,
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
-            }
-
-            try {
-                if (ctx3) {
-                    new Chart(ctx3, {
-                        type: 'line',
-                        data: {
-                            labels: chartData.upload_trends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
-                            datasets: [{
-                                label: 'Documents Processed',
-                                data: chartData.upload_trends.map(t => t.count),
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                tension: 0.4,
-                                fill: true,
-                                pointBackgroundColor: '#3b82f6',
-                                pointBorderColor: '#ffffff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: {
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: {
-                                        color: '#718096',
-                                        stepSize: 5
-                                    }
+                // Create Department Chart
+                try {
+                    const ctx2 = document.getElementById('statsDeptChart');
+                    if (ctx2 && Object.keys(chartData.departments).length > 0) {
+                        const ctx2Context = ctx2.getContext('2d');
+                        if (ctx2Context) {
+                            charts.statsDept = new Chart(ctx2Context, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: Object.keys(chartData.departments).map(dept => dept.toUpperCase()),
+                                    datasets: [{
+                                        data: Object.values(chartData.departments),
+                                        backgroundColor: [
+                                            '#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4'
+                                        ],
+                                        borderWidth: 0,
+                                        hoverOffset: 4
+                                    }]
                                 },
-                                x: {
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: { color: '#718096' }
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                            labels: {
+                                                padding: 20,
+                                                usePointStyle: true,
+                                                color: '#2d3748',
+                                                font: { size: 12 }
+                                            }
+                                        }
+                                    }
                                 }
-                            }
+                            });
                         }
-                    });
+                    }
+                } catch (error) {
+                    console.log('Failed to create department chart:', error.message);
                 }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
-            }
-            }, 100); // Small delay to ensure DOM is ready
+
+                // Create Trends Chart
+                try {
+                    const ctx3 = document.getElementById('statsLineChart');
+                    if (ctx3 && chartData.upload_trends.length > 0) {
+                        const ctx3Context = ctx3.getContext('2d');
+                        if (ctx3Context) {
+                            charts.statsLine = new Chart(ctx3Context, {
+                                type: 'line',
+                                data: {
+                                    labels: chartData.upload_trends.map(t => {
+                                        const date = new Date(t.date);
+                                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                    }),
+                                    datasets: [{
+                                        label: 'Documents Uploaded',
+                                        data: chartData.upload_trends.map(t => t.count),
+                                        borderColor: '#3b82f6',
+                                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointBackgroundColor: '#3b82f6',
+                                        pointBorderColor: '#ffffff',
+                                        pointBorderWidth: 2,
+                                        pointRadius: 4
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: true,
+                                            position: 'top',
+                                            labels: {
+                                                color: '#2d3748',
+                                                font: { size: 12 }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            grid: { color: '#e2e8f0' },
+                                            ticks: { color: '#718096' }
+                                        },
+                                        x: {
+                                            grid: { color: '#e2e8f0' },
+                                            ticks: { color: '#718096' }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.log('Failed to create trends chart:', error.message);
+                }
+
+                // Create Priority Chart
+                try {
+                    const ctx4 = document.getElementById('statsPriorityChart');
+                    if (ctx4 && Object.keys(chartData.priorities).length > 0) {
+                        const ctx4Context = ctx4.getContext('2d');
+                        if (ctx4Context) {
+                            charts.statsPriority = new Chart(ctx4Context, {
+                                type: 'pie',
+                                data: {
+                                    labels: Object.keys(chartData.priorities).map(p => p.charAt(0).toUpperCase() + p.slice(1)),
+                                    datasets: [{
+                                        data: Object.values(chartData.priorities),
+                                        backgroundColor: [
+                                            '#ef4444', // Red for High
+                                            '#f59e0b', // Orange for Medium  
+                                            '#10b981'  // Green for Low
+                                        ],
+                                        borderWidth: 0
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                            labels: {
+                                                padding: 20,
+                                                usePointStyle: true,
+                                                color: '#2d3748',
+                                                font: { size: 12 }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.log('Failed to create priority chart:', error.message);
+                }
+
+                console.log('Analytics charts created successfully');
+            }, 200);
         }
 
         async function reviewDocument(docId, action, comments) {
@@ -2633,7 +2691,9 @@
             }
 
             // Activate selected nav item
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
 
             // Close mobile menu if open
             document.getElementById('sidebar').classList.remove('mobile-open');
@@ -2646,7 +2706,10 @@
             } else if (tabName === 'notifications') {
                 loadEmailNotifications();
             } else if (tabName === 'stats') {
-                loadStats();
+                // Load stats and create charts after a delay to ensure DOM is ready
+                setTimeout(async () => {
+                    await loadStats();
+                }, 100);
             }
         }
 
