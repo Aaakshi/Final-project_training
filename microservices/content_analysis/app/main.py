@@ -1,57 +1,255 @@
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import sys
 import os
 import uvicorn
 import re
-import hashlib
-from typing import Dict, List, Optional
-from collections import Counter
-import nltk
-from textstat import flesch_reading_ease
+from typing import List, Dict, Any
 
-# Download required NLTK data
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
+# Add the project root to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
 
 try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-
-from nltk.corpus import stopwords
-from nltk.tokenize import sent_tokenize, word_tokenize
+    from libs.utils.logger import setup_logger
+    logger = setup_logger(__name__)
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Content Analysis Service")
 
 class AnalysisRequest(BaseModel):
     doc_id: str
     content: str
-    filename: Optional[str] = None
 
 class EntityExtractionResult(BaseModel):
     names: List[str]
     dates: List[str]
-    emails: List[str]
     amounts: List[str]
+    emails: List[str]
     phone_numbers: List[str]
-    addresses: List[str]
 
 class AnalysisResponse(BaseModel):
-    doc_id: str
     entities: EntityExtractionResult
     sentiment: str
-    risk_score: float
-    confidentiality_percent: float
-    word_count: int
-    char_count: int
-    language: str
-    readability_score: float
     summary: str
     key_phrases: List[str]
-    analysis_status: str
+    readability_score: float
+    risk_score: float
+    metadata: Dict[str, Any]
+
+@app.get("/")
+async def root():
+    return {"message": "Content Analysis Service is running", "service": "content_analysis"}
+
+def generate_summary(content: str) -> str:
+    """Generate a comprehensive bullet-point summary that covers the entire document"""
+    if not content or len(content.strip()) == 0:
+        return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
+
+    # Clean and prepare content
+    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
+    content_words = content.split()
+    total_words = len(content_words)
+    
+    if total_words < 10:
+        return f"• Short document with {total_words} words\n• Content: {content[:100]}{'...' if len(content) > 100 else ''}\n• Ready for review"
+
+    # Split content into meaningful sentences
+    sentences = []
+    
+    # Enhanced sentence splitting
+    sentence_endings = re.split(r'[.!?]+', content)
+    
+    for sent in sentence_endings:
+        sent = sent.strip()
+        # Filter out very short or meaningless sentences
+        if len(sent) > 15 and len(sent.split()) >= 4:
+            sentences.append(sent)
+    
+    # If we don't have enough sentences, try splitting by line breaks
+    if len(sentences) < 3:
+        line_sentences = content.split('\n')
+        for sent in line_sentences:
+            sent = sent.strip()
+            if len(sent) > 15 and len(sent.split()) >= 4:
+                sentences.append(sent)
+    
+    # Last resort: create chunks from the content
+    if len(sentences) < 3:
+        words = content.split()
+        chunk_size = max(15, len(words) // 6)
+        for i in range(0, len(words), chunk_size):
+            chunk = ' '.join(words[i:i+chunk_size])
+            if len(chunk) > 20:
+                sentences.append(chunk)
+
+    summary_points = []
+    used_sentences = set()
+    content_lower = content.lower()
+    
+    # Strategy 1: Document Overview from beginning (25% of content)
+    beginning_section = content[:len(content)//4]
+    if sentences and len(sentences) > 0:
+        first_sentence = sentences[0][:150] + ("..." if len(sentences[0]) > 150 else "")
+        summary_points.append(f"• Document Overview: {first_sentence}")
+        used_sentences.add(sentences[0])
+    
+    # Strategy 2: Extract action items and requirements
+    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'immediate', 'approve', 'review', 'apply', 'process', 'respond', 'reply', 'contact']
+    action_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and action_count < 2:
+            if any(keyword in sentence.lower() for keyword in action_keywords):
+                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+                summary_points.append(f"• Action Required: {clean_sentence}")
+                used_sentences.add(sentence)
+                action_count += 1
+    
+    # Strategy 3: Financial and numerical information
+    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'revenue', 'salary', 'fee', 'charge', 'dollar', 'money', 'fund', 'bill', 'receipt', 'account']
+    financial_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and financial_count < 1:
+            has_financial = any(keyword in sentence.lower() for keyword in financial_keywords)
+            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+|\d+ dollars?', sentence)
+            if has_financial or has_numbers:
+                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+                summary_points.append(f"• Financial Details: {clean_sentence}")
+                used_sentences.add(sentence)
+                financial_count += 1
+    
+    # Strategy 4: Personnel and department information
+    people_keywords = ['employee', 'manager', 'director', 'supervisor', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff', 'personnel', 'admin', 'coordinator', 'specialist']
+    people_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and people_count < 1:
+            if any(keyword in sentence.lower() for keyword in people_keywords):
+                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+                summary_points.append(f"• Personnel/Department: {clean_sentence}")
+                used_sentences.add(sentence)
+                people_count += 1
+    
+    # Strategy 5: Timeline and dates
+    date_patterns = [r'\d{4}-\d{2}-\d{2}', r'\d{2}/\d{2}/\d{4}', r'\d{2}-\d{2}-\d{4}']
+    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'time', 'when', 'by', 'until', 'before', 'after', 'start', 'end', 'meeting', 'event']
+    timeline_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and timeline_count < 1:
+            has_date = any(re.search(pattern, sentence, re.IGNORECASE) for pattern in date_patterns)
+            has_timeline = any(keyword in sentence.lower() for keyword in timeline_keywords)
+            if has_date or has_timeline:
+                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+                summary_points.append(f"• Timeline/Dates: {clean_sentence}")
+                used_sentences.add(sentence)
+                timeline_count += 1
+
+    # Strategy 6: Process and procedures from middle section (50% of content)
+    middle_start = len(content) // 4
+    middle_end = 3 * len(content) // 4
+    middle_section = content[middle_start:middle_end]
+    
+    process_keywords = ['process', 'procedure', 'step', 'method', 'workflow', 'protocol', 'guideline', 'instruction', 'policy', 'rule']
+    process_count = 0
+    
+    for sentence in sentences:
+        if sentence not in used_sentences and process_count < 2:
+            sentence_position = content.find(sentence)
+            if middle_start <= sentence_position <= middle_end:
+                if any(keyword in sentence.lower() for keyword in process_keywords) or len(sentence.split()) > 10:
+                    clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+                    summary_points.append(f"• Process/Procedure: {clean_sentence}")
+                    used_sentences.add(sentence)
+                    process_count += 1
+
+    # Strategy 7: Key content from remaining sentences
+    remaining_sentences = [s for s in sentences if s not in used_sentences]
+    
+    # Score remaining sentences by importance
+    scored_remaining = []
+    for sentence in remaining_sentences:
+        score = 0
+        words = sentence.split()
+        
+        # Prefer medium-length sentences
+        if 8 <= len(words) <= 25:
+            score += 2
+        
+        # Important keywords
+        important_keywords = ['important', 'critical', 'key', 'main', 'primary', 'significant', 'essential', 'note', 'attention', 'summary', 'conclusion']
+        if any(keyword in sentence.lower() for keyword in important_keywords):
+            score += 3
+        
+        # Contains specifics (names, numbers, etc.)
+        if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
+            score += 1
+        
+        # Avoid very generic sentences
+        generic_phrases = ['this document', 'please note', 'thank you', 'sincerely', 'best regards']
+        if any(phrase in sentence.lower() for phrase in generic_phrases):
+            score -= 2
+        
+        scored_remaining.append((score, sentence))
+    
+    # Sort by score and add top sentences
+    scored_remaining.sort(key=lambda x: x[0], reverse=True)
+    
+    content_added = 0
+    for score, sentence in scored_remaining:
+        if len(summary_points) >= 10:
+            break
+        if score >= 1 and content_added < 3:
+            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+            summary_points.append(f"• Key Content: {clean_sentence}")
+            content_added += 1
+
+    # Strategy 8: Ensure minimum coverage - add from final 25% if needed
+    if len(summary_points) < 4:
+        final_section = content[3 * len(content) // 4:]
+        final_sentences = [s for s in sentences if s not in used_sentences and final_section in content[content.find(s):]]
+        
+        for sentence in final_sentences[:2]:
+            if len(summary_points) >= 8:
+                break
+            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+            summary_points.append(f"• Document Conclusion: {clean_sentence}")
+
+    # Ensure we have a minimum number of summary points
+    if len(summary_points) < 3:
+        # Create summary from content chunks to ensure coverage
+        chunk_size = max(30, total_words // 8)
+        for i in range(0, min(len(content_words), chunk_size * 6), chunk_size):
+            if len(summary_points) >= 6:
+                break
+            chunk = ' '.join(content_words[i:i+chunk_size])
+            if len(chunk) > 30:
+                clean_chunk = chunk[:150] + ("..." if len(chunk) > 150 else "")
+                summary_points.append(f"• Content Section: {clean_chunk}")
+    
+    # Create final summary
+    final_summary = '\n'.join(summary_points)
+    
+    # Ensure we have a proper summary
+    if not summary_points or len(final_summary) < 50:
+        final_summary = f"• Document processed: {total_words} words analyzed\n• Content type: Text document\n• Key content: {content[:200]}{'...' if len(content) > 200 else ''}\n• Analysis complete: Ready for review"
+    
+    # Ensure at least 15% coverage as mentioned in requirements
+    coverage_target = max(3, min(10, total_words // 50))
+    while len(summary_points) < coverage_target and len(summary_points) < 10:
+        if remaining_sentences:
+            sentence = remaining_sentences.pop(0)
+            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+            summary_points.append(f"• Additional Information: {clean_sentence}")
+        else:
+            break
+    
+    return '\n'.join(summary_points)
 
 def extract_entities(content: str) -> EntityExtractionResult:
     """Extract various entities from document content"""
@@ -90,43 +288,59 @@ def extract_entities(content: str) -> EntityExtractionResult:
 
     # Extract phone numbers
     phone_patterns = [
-        r'\+?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}',  # US format
-        r'\+?[0-9]{1,3}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,4}[-.\s]?[0-9]{1,9}'  # International
+        r'\(\d{3}\)\s*\d{3}-\d{4}',  # (123) 456-7890
+        r'\d{3}-\d{3}-\d{4}',  # 123-456-7890
+        r'\d{3}\.\d{3}\.\d{4}',  # 123.456.7890
+        r'\+\d{1,3}\s*\d{3}\s*\d{3}\s*\d{4}'  # +1 123 456 7890
     ]
     phone_numbers = []
     for pattern in phone_patterns:
         phone_numbers.extend(re.findall(pattern, content))
     phone_numbers = list(set(phone_numbers))
 
-    # Extract addresses (basic pattern)
-    address_pattern = r'\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl)\b'
-    addresses = re.findall(address_pattern, content, re.IGNORECASE)
-    addresses = list(set(addresses))
-
     return EntityExtractionResult(
         names=names[:10],  # Limit to top 10
         dates=dates[:10],
-        emails=emails[:10],
         amounts=amounts[:10],
-        phone_numbers=phone_numbers[:10],
-        addresses=addresses[:10]
+        emails=emails[:10],
+        phone_numbers=phone_numbers[:10]
     )
 
-def analyze_sentiment(content: str) -> str:
-    """Simple sentiment analysis based on keywords"""
-    positive_words = ['good', 'excellent', 'great', 'positive', 'success', 'approve', 'accept', 'agree', 'satisfied', 'happy']
-    negative_words = ['bad', 'terrible', 'negative', 'fail', 'reject', 'deny', 'disagree', 'unsatisfied', 'angry', 'disappointed']
+def calculate_readability_score(content: str) -> float:
+    """Simple readability score calculation"""
+    words = content.split()
+    sentences = content.split('.')
 
-    content_lower = content.lower()
-    positive_count = sum(1 for word in positive_words if word in content_lower)
-    negative_count = sum(1 for word in negative_words if word in content_lower)
+    if len(sentences) == 0 or len(words) == 0:
+        return 0.0
 
-    if positive_count > negative_count:
-        return "positive"
-    elif negative_count > positive_count:
-        return "negative"
-    else:
-        return "neutral"
+    avg_sentence_length = len(words) / len(sentences)
+    avg_word_length = sum(len(word) for word in words) / len(words)
+
+    # Simple readability formula (lower is better)
+    score = (avg_sentence_length * 0.3) + (avg_word_length * 0.7)
+
+    # Normalize to 0-1 scale (1 = most readable)
+    normalized_score = max(0, min(1, 1 - (score / 20)))
+
+    return round(normalized_score, 2)
+
+def extract_key_phrases(content: str) -> List[str]:
+    """Extract key phrases from content"""
+    # Simple key phrase extraction based on frequency
+    words = re.findall(r'\b[A-Za-z]{3,}\b', content.lower())
+    word_freq = {}
+
+    # Common stop words to exclude
+    stop_words = {'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use', 'may', 'than', 'first', 'been', 'call', 'find', 'from', 'have', 'into', 'long', 'look', 'made', 'make', 'many', 'more', 'most', 'move', 'much', 'must', 'name', 'need', 'number', 'other', 'over', 'part', 'people', 'place', 'right', 'said', 'same', 'seem', 'some', 'sound', 'still', 'such', 'take', 'tell', 'them', 'these', 'they', 'this', 'time', 'very', 'want', 'water', 'well', 'were', 'what', 'when', 'where', 'which', 'while', 'will', 'with', 'word', 'work', 'would', 'write', 'year', 'your'}
+
+    for word in words:
+        if word not in stop_words and len(word) > 3:
+            word_freq[word] = word_freq.get(word, 0) + 1
+
+    # Get top words
+    key_phrases = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:15]
+    return [phrase[0] for phrase in key_phrases]
 
 def calculate_risk_score(content: str, entities: EntityExtractionResult) -> float:
     """Calculate document risk score based on content and entities"""
@@ -160,309 +374,61 @@ def calculate_risk_score(content: str, entities: EntityExtractionResult) -> floa
 
     return min(risk_score, 1.0)
 
-def calculate_confidentiality_score(content: str, entities: EntityExtractionResult) -> float:
-    """Calculate confidentiality percentage based on content analysis"""
-    confidentiality_score = 0.0
-    content_lower = content.lower()
-
-    # High confidentiality indicators
-    high_conf_keywords = ['confidential', 'classified', 'restricted', 'top secret', 'proprietary']
-    medium_conf_keywords = ['internal', 'private', 'sensitive', 'do not distribute', 'limited access']
-    personal_info = ['ssn', 'social security', 'credit card', 'bank account', 'password']
-
-    # Check for high confidentiality keywords
-    if any(word in content_lower for word in high_conf_keywords):
-        confidentiality_score += 0.4
-
-    # Check for medium confidentiality keywords
-    if any(word in content_lower for word in medium_conf_keywords):
-        confidentiality_score += 0.3
-
-    # Check for personal information
-    if any(word in content_lower for word in personal_info):
-        confidentiality_score += 0.2
-
-    # Based on entities found
-    if entities.amounts:
-        confidentiality_score += 0.1
-    if entities.emails:
-        confidentiality_score += 0.05
-    if entities.phone_numbers:
-        confidentiality_score += 0.05
-
-    return min(confidentiality_score * 100, 100.0)  # Return as percentage
-
-def calculate_readability_score(content: str) -> float:
-    """Simple readability score calculation"""
-    words = content.split()
-    sentences = content.split('.')
-
-    if len(sentences) == 0 or len(words) == 0:
-        return 0.0
-
-    avg_sentence_length = len(words) / len(sentences)
-    avg_word_length = sum(len(word) for word in words) / len(words)
-
-    # Simple readability formula (lower is better)
-    score = (avg_sentence_length * 0.3) + (avg_word_length * 0.7)
-
-    # Normalize to 0-1 scale (1 = most readable)
-    normalized_score = max(0, min(1, 1 - (score / 20)))
-
-    return round(normalized_score, 2)
-
-def extract_key_phrases(content: str) -> List[str]:
-    """Extract key phrases from content"""
-    # Simple key phrase extraction based on frequency
-    words = re.findall(r'\b[A-Za-z]{3,}\b', content.lower())
-    word_freq = {}
-
-    for word in words:
-        if word not in ['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use']:
-            word_freq[word] = word_freq.get(word, 0) + 1
-
-    # Get top words
-    key_phrases = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:10]
-    return [phrase[0] for phrase in key_phrases]
-
-def generate_summary(content: str) -> str:
-    """Generate a comprehensive bullet-point summary that covers the entire document"""
-    if not content or len(content.strip()) == 0:
-        return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
-
-    # Clean and prepare content
-    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
-    content_words = content.split()
-    total_words = len(content_words)
-    
-    # Split content into meaningful sentences
-    sentences = []
-    
-    # First try splitting by periods, exclamation marks, and question marks
-    import re
-    sentence_endings = re.split(r'[.!?]+', content)
-    
-    for sent in sentence_endings:
-        sent = sent.strip()
-        # Filter out very short or meaningless sentences
-        if len(sent) > 20 and len(sent.split()) >= 5:
-            sentences.append(sent)
-    
-    # If we don't have enough sentences, try splitting by line breaks
-    if len(sentences) < 3:
-        line_sentences = content.split('\n')
-        for sent in line_sentences:
-            sent = sent.strip()
-            if len(sent) > 20 and len(sent.split()) >= 5:
-                sentences.append(sent)
-    
-    # Last resort: create chunks from the content
-    if len(sentences) < 3:
-        words = content.split()
-        chunk_size = max(20, len(words) // 8)
-        for i in range(0, len(words), chunk_size):
-            chunk = ' '.join(words[i:i+chunk_size])
-            if len(chunk) > 30:
-                sentences.append(chunk)
-    
-    summary_points = []
-    used_sentences = set()  # Track used sentences to avoid duplication
-    
-    # Strategy: Create comprehensive summary by analyzing different aspects
-    
-    # 1. Document Overview from beginning
-    if len(sentences) > 0:
-        first_sentence = sentences[0][:120] + ("..." if len(sentences[0]) > 120 else "")
-        summary_points.append(f"• Document Overview: {first_sentence}")
-        used_sentences.add(sentences[0])
-    
-    # 2. Extract key information by categories
-    import re
-    
-    # Action items and requirements
-    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'immediate', 'approve', 'review', 'apply', 'process']
-    action_count = 0
-    
-    for sentence in sentences:
-        if sentence not in used_sentences and action_count < 2:
-            if any(keyword in sentence.lower() for keyword in action_keywords):
-                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-                summary_points.append(f"• Action Required: {clean_sentence}")
-                used_sentences.add(sentence)
-                action_count += 1
-    
-    # Financial and numerical information
-    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'revenue', 'salary', 'fee', 'charge', 'dollar', 'money', 'fund']
-    financial_count = 0
-    
-    for sentence in sentences:
-        if sentence not in used_sentences and financial_count < 1:
-            has_financial = any(keyword in sentence.lower() for keyword in financial_keywords)
-            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+|\d+ dollars?', sentence)
-            if has_financial or has_numbers:
-                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-                summary_points.append(f"• Financial Details: {clean_sentence}")
-                used_sentences.add(sentence)
-                financial_count += 1
-    
-    # Personnel and department information
-    people_keywords = ['employee', 'manager', 'director', 'supervisor', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff', 'personnel', 'admin']
-    people_count = 0
-    
-    for sentence in sentences:
-        if sentence not in used_sentences and people_count < 1:
-            if any(keyword in sentence.lower() for keyword in people_keywords):
-                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-                summary_points.append(f"• Personnel/Department: {clean_sentence}")
-                used_sentences.add(sentence)
-                people_count += 1
-    
-    # Timeline and dates
-    date_patterns = [r'\d{4}-\d{2}-\d{2}', r'\d{2}/\d{2}/\d{4}', r'\d{2}-\d{2}-\d{4}']
-    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'time', 'when', 'by', 'until', 'before', 'after', 'start', 'end']
-    timeline_count = 0
-    
-    for sentence in sentences:
-        if sentence not in used_sentences and timeline_count < 1:
-            has_date = any(re.search(pattern, sentence, re.IGNORECASE) for pattern in date_patterns)
-            has_timeline = any(keyword in sentence.lower() for keyword in timeline_keywords)
-            if has_date or has_timeline:
-                clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-                summary_points.append(f"• Timeline/Dates: {clean_sentence}")
-                used_sentences.add(sentence)
-                timeline_count += 1
-    
-    # Fill with remaining important content to reach 6-8 bullet points
-    remaining_sentences = [s for s in sentences if s not in used_sentences]
-    
-    # Score remaining sentences by importance
-    scored_remaining = []
-    for sentence in remaining_sentences:
-        score = 0
-        words = sentence.split()
-        
-        # Prefer medium-length sentences
-        if 10 <= len(words) <= 30:
-            score += 2
-        
-        # Important keywords
-        important_keywords = ['important', 'critical', 'key', 'main', 'primary', 'significant', 'essential', 'note', 'attention', 'policy', 'procedure']
-        if any(keyword in sentence.lower() for keyword in important_keywords):
-            score += 3
-        
-        # Contains specifics (names, numbers, etc.)
-        if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
-            score += 1
-        
-        scored_remaining.append((score, sentence))
-    
-    # Sort by score and add top sentences
-    scored_remaining.sort(key=lambda x: x[0], reverse=True)
-    
-    for score, sentence in scored_remaining:
-        if len(summary_points) >= 8:
-            break
-        if score >= 2:  # Only include reasonably important sentences
-            clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-            summary_points.append(f"• Key Content: {clean_sentence}")
-    
-    # If we still don't have enough points, add any remaining content
-    if len(summary_points) < 4:
-        for sentence in remaining_sentences[:4]:
-            if len(summary_points) >= 6:
-                break
-            clean_sentence = sentence[:120] + ("..." if len(sentence) > 120 else "")
-            summary_points.append(f"• Additional Information: {clean_sentence}")
-    
-    # Ensure we have a minimum number of summary points
-    if len(summary_points) < 3:
-        # Create summary from content chunks
-        chunk_size = max(50, total_words // 6)
-        for i in range(0, min(len(content_words), chunk_size * 4), chunk_size):
-            if len(summary_points) >= 5:
-                break
-            chunk = ' '.join(content_words[i:i+chunk_size])
-            if len(chunk) > 40:
-                clean_chunk = chunk[:120] + ("..." if len(chunk) > 120 else "")
-                summary_points.append(f"• Content Section {len(summary_points)+1}: {clean_chunk}")
-    
-    # Create final summary
-    final_summary = '\n'.join(summary_points)
-    
-    # Ensure we have a proper summary
-    if not summary_points or len(final_summary) < 30:
-        final_summary = f"• Document Type: {total_words} word document processed\n• Content Status: Ready for review\n• Summary: {content[:150]}{'...' if len(content) > 150 else ''}"
-    
-    return final_summary
-
-def detect_language(content: str) -> str:
-    """Simple language detection"""
-    # This is a very basic implementation
-    # In a real system, you'd use a proper language detection library
-    common_english_words = ['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how']
-
-    content_lower = content.lower()
-    english_word_count = sum(1 for word in common_english_words if word in content_lower)
-
-    return "en" if english_word_count > 3 else "unknown"
-
-@app.get("/")
-async def root():
-    return {"message": "Content Analysis Service is running", "service": "content_analysis"}
-
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_content(request: AnalysisRequest):
-    """Analyze document content for entities, sentiment, and metadata"""
+    """Analyze document content and return comprehensive analysis"""
     try:
-        content = request.content
-
-        if not content or len(content.strip()) == 0:
-            raise HTTPException(status_code=400, detail="Content cannot be empty")
-
         # Extract entities
-        entities = extract_entities(content)
-
-        # Analyze sentiment
-        sentiment = analyze_sentiment(content)
-
-        # Calculate risk score
-        risk_score = calculate_risk_score(content, entities)
-
-        # Calculate confidentiality percentage
-        confidentiality_percent = calculate_confidentiality_score(content, entities)
-
-        # Calculate readability
-        readability_score = calculate_readability_score(content)
-
+        entities = extract_entities(request.content)
+        
+        # Generate comprehensive summary
+        summary = generate_summary(request.content)
+        
         # Extract key phrases
-        key_phrases = extract_key_phrases(content)
-
-        # Generate summary
-        summary = generate_summary(content)
-
-        # Detect language
-        language = detect_language(content)
-
-        # Calculate metrics
-        word_count = len(content.split())
-        char_count = len(content)
-
+        key_phrases = extract_key_phrases(request.content)
+        
+        # Calculate readability score
+        readability_score = calculate_readability_score(request.content)
+        
+        # Calculate risk score
+        risk_score = calculate_risk_score(request.content, entities)
+        
+        # Basic sentiment analysis (simplified)
+        sentiment = "neutral"
+        positive_words = ["good", "excellent", "positive", "success", "approve", "great"]
+        negative_words = ["bad", "terrible", "negative", "fail", "reject", "poor"]
+        
+        content_lower = request.content.lower()
+        positive_count = sum(1 for word in positive_words if word in content_lower)
+        negative_count = sum(1 for word in negative_words if word in content_lower)
+        
+        if positive_count > negative_count:
+            sentiment = "positive"
+        elif negative_count > positive_count:
+            sentiment = "negative"
+        
+        # Additional metadata
+        metadata = {
+            "word_count": len(request.content.split()),
+            "character_count": len(request.content),
+            "sentence_count": len(request.content.split('.')),
+            "paragraph_count": len(request.content.split('\n\n'))
+        }
+        
+        logger.info(f"Analyzed content for document {request.doc_id}")
+        
         return AnalysisResponse(
-            doc_id=request.doc_id,
             entities=entities,
             sentiment=sentiment,
-            risk_score=risk_score,
-            confidentiality_percent=confidentiality_percent,
-            word_count=word_count,
-            char_count=char_count,
-            language=language,
-            readability_score=readability_score,
             summary=summary,
             key_phrases=key_phrases,
-            analysis_status="completed"
+            readability_score=readability_score,
+            risk_score=risk_score,
+            metadata=metadata
         )
-
+        
     except Exception as e:
+        logger.error(f"Content analysis error: {e}")
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/ping")
