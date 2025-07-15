@@ -731,13 +731,11 @@ async def bulk_upload_documents(
         summary = analysis_data.get('summary', '')
         
         # Ensure we have a meaningful summary
-        if not summary or summary.strip() == '' or len(summary.strip()) < 20:
-            # Generate a basic summary from the extracted text
-            if extracted_text and len(extracted_text.strip()) > 50:
-                words = extracted_text.strip().split()[:35]
-                summary = ' '.join(words) + ("..." if len(extracted_text.strip().split()) > 35 else ".")
-            else:
-                summary = f"Document '{file.filename}' processed successfully. Content classified as {doc_type} for {department} department."
+        if not summary or summary.strip() == '' or len(summary.strip()) < 30:
+            # Use local summary generation as fallback
+            summary = generate_summary(extracted_text)
+            if not summary or len(summary.strip()) < 30:
+                summary = f"• Document Type: {doc_type.replace('_', ' ').title()}\n• Department: {department.upper()}\n• File: {file.filename}\n• Content: Document processed successfully and ready for review"
         
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
         entities = json.dumps(analysis_data.get('entities', {}))

@@ -958,6 +958,89 @@
                 display: block;
             }
         }
+
+        .document-summary {
+            margin-top: 15px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+
+        .document-summary h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .summary-content {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #555;
+        }
+
+        .summary-content p {
+            margin: 0 0 6px 0;
+        }
+
+        .confidentiality-info {
+            margin-top: 12px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .confidentiality-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .conf-level {
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .conf-high {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .conf-medium {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .conf-low {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .confidentiality-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .conf-progress {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .conf-percentage {
+            font-size: 11px;
+            color: #666;
+            float: right;
+        }
     </style>
 </head>
 <body>
@@ -1637,7 +1720,7 @@
                 const uploadDate = new Date(doc.uploaded_at).toLocaleDateString();
                 const department = doc.department || 'general';
                 const priority = doc.priority || 'medium';
-                
+
                 // Extract first few lines of summary for preview
                 let summaryPreview = '';
                 if (doc.summary && doc.summary.trim()) {
@@ -1686,7 +1769,7 @@
                     const modalContent = document.getElementById('documentDetails');
                     let modalHTML = `
                         <h2><i class="fas fa-file-alt"></i> ${doc.original_name}</h2>
-                        
+
                         <!-- ML-Generated Summary Section - Prominently displayed at top -->
                         <div style="margin: 20px 0; background: linear-gradient(135deg, #e6f3ff 0%, #f0f8ff 100%); padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6;">
                             <h3 style="margin: 0 0 15px 0; color: #1e40af; font-size: 18px; display: flex; align-items: center; gap: 10px;">
@@ -1838,7 +1921,7 @@
                 if (response.ok) {
                     document.getElementById('totalDocuments').textContent = data.total_documents || 0;
                     document.getElementById('processedDocuments').textContent = data.processed_documents || 0;
-                    document.getElementById('pendingDocuments').textContent = data.pending_documents || 0;
+                    document.getElementById('pendingDocuments').textContent = data.pendingDocuments || 0;
                     document.getElementById('processingRate').textContent = (data.processing_rate || 0) + '%';
 
                     createStatisticsCharts(data);
@@ -2268,6 +2351,36 @@
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function getConfidentialityLevel(percentage) {
+            if (percentage >= 70) return 'high';
+            if (percentage >= 30) return 'medium';
+            return 'low';
+        }
+
+        function getConfidentialityColor(percentage) {
+            if (percentage >= 70) return '#dc3545';
+            if (percentage >= 30) return '#ffc107';
+            return '#28a745';
+        }
+
+        function formatSummary(summary) {
+            if (!summary) return '';
+
+            // Split by bullet points and format each line
+            const lines = summary.split('\n').filter(line => line.trim());
+            return lines.map(line => {
+                if (line.trim().startsWith('•')) {
+                    return `<p><strong>•</strong> ${line.substring(1).trim()}</p>`;
+                }
+                return `<p>${line.trim()}</p>`;
+            }).join('');
         }
     </script>
 </body>
