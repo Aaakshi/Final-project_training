@@ -1175,6 +1175,12 @@
                 </button>
             </form>
 
+            <div style="text-align: center; margin: 20px 0;">
+                <button onclick="showRegisterForm()" class="btn btn-secondary" style="width: 100%;">
+                    <i class="fas fa-user-plus"></i> Register New User
+                </button>
+            </div>
+
             <div class="quick-login">
                 <h4>Quick Login (Demo Users):</h4>
                 <div class="quick-login-grid">
@@ -1186,6 +1192,60 @@
                     <button class="quick-login-btn" onclick="quickLogin('admin@company.com', 'admin123')">Admin</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Registration Form -->
+        <div id="registerContainer" class="auth-container" style="display: none;">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #2d3748;">Register New User</h2>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="regFullName">Full Name:</label>
+                    <input type="text" id="regFullName" name="full_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="regEmail">Email:</label>
+                    <input type="email" id="regEmail" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="regPassword">Password:</label>
+                    <input type="password" id="regPassword" name="password" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="regRole">Role:</label>
+                    <select id="regRole" name="role" required>
+                        <option value="">Select Role</option>
+                        <option value="employee">Employee</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="regDepartment">Department:</label>
+                    <select id="regDepartment" name="department" required>
+                        <option value="">Select Department</option>
+                        <option value="hr">HR</option>
+                        <option value="finance">Finance</option>
+                        <option value="legal">Legal</option>
+                        <option value="it">IT</option>
+                        <option value="administration">Administration</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="sales">Sales</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn" style="width: 100%; margin-bottom: 15px;">
+                    <i class="fas fa-user-plus"></i> Register
+                </button>
+
+                <button type="button" onclick="showLoginForm()" class="btn btn-secondary" style="width: 100%;">
+                    <i class="fas fa-arrow-left"></i> Back to Login
+                </button>
+            </form>
         </div>
 
         <!-- Main Application -->
@@ -1596,6 +1656,7 @@
             }
 
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
             document.getElementById('uploadForm').addEventListener('submit', handleUpload);
         });
 
@@ -1850,6 +1911,52 @@
             }).join('');
         }
 
+        function showRegisterForm() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('registerContainer').style.display = 'block';
+        }
+
+        function showLoginForm() {
+            document.getElementById('registerContainer').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'block';
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+
+            const formData = new FormData(event.target);
+            const registerData = {
+                full_name: formData.get('full_name'),
+                email: formData.get('email'),
+                password: formData.get('password'),
+                role: formData.get('role'),
+                department: formData.get('department')
+            };
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Registration successful! You can now login.', 'success');
+                    event.target.reset();
+                    showLoginForm();
+                } else {
+                    showToast('Registration failed: ' + result.detail, 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showToast('Registration failed. Please try again.', 'error');
+            }
+        }
+
         async function showDocumentDetails(docId) {
             try {
                 const response = await fetch(`/api/documents/${docId}`, {
@@ -1863,8 +1970,15 @@
                 if (response.ok) {
                     const confidentiality = Math.round(doc.confidentiality_percent || 0);
                     let confidentialityColor = '#48bb78';
-                    if (confidentiality > 70) confidentialityColor = '#e53e3e';
-                    else if (confidentiality > 40) confidentialityColor = '#ed8936';
+                    let confidentialityLevel = 'Low';
+                    
+                    if (confidentiality > 70) {
+                        confidentialityColor = '#e53e3e';
+                        confidentialityLevel = 'High';
+                    } else if (confidentiality > 40) {
+                        confidentialityColor = '#ed8936';
+                        confidentialityLevel = 'Medium';
+                    }
 
                     const modalContent = document.getElementById('documentDetails');
                     let modalHTML = `
@@ -1901,10 +2015,18 @@
                         </div>
 
                         <div style="margin: 20px 0;">
-                            <label><strong>Confidentiality Level:</strong></label>
-                            <div class="confidentiality-bar">
-                                <div class="confidentiality-fill" style="width: ${confidentiality}%; background: ${confidentialityColor};"></div>
-                                <div class="confidentiality-text">${confidentiality}%</div>
+                            <label><strong>Confidentiality Analysis:</strong></label>
+                            <div style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e2e8f0;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-weight: 600;">Level: ${confidentialityLevel}</span>
+                                    <span style="font-weight: 600; color: ${confidentialityColor};">${confidentiality}%</span>
+                                </div>
+                                <div class="confidentiality-bar">
+                                    <div class="confidentiality-fill" style="width: ${confidentiality}%; background: ${confidentialityColor};"></div>
+                                </div>
+                                <div style="margin-top: 8px; font-size: 12px; color: #666;">
+                                    Based on content analysis including sensitive keywords, document type, and security indicators
+                                </div>
                             </div>
                         </div>
 

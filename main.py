@@ -194,16 +194,16 @@ def add_dummy_data():
     print("Adding dummy data for demo users...")
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
-    
+
     # Check if dummy data already exists
     cursor.execute("SELECT COUNT(*) FROM documents")
     existing_count = cursor.fetchone()[0]
-    
+
     if existing_count > 0:
         print("Dummy data already exists, skipping...")
         conn.close()
         return
-    
+
     dummy_documents = [
         {
             'doc_id': str(uuid.uuid4()),
@@ -348,7 +348,7 @@ def add_dummy_data():
             'routing_reason': 'Marketing performance document routed to management for review'
         }
     ]
-    
+
     # Add email notifications for these documents
     email_notifications = [
         {
@@ -388,13 +388,13 @@ def add_dummy_data():
             'priority': 'high'
         }
     ]
-    
+
     # Insert dummy documents
     for doc in dummy_documents:
         # Set upload time to various times in the past
         days_ago = dummy_documents.index(doc) + 1
         upload_time = (datetime.now() - timedelta(days=days_ago)).isoformat()
-        
+
         cursor.execute('''
             INSERT INTO documents 
             (doc_id, original_name, file_path, file_size, file_type, uploaded_by, uploaded_at,
@@ -412,12 +412,12 @@ def add_dummy_data():
             doc['sentiment'], doc['summary'], doc['key_phrases'], doc['entities'],
             doc['routed_to'], doc['routing_reason']
         ))
-    
+
     # Insert email notifications
     for notif in email_notifications:
         days_ago = email_notifications.index(notif) + 1
         sent_time = (datetime.now() - timedelta(days=days_ago)).isoformat()
-        
+
         cursor.execute('''
             INSERT INTO email_notifications 
             (doc_id, sent_by, received_by, subject, body_preview, email_type, status, sent_at, document_name, department, priority)
@@ -427,7 +427,7 @@ def add_dummy_data():
             notif['body_preview'], notif['email_type'], notif['status'], sent_time,
             notif['document_name'], notif['department'], notif['priority']
         ))
-    
+
     conn.commit()
     conn.close()
     print(f"Added {len(dummy_documents)} dummy documents and {len(email_notifications)} email notifications")
@@ -465,7 +465,7 @@ def migrate_database():
 
 # Initialize database on startup
 init_database_if_needed()
-    
+
 
 # Pydantic models
 class UserRegister(BaseModel):
@@ -597,31 +597,31 @@ def generate_summary(content: str) -> str:
 
     # Strategy 6: Key content from remaining sentences
     remaining_sentences = [s for s in sentences if s not in used_sentences]
-    
+
     # Score sentences by importance
     scored_remaining = []
     for sentence in remaining_sentences:
         score = 0
         words = sentence.split()
-        
+
         # Prefer medium-length sentences
         if 5 <= len(words) <= 20:
             score += 2
-            
+
         # Important keywords
         important_keywords = ['important', 'critical', 'key', 'main', 'significant', 'note', 'summary']
         if any(keyword in sentence.lower() for keyword in important_keywords):
             score += 3
-            
+
         # Contains specific information
         if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
             score += 1
-            
+
         scored_remaining.append((score, sentence))
-    
+
     # Sort by score and add top sentences
     scored_remaining.sort(key=lambda x: x[0], reverse=True)
-    
+
     for score, sentence in scored_remaining:
         if len(summary_points) >= 8:
             break
@@ -981,14 +981,14 @@ async def bulk_upload_documents(
         confidentiality_percent = analysis_data.get('confidentiality_percent', 0.0)
         sentiment = analysis_data.get('sentiment', 'neutral')
         summary = analysis_data.get('summary', '')
-        
+
         # Ensure we have a meaningful summary
         if not summary or summary.strip() == '' or len(summary.strip()) < 30:
             # Use local summary generation as fallback
             summary = generate_summary(extracted_text)
             if not summary or len(summary.strip()) < 30:
                 summary = f"• Document Type: {doc_type.replace('_', ' ').title()}\n• Department: {department.upper()}\n• File: {file.filename}\n• Content: Document processed successfully and ready for review"
-        
+
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
         entities = json.dumps(analysis_data.get('entities', {}))
 
@@ -1400,7 +1400,7 @@ async def get_email_notifications(current_user: dict = Depends(get_current_user)
             'document_name': notif[9],
             'department': notif[10],
             'priority': notif[12] if len(notif) > 12 else 'medium'
-        })
+                })
 
     return {
         'emails': formatted_notifications,
