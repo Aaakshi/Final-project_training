@@ -226,37 +226,90 @@ def extract_key_phrases(content: str) -> List[str]:
     return [phrase[0] for phrase in key_phrases]
 
 def generate_summary(content: str) -> str:
-    """Generate a brief summary of the document"""
-    sentences = [s.strip() for s in content.split('.') if s.strip()]
-
-    if not sentences:
+    """Generate a brief summary of the document using ML-like approach"""
+    if not content or len(content.strip()) == 0:
         return "No content available for summary"
 
+    # Clean and prepare content
+    content = content.strip()
+    sentences = [s.strip() for s in content.split('.') if s.strip() and len(s.strip()) > 10]
+
+    if not sentences:
+        # Fallback to simple truncation if no proper sentences found
+        words = content.split()[:30]
+        return ' '.join(words) + "..." if len(words) == 30 else ' '.join(words)
+
     if len(sentences) <= 2:
-        return content[:200] + "..." if len(content) > 200 else content
+        return '. '.join(sentences) + "." if not sentences[-1].endswith('.') else '. '.join(sentences)
 
-    # Find the most informative sentences (containing key terms)
-    key_terms = ['request', 'document', 'policy', 'agreement', 'invoice', 'payment', 'employee', 'department', 'project', 'meeting', 'contract', 'budget', 'report', 'analysis', 'system', 'process']
+    # Enhanced key terms for better classification
+    key_terms = {
+        'action': ['request', 'submit', 'approve', 'review', 'process', 'complete', 'urgent', 'immediate'],
+        'business': ['invoice', 'payment', 'contract', 'agreement', 'budget', 'financial', 'cost'],
+        'people': ['employee', 'manager', 'team', 'department', 'staff', 'personnel'],
+        'process': ['policy', 'procedure', 'workflow', 'system', 'analysis', 'report'],
+        'time': ['deadline', 'schedule', 'meeting', 'date', 'time', 'duration'],
+        'location': ['office', 'department', 'location', 'address', 'facility']
+    }
 
+    # Score sentences based on multiple factors
     scored_sentences = []
-    for sentence in sentences[:10]:  # Limit to first 10 sentences
-        score = sum(1 for term in key_terms if term.lower() in sentence.lower())
-        scored_sentences.append((score, sentence))
+    for i, sentence in enumerate(sentences[:15]):  # Limit to first 15 sentences
+        score = 0
+        sentence_lower = sentence.lower()
+        
+        # Position scoring (earlier sentences get higher scores)
+        position_score = max(0, 5 - i)
+        score += position_score
+        
+        # Length scoring (prefer medium-length sentences)
+        word_count = len(sentence.split())
+        if 8 <= word_count <= 25:
+            score += 3
+        elif 5 <= word_count <= 35:
+            score += 1
+            
+        # Key term scoring
+        for category, terms in key_terms.items():
+            category_matches = sum(1 for term in terms if term in sentence_lower)
+            score += category_matches * 2
+            
+        # Avoid very short or very long sentences
+        if word_count < 4:
+            score -= 5
+        elif word_count > 40:
+            score -= 2
+            
+        scored_sentences.append((score, sentence, i))
 
-    # Sort by score and take top sentences
-    scored_sentences.sort(key=lambda x: x[0], reverse=True)
+    # Sort by score (descending) and position (ascending as tiebreaker)
+    scored_sentences.sort(key=lambda x: (-x[0], x[2]))
 
-    # Take top 2-3 sentences or first 2 if no high-scoring sentences
-    if scored_sentences[0][0] > 0:
-        summary_sentences = [s[1] for s in scored_sentences[:2]]
+    # Select top sentences
+    if scored_sentences and scored_sentences[0][0] > 0:
+        # Take top 2-3 sentences based on their scores
+        selected_sentences = []
+        for score, sentence, pos in scored_sentences[:3]:
+            if score >= 2 or len(selected_sentences) == 0:  # Ensure at least one sentence
+                selected_sentences.append(sentence)
+            if len(selected_sentences) >= 2 and score < scored_sentences[0][0] * 0.7:
+                break  # Stop if score drops significantly
     else:
-        summary_sentences = sentences[:2]
+        # Fallback: take first 2 sentences
+        selected_sentences = sentences[:2]
 
-    summary = '. '.join(summary_sentences)
+    # Create summary
+    summary = '. '.join(selected_sentences)
     if summary and not summary.endswith('.'):
         summary += '.'
 
-    return summary[:400] + "..." if len(summary) > 400 else summary
+    # Ensure reasonable length
+    if len(summary) > 500:
+        # Truncate at word boundary
+        words = summary[:500].split()
+        summary = ' '.join(words[:-1]) + "..."
+    
+    return summary if summary else "Document processed successfully - content available for review."
 
 def detect_language(content: str) -> str:
     """Simple language detection"""

@@ -529,7 +529,7 @@ async def bulk_upload_documents(
                         "doc_id": doc_id,
                         "content": extracted_text,
                         "filename": file.filename,
-                        "file_type": file.extension
+                        "file_type": file_extension
                     },
                     timeout=30
                 )
