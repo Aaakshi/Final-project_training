@@ -1860,13 +1860,10 @@
                 });
 
                 const data = await response.json();
-                const docs = data.documents;
 
                 if (response.ok) {
-                    displayDocuments(docs);
-                    if (docs && docs.length > 0) {
-                        console.log(`Loaded ${docs.length} documents out of ${data.total_count} total`);
-                    }
+                    displayDocuments(data.documents);
+                    console.log(`Loaded ${data.documents.length} documents out of ${data.total_count} total`);
                 } else {
                     showToast('Failed to load documents', 'error');
                 }
@@ -1974,7 +1971,7 @@
                     const confidentiality = Math.round(doc.confidentiality_percent || 0);
                     let confidentialityColor = '#48bb78';
                     let confidentialityLevel = 'Low';
-
+                    
                     if (confidentiality > 70) {
                         confidentialityColor = '#e53e3e';
                         confidentialityLevel = 'High';
@@ -2333,151 +2330,201 @@
                 priorities: data.priorities || sampleData.priorities
             };
 
-            // Create charts with error handling
-            try {
-                const ctx1 = document.getElementById('statsTypeChart')?.getContext('2d');
-                const ctx2 = document.getElementById('statsDeptChart')?.getContext('2d');
-                const ctx3 = document.getElementById('statsLineChart')?.getContext('2d');
-
-                if (ctx1) {
-                    new Chart(ctx1, {
-                        type: 'bar',
-                        data: {
-                            labels: Object.keys(chartData.document_types),
-                            datasets: [{
-                                label: 'Document Count',
-                                data: Object.values(chartData.document_types),
-                                backgroundColor: '#3b82f6',
-                                borderRadius: 6,
-                                borderSkipped: false,
-                                hoverBackgroundColor: '#2563eb'
-                            }]
+            // Create document processing trends chart
+            const statsLineCtx = document.getElementById('statsLineChart');
+            if (statsLineCtx) {
+                try {
+                    charts.statsLine = new Chart(statsLineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.upload_trends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+                        datasets: [{
+                            label: 'Documents Processed',
+                            data: chartData.upload_trends.map(t => t.count),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#3b82f6',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#2d3748',
+                                    font: { size: 12 }
+                                }
+                            }
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: {
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
+                        scales: { 
+                            y: { 
+                                beginAtZero: true,
+                                grid: { color: '#e2e8f0' },
+                                ticks: { 
+                                    color: '#718096',
+                                    stepSize: 5
                                 }
                             },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: {
-                                        color: '#718096',
-                                        stepSize: 10
-                                    }
-                                },
-                                x: {
-                                    grid: { display: false },
-                                    ticks: { color: '#718096' }
+                            x: {
+                                grid: { color: '#e2e8f0' },
+                                ticks: { color: '#718096' }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                    console.log('Failed to create stats line chart:', error.message);
+                }
+            }
+
+            // Department workload chart
+            const statsDeptCtx = document.getElementById('statsDeptChart');
+            if (statsDeptCtx) {
+                try {
+                    const deptLabels = Object.keys(chartData.departments);
+                    const deptValues = Object.values(chartData.departments);
+
+                    charts.statsDept = new Chart(statsDeptCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: deptLabels,
+                        datasets: [{
+                            data: deptValues,
+                            backgroundColor: [
+                                '#3b82f6', // HR
+                                '#10b981', // Finance
+                                '#ef4444', // Legal
+                                '#f59e0b', // IT
+                                '#8b5cf6'  // Administration
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true,
+                                    color: '#2d3748',
+                                    font: { size: 12 }
                                 }
                             }
                         }
-                    });
+                    }
+                });
+                } catch (error) {
+                    console.log('Failed to create department chart:', error.message);
                 }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
             }
 
-            try {
-                if (ctx2) {
-                    new Chart(ctx2, {
-                        type: 'doughnut',
-                        data: {
-                            labels: Object.keys(chartData.departments),
-                            datasets: [{
-                                data: Object.values(chartData.departments),
-                                backgroundColor: [
-                                    '#3b82f6', // HR
-                                    '#10b981', // Finance
-                                    '#ef4444', // Legal
-                                    '#f59e0b', // IT
-                                    '#8b5cf6'  // Administration
-                                ],
-                                borderWidth: 0,
-                                hoverOffset: 4
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 20,
-                                        usePointStyle: true,
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
+            // Document types chart
+            const statsTypeCtx = document.getElementById('statsTypeChart');
+            if (statsTypeCtx) {
+                try {
+                    const typeLabels = Object.keys(chartData.document_types);
+                    const typeValues = Object.values(chartData.document_types);
+
+                    charts.statsType = new Chart(statsTypeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: typeLabels,
+                        datasets: [{
+                            label: 'Document Count',
+                            data: typeValues,
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 6,
+                            borderSkipped: false,
+                            hoverBackgroundColor: '#2563eb'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    color: '#2d3748',
+                                    font: { size: 12 }
                                 }
                             }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
-            }
-
-            try {
-                if (ctx3) {
-                    new Chart(ctx3, {
-                        type: 'line',
-                        data: {
-                            labels: chartData.upload_trends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
-                            datasets: [{
-                                label: 'Documents Processed',
-                                data: chartData.upload_trends.map(t => t.count),
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                tension: 0.4,
-                                fill: true,
-                                pointBackgroundColor: '#3b82f6',
-                                pointBorderColor: '#ffffff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4
-                            }]
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
-                                    labels: {
-                                        color: '#2d3748',
-                                        font: { size: 12 }
-                                    }
+                        scales: {
+                            y: { 
+                                beginAtZero: true,
+                                grid: { color: '#e2e8f0' },
+                                ticks: { 
+                                    color: '#718096',
+                                    stepSize: 10
                                 }
                             },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: {
-                                        color: '#718096',
-                                        stepSize: 5
-                                    }
-                                },
-                                x: {
-                                    grid: { color: '#e2e8f0' },
-                                    ticks: { color: '#718096' }
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: '#718096' }
+                            }
+                        }
+                    }
+                });
+                } catch (error) {
+                    console.log('Failed to create type chart:', error.message);
+                }
+            }
+
+            // Priority distribution chart
+            const statsPriorityCtx = document.getElementById('statsPriorityChart');
+            if (statsPriorityCtx) {
+                try {
+                    const priorityLabels = Object.keys(chartData.priorities);
+                    const priorityValues = Object.values(chartData.priorities);
+
+                    charts.statsPriority = new Chart(statsPriorityCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: priorityLabels,
+                        datasets: [{
+                            data: priorityValues,
+                            backgroundColor: [
+                                '#e53e3e', // High
+                                '#ed8936', // Medium
+                                '#48bb78'  // Low
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { 
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    usePointStyle: true,
+                                    color: '#2d3748',
+                                    font: { size: 12 }
                                 }
                             }
                         }
+                    }
                     });
+                } catch (error) {
+                    console.log('Failed to create priority chart:', error.message);
                 }
-            } catch (error) {
-                console.log('Failed to create chart:', error.message);
             }
             }, 100); // Small delay to ensure DOM is ready
         }
