@@ -679,24 +679,194 @@ def classify_document(text: str, filename: str) -> tuple:
     text_lower = text.lower()
     filename_lower = filename.lower()
 
-    # Classification logic
-    if any(keyword in text_lower or keyword in filename_lower for keyword in 
-           ['invoice', 'billing', 'payment', 'finance', 'receipt', 'expense', 'budget']):
-        return 'invoice', 'finance', 'high'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['contract', 'agreement', 'legal', 'terms', 'conditions', 'clause']):
-        return 'contract', 'legal', 'high'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['employee', 'hr', 'human resources', 'payroll', 'vacation', 'leave']):
-        return 'hr_document', 'hr', 'medium'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['it', 'technical', 'software', 'hardware', 'system', 'network']):
-        return 'it_document', 'it', 'medium'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['marketing', 'campaign', 'promotion', 'advertisement', 'brand']):
-        return 'marketing_document', 'marketing', 'low'
-    else:
+    # Enhanced classification logic with more comprehensive keywords
+    
+    # Finance keywords with priority scoring
+    finance_keywords = ['invoice', 'billing', 'payment', 'finance', 'receipt', 'expense', 'budget',
+                       'financial', 'accounting', 'cost', 'revenue', 'profit', 'loss', 'tax',
+                       'audit', 'payroll', 'salary', 'wage', 'reimbursement', 'purchase order',
+                       'vendor payment', 'bank statement', 'credit', 'debit', 'transaction',
+                       'cash flow', 'balance sheet', 'p&l', 'roi', 'margin', 'earnings']
+    
+    # Legal keywords
+    legal_keywords = ['contract', 'agreement', 'legal', 'terms', 'conditions', 'clause',
+                     'litigation', 'compliance', 'regulation', 'policy', 'nda', 'non-disclosure',
+                     'copyright', 'trademark', 'patent', 'liability', 'warranty', 'settlement',
+                     'lawsuit', 'attorney', 'lawyer', 'court', 'arbitration', 'confidentiality']
+    
+    # HR keywords
+    hr_keywords = ['employee', 'hr', 'human resources', 'payroll', 'vacation', 'leave',
+                  'personnel', 'hiring', 'recruitment', 'training', 'performance', 'benefits',
+                  'termination', 'resignation', 'promotion', 'appraisal', 'job description',
+                  'workplace policy', 'harassment', 'diversity', 'staff', 'workforce',
+                  'employment', 'onboarding', 'orientation', 'compensation']
+    
+    # IT keywords
+    it_keywords = ['it', 'technical', 'software', 'hardware', 'system', 'network',
+                  'security', 'cybersecurity', 'database', 'server', 'cloud', 'infrastructure',
+                  'programming', 'development', 'application', 'platform', 'integration',
+                  'api', 'maintenance', 'support', 'troubleshooting', 'bug', 'feature']
+    
+    # Marketing keywords
+    marketing_keywords = ['marketing', 'campaign', 'promotion', 'advertisement', 'brand',
+                         'social media', 'digital marketing', 'content marketing', 'seo',
+                         'analytics', 'engagement', 'conversion', 'lead generation', 'roi']
+
+    # Check for high priority indicators
+    high_priority_indicators = ['urgent', 'immediate', 'asap', 'critical', 'emergency',
+                               'deadline', 'action required', 'confidential', 'sensitive']
+    
+    priority = 'low'
+    if any(indicator in text_lower for indicator in high_priority_indicators):
+        priority = 'high'
+    elif any(word in text_lower for word in ['important', 'priority', 'review', 'approval']):
+        priority = 'medium'
+
+    # Classification with scoring
+    finance_score = sum(1 for keyword in finance_keywords if keyword in text_lower or keyword in filename_lower)
+    legal_score = sum(1 for keyword in legal_keywords if keyword in text_lower or keyword in filename_lower)
+    hr_score = sum(1 for keyword in hr_keywords if keyword in text_lower or keyword in filename_lower)
+    it_score = sum(1 for keyword in it_keywords if keyword in text_lower or keyword in filename_lower)
+    marketing_score = sum(1 for keyword in marketing_keywords if keyword in text_lower or keyword in filename_lower)
+
+    # Determine classification based on highest score
+    scores = {
+        'finance': (finance_score, 'invoice', 'finance', 'high'),
+        'legal': (legal_score, 'contract', 'legal', 'high'), 
+        'hr': (hr_score, 'hr_document', 'hr', 'medium'),
+        'it': (it_score, 'it_document', 'it', 'medium'),
+        'marketing': (marketing_score, 'marketing_document', 'marketing', 'low')
+    }
+
+    best_match = max(scores.items(), key=lambda x: x[1][0])
+    category, (score, doc_type, department, base_priority) = best_match
+
+    if score == 0:
         return 'general', 'administration', 'low'
+    
+    # Override priority if high priority indicators found
+    final_priority = priority if priority == 'high' else base_priority
+    
+    return doc_type, department, final_priority
+
+def calculate_local_confidentiality_score(content: str) -> float:
+    """Calculate confidentiality percentage based on document content"""
+    content_lower = content.lower()
+    
+    # Very High confidentiality keywords (40-60 points each)
+    very_high_conf_keywords = [
+        'salary', 'wages', 'compensation', 'payroll', 'bonus', 'ssn', 'social security',
+        'medical records', 'health information', 'confidential', 'classified', 'restricted',
+        'proprietary', 'trade secret', 'lawsuit', 'litigation', 'settlement', 'legal action'
+    ]
+    
+    # High confidentiality keywords (25-40 points each)
+    high_conf_keywords = [
+        'private', 'internal only', 'sensitive', 'privileged', 'employee id', 'personnel file',
+        'hr record', 'performance review', 'disciplinary action', 'termination', 'contract',
+        'budget', 'financial', 'customer list', 'pricing strategy', 'strategic plan'
+    ]
+    
+    # Medium confidentiality keywords (15-25 points each)
+    medium_conf_keywords = [
+        'employee', 'staff', 'personnel', 'hr', 'human resources', 'department', 'manager',
+        'project', 'budget', 'cost', 'revenue', 'client', 'customer', 'meeting notes', 'policy'
+    ]
+    
+    score = 0.0
+    
+    # Check for very high confidentiality content
+    for keyword in very_high_conf_keywords:
+        if keyword in content_lower:
+            score += 50
+    
+    # Check for high confidentiality content
+    for keyword in high_conf_keywords:
+        if keyword in content_lower:
+            score += 32
+    
+    # Check for medium confidentiality content
+    for keyword in medium_conf_keywords:
+        if keyword in content_lower:
+            score += 20
+    
+    # Enhanced pattern matching for sensitive data
+    import re
+    patterns = {
+        r'\b\d{3}-\d{2}-\d{4}\b': 60,  # SSN pattern
+        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 55,  # Credit card pattern
+        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 25,  # Money amounts
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 20,  # Email addresses
+    }
+    
+    for pattern, points in patterns.items():
+        matches = re.findall(pattern, content)
+        if matches:
+            score += points * min(len(matches), 3)
+    
+    # Normalize score to percentage (0-100)
+    normalized_score = min(100, max(0, score))
+    return normalized_score
+
+def perform_local_content_analysis(content: str, filename: str) -> dict:
+    """Perform local content analysis when microservice is unavailable"""
+    # Calculate confidentiality score
+    confidentiality_percent = calculate_local_confidentiality_score(content)
+    
+    # Generate summary
+    summary = generate_summary(content)
+    
+    # Extract key phrases
+    key_phrases = []
+    business_keywords = [
+        'contract', 'agreement', 'policy', 'procedure', 'deadline', 'budget',
+        'invoice', 'payment', 'employee', 'department', 'manager', 'director',
+        'project', 'meeting', 'review', 'approval', 'compliance', 'audit'
+    ]
+    content_lower = content.lower()
+    for keyword in business_keywords:
+        if keyword in content_lower:
+            key_phrases.append(keyword.title())
+    
+    # Basic sentiment analysis
+    sentiment = "neutral"
+    positive_words = ["good", "excellent", "positive", "success", "approve", "great", "thank you"]
+    negative_words = ["bad", "terrible", "negative", "fail", "reject", "poor", "urgent", "problem"]
+    
+    positive_count = sum(1 for word in positive_words if word in content_lower)
+    negative_count = sum(1 for word in negative_words if word in content_lower)
+    
+    if positive_count > negative_count:
+        sentiment = "positive"
+    elif negative_count > positive_count:
+        sentiment = "negative"
+    
+    # Calculate risk score
+    risk_score = 0.0
+    risk_keywords = ['urgent', 'immediate', 'deadline', 'legal', 'lawsuit', 'compliance', 'violation']
+    for keyword in risk_keywords:
+        if keyword in content_lower:
+            risk_score += 0.3
+    risk_score = min(risk_score, 1.0)
+    
+    return {
+        'confidentiality_percent': confidentiality_percent,
+        'summary': summary,
+        'key_phrases': key_phrases[:10],
+        'sentiment': sentiment,
+        'risk_score': risk_score,
+        'entities': {
+            'names': [],
+            'dates': [],
+            'amounts': [],
+            'organizations': [],
+            'locations': []
+        },
+        'metadata': {
+            'word_count': len(content.split()),
+            'confidentiality_level': "High" if confidentiality_percent >= 70 else "Medium" if confidentiality_percent >= 30 else "Low"
+        }
+    }
 
 def get_department_email(department: str) -> str:
     """Get the appropriate email for a department based on existing users"""
@@ -894,7 +1064,7 @@ async def bulk_upload_documents(
         analysis_data = {}
         routing_data = {}
 
-        # Use microservices for processing
+        # Use microservices for processing with proper fallback
         try:
             # 1. Classification Service
             import requests
@@ -925,7 +1095,8 @@ async def bulk_upload_documents(
                 # Fallback to local classification
                 doc_type, department, priority = classify_document(extracted_text, file.filename)
 
-            # 2. Content Analysis Service
+            # 2. Content Analysis Service with local fallback
+            analysis_data = {}
             try:
                 analysis_response = requests.post(
                     "http://localhost:8003/analyze",
@@ -940,10 +1111,11 @@ async def bulk_upload_documents(
                 if analysis_response.status_code == 200:
                     analysis_data = analysis_response.json()
                 else:
-                    analysis_data = {}
+                    print("Content analysis service returned non-200, using local analysis")
+                    analysis_data = perform_local_content_analysis(extracted_text, file.filename)
             except Exception as e:
-                print(f"Content analysis service error: {str(e)}")
-                analysis_data = {}
+                print(f"Content analysis service error: {str(e)}, using local analysis")
+                analysis_data = perform_local_content_analysis(extracted_text, file.filename)
 
             # 3. Routing Engine Service
             try:
@@ -973,7 +1145,7 @@ async def bulk_upload_documents(
             print(f"Microservice error: {str(e)}")
             # Fallback to local processing
             doc_type, department, priority = classify_document(extracted_text, file.filename)
-            analysis_data = {}
+            analysis_data = perform_local_content_analysis(extracted_text, file.filename)
             routing_data = {}
 
         # Store content analysis data in database
