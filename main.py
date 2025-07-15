@@ -567,6 +567,29 @@ async def bulk_upload_documents(
                 print(f"Content analysis service error: {str(e)}")
                 analysis_data = {}
 
+            # 2.5. Generate Summary using ML
+            summary = ""
+            try:
+                summary_response = requests.post(
+                    "http://localhost:8003/generate-summary",
+                    json={
+                        "content": extracted_text,
+                        "doc_type": doc_type,
+                        "department": department
+                    },
+                    timeout=30
+                )
+
+                if summary_response.status_code == 200:
+                    summary_data = summary_response.json()
+                    summary = summary_data.get('summary', '')
+                else:
+                    # Fallback summary
+                    summary = f"Document uploaded for {department} department review"
+            except Exception as e:
+                print(f"Summary generation service error: {str(e)}")
+                summary = f"Document uploaded for {department} department review"
+
             # 3. Routing Engine Service
             try:
                 routing_response = requests.post(
@@ -602,7 +625,6 @@ async def bulk_upload_documents(
         risk_score = analysis_data.get('risk_score', 0.0)
         confidentiality_percent = analysis_data.get('confidentiality_percent', 0.0)
         sentiment = analysis_data.get('sentiment', 'neutral')
-        summary = analysis_data.get('summary', '')
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
         entities = json.dumps(analysis_data.get('entities', {}))
 
@@ -651,7 +673,7 @@ async def bulk_upload_documents(
             'type': doc_type,
             'department': department,
             'priority': priority,
-            'summary': analysis_data.get('summary', ''),
+            'summary': summary,
             'routing_info': routing_data.get('routing_reason', '')
         })
 

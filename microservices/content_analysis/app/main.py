@@ -4,7 +4,33 @@ import sys
 import os
 import uvicorn
 import re
-import hashlib
+from datetime import datetime
+
+# Add the project root to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../..'))
+
+try:
+    from libs.utils.logger import setup_logger
+    logger = setup_logger(__name__)
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+app = FastAPI(title="Content Analysis Service")
+
+@app.get("/")
+async def root():
+    return {"message": "Content Analysis Service is running", "service": "content_analysis"}
+
+class AnalysisRequest(BaseModel):
+    doc_id: str
+    content: str
+
+class SummaryRequest(BaseModel):
+    content: str
+    doc_type: str = "general"
+    department: str = "general"
 from typing import Dict, List, Optional
 from collections import Counter
 import nltk
@@ -23,13 +49,6 @@ except LookupError:
 
 from nltk.corpus import stopwords
 from nltk.tokenize import sent_tokenize, word_tokenize
-
-app = FastAPI(title="Content Analysis Service")
-
-class AnalysisRequest(BaseModel):
-    doc_id: str
-    content: str
-    filename: Optional[str] = None
 
 class EntityExtractionResult(BaseModel):
     names: List[str]
@@ -257,29 +276,29 @@ def generate_summary(content: str) -> str:
     for i, sentence in enumerate(sentences[:15]):  # Limit to first 15 sentences
         score = 0
         sentence_lower = sentence.lower()
-        
+
         # Position scoring (earlier sentences get higher scores)
         position_score = max(0, 5 - i)
         score += position_score
-        
+
         # Length scoring (prefer medium-length sentences)
         word_count = len(sentence.split())
         if 8 <= word_count <= 25:
             score += 3
         elif 5 <= word_count <= 35:
             score += 1
-            
+
         # Key term scoring
         for category, terms in key_terms.items():
             category_matches = sum(1 for term in terms if term in sentence_lower)
             score += category_matches * 2
-            
+
         # Avoid very short or very long sentences
         if word_count < 4:
             score -= 5
         elif word_count > 40:
             score -= 2
-            
+
         scored_sentences.append((score, sentence, i))
 
     # Sort by score (descending) and position (ascending as tiebreaker)
@@ -308,7 +327,7 @@ def generate_summary(content: str) -> str:
         # Truncate at word boundary
         words = summary[:500].split()
         summary = ' '.join(words[:-1]) + "..."
-    
+
     return summary if summary else "Document processed successfully - content available for review."
 
 def detect_language(content: str) -> str:
@@ -321,10 +340,6 @@ def detect_language(content: str) -> str:
     english_word_count = sum(1 for word in common_english_words if word in content_lower)
 
     return "en" if english_word_count > 3 else "unknown"
-
-@app.get("/")
-async def root():
-    return {"message": "Content Analysis Service is running", "service": "content_analysis"}
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_content(request: AnalysisRequest):
@@ -380,6 +395,169 @@ async def analyze_content(request: AnalysisRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+@app.post("/generate-summary")
+async def generate_summary_endpoint(request: SummaryRequest):
+    """Generate intelligent summary using ML-like approach"""
+    try:
+        summary = generate_intelligent_summary(request.content, request.doc_type, request.department)
+        logger.info(f"Generated summary for {request.doc_type} document")
+        return {"summary": summary, "status": "success"}
+    except Exception as e:
+        logger.error(f"Summary generation error: {e}")
+        return {"summary": "Summary generation failed", "status": "error"}
+
+def generate_intelligent_summary(content: str, doc_type: str = "general", department: str = "general") -> str:
+    """Advanced ML-like summary generation with department-specific intelligence"""
+    if not content or len(content.strip()) == 0:
+        return "No content available for summary"
+
+    # Clean and prepare content
+    content = content.strip()
+    sentences = [s.strip() for s in content.split('.') if s.strip() and len(s.strip()) > 10]
+
+    if not sentences:
+        words = content.split()[:30]
+        return ' '.join(words) + "..." if len(words) == 30 else ' '.join(words)
+
+    if len(sentences) <= 2:
+        return '. '.join(sentences) + "." if not sentences[-1].endswith('.') else '. '.join(sentences)
+
+    # Enhanced department-specific key terms for ML-like classification
+    key_terms = {
+        'hr': {
+            'action': ['request', 'apply', 'approve', 'review', 'schedule', 'interview', 'hire', 'onboard', 'train'],
+            'process': ['recruitment', 'onboarding', 'performance', 'evaluation', 'benefits', 'leave', 'vacation'],
+            'people': ['employee', 'candidate', 'manager', 'team', 'staff', 'personnel', 'supervisor'],
+            'priority': ['urgent', 'immediate', 'deadline', 'asap', 'priority', 'critical', 'important']
+        },
+        'finance': {
+            'action': ['pay', 'invoice', 'process', 'approve', 'reimburse', 'budget', 'expense', 'bill'],
+            'process': ['payment', 'accounting', 'billing', 'reimbursement', 'budget', 'financial', 'cost'],
+            'amounts': ['amount', 'cost', 'price', 'total', 'sum', 'value', 'budget', 'expense'],
+            'priority': ['urgent', 'payment due', 'overdue', 'deadline', 'immediate', 'critical']
+        },
+        'legal': {
+            'action': ['review', 'approve', 'sign', 'execute', 'negotiate', 'comply', 'submit'],
+            'process': ['contract', 'agreement', 'compliance', 'legal', 'terms', 'clause', 'policy'],
+            'entities': ['party', 'client', 'vendor', 'company', 'organization', 'entity'],
+            'priority': ['urgent', 'deadline', 'critical', 'immediate', 'time-sensitive']
+        },
+        'it': {
+            'action': ['install', 'configure', 'update', 'backup', 'restore', 'deploy', 'fix', 'troubleshoot'],
+            'process': ['system', 'software', 'hardware', 'network', 'security', 'database', 'server'],
+            'technical': ['application', 'platform', 'infrastructure', 'technology', 'tool', 'service'],
+            'priority': ['critical', 'urgent', 'high priority', 'system down', 'outage', 'emergency']
+        }
+    }
+
+    # Get department-specific terms or use general terms
+    dept_terms = key_terms.get(department, {
+        'action': ['request', 'submit', 'approve', 'review', 'process', 'complete'],
+        'business': ['document', 'report', 'analysis', 'information', 'data'],
+        'process': ['workflow', 'procedure', 'policy', 'system', 'method'],
+        'priority': ['urgent', 'important', 'priority', 'deadline', 'immediate']
+    })
+
+    # ML-like scoring system for sentence importance
+    scored_sentences = []
+    for i, sentence in enumerate(sentences):
+        score = 0
+        sentence_lower = sentence.lower()
+
+        # Position bias (first and last sentences are often important)
+        if i == 0:
+            score += 3
+        elif i == len(sentences) - 1:
+            score += 2
+        elif i == 1:
+            score += 1
+
+        # Department-specific term scoring
+        for category, terms in dept_terms.items():
+            for term in terms:
+                if term in sentence_lower:
+                    if category == 'priority':
+                        score += 4  # Priority terms get highest weight
+                    elif category == 'action':
+                        score += 3  # Action terms are very important
+                    else:
+                        score += 2
+
+        # General importance indicators
+        importance_indicators = ['important', 'critical', 'urgent', 'required', 'must', 'should', 'need']
+        for indicator in importance_indicators:
+            if indicator in sentence_lower:
+                score += 3
+
+        # Document type specific scoring
+        if doc_type == 'hr_document':
+            hr_keywords = ['employee', 'hire', 'salary', 'benefits', 'vacation', 'performance', 'training']
+            score += sum(2 for keyword in hr_keywords if keyword in sentence_lower)
+        elif doc_type == 'financial_document':
+            finance_keywords = ['payment', 'invoice', 'amount', 'cost', 'budget', 'expense']
+            score += sum(2 for keyword in finance_keywords if keyword in sentence_lower)
+        elif doc_type == 'legal_document':
+            legal_keywords = ['contract', 'agreement', 'terms', 'legal', 'compliance', 'sign']
+            score += sum(2 for keyword in finance_keywords if keyword in sentence_lower)
+
+        # Names and dates add relevance
+        if re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', sentence):
+            score += 1
+        if re.search(r'\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4}', sentence):
+            score += 1
+
+        # Monetary amounts add relevance for finance docs
+        if re.search(r'\$\d+\.?\d*|\d+\.\d+', sentence):
+            score += 2 if department == 'finance' else 1
+
+        # Length penalty for very short or very long sentences
+        if len(sentence.split()) < 5:
+            score -= 1
+        elif len(sentence.split()) > 30:
+            score -= 1
+
+        scored_sentences.append((score, sentence, i))
+
+    # Sort by score (descending)
+    scored_sentences.sort(key=lambda x: x[0], reverse=True)
+
+    # Select top sentences intelligently
+    if scored_sentences and scored_sentences[0][0] > 0:
+        selected_sentences = []
+        for score, sentence, pos in scored_sentences[:4]:  # Consider top 4
+            if score >= 2 or len(selected_sentences) == 0:  # Ensure at least one sentence
+                selected_sentences.append(sentence)
+            if len(selected_sentences) >= 3:  # Limit to 3 sentences max
+                break
+            if len(selected_sentences) >= 2 and score < scored_sentences[0][0] * 0.6:
+                break  # Stop if score drops significantly
+    else:
+        # Fallback: take first 2 sentences
+        selected_sentences = sentences[:2]
+
+    # Create intelligent summary with department context
+    summary = '. '.join(selected_sentences)
+    if summary and not summary.endswith('.'):
+        summary += '.'
+
+    # Add department-specific prefix for context
+    dept_prefixes = {
+        'hr': 'HR Request: ',
+        'finance': 'Financial Document: ',
+        'legal': 'Legal Document: ',
+        'it': 'IT Request: '
+    }
+
+    if department in dept_prefixes and not summary.startswith(dept_prefixes[department]):
+        summary = dept_prefixes[department] + summary
+
+    # Ensure reasonable length (max 300 chars for quick review)
+    if len(summary) > 300:
+        words = summary[:297].split()
+        summary = ' '.join(words[:-1]) + "..."
+
+    return summary if summary else f"Document processed for {department} department - content available for detailed review."
 
 @app.get("/ping")
 async def ping():
