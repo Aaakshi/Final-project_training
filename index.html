@@ -32,7 +32,7 @@
             color: white;
             margin-bottom: 0;
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            padding: 30px 20px;
+            padding: 20px 15px;
             box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
             position: relative;
             overflow: hidden;
@@ -50,19 +50,21 @@
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 8px;
+            font-size: 1.8em;
+            margin-bottom: 6px;
             font-weight: 600;
             position: relative;
             z-index: 1;
+            line-height: 1.2;
         }
 
         .header p {
-            font-size: 1.2em;
+            font-size: 1em;
             opacity: 0.9;
             font-weight: 300;
             position: relative;
             z-index: 1;
+            line-height: 1.3;
         }
 
         /* Login Styles */
@@ -101,13 +103,14 @@
 
         /* Sidebar Navigation */
         .sidebar {
-            width: 280px;
+            width: 260px;
             background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
             color: white;
             padding: 0;
             box-shadow: 4px 0 15px rgba(0,0,0,0.1);
             position: relative;
             transition: all 0.3s ease;
+            min-height: calc(100vh - 120px);
         }
 
         .sidebar-header {
@@ -235,29 +238,31 @@
 
         .content-header {
             background: white;
-            padding: 25px 35px;
+            padding: 20px 25px;
             border-bottom: 1px solid #e2e8f0;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
 
         .page-title {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 700;
             color: #2d3748;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
+            line-height: 1.2;
         }
 
         .page-subtitle {
             color: #718096;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 400;
+            line-height: 1.3;
         }
 
         .content-body {
-            padding: 35px;
+            padding: 25px;
         }
 
         /* Tab Content */
@@ -816,7 +821,7 @@
         /* Responsive Design */
         @media (max-width: 1024px) {
             .sidebar {
-                width: 250px;
+                width: 240px;
             }
 
             .dashboard-sections {
@@ -826,14 +831,37 @@
             .charts-section {
                 grid-template-columns: 1fr;
             }
+
+            .quick-stats {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 20px;
+            }
+
+            .content-body {
+                padding: 20px;
+            }
         }
 
         @media (max-width: 768px) {
+            .header {
+                padding: 15px 10px;
+            }
+
+            .header h1 {
+                font-size: 1.5em;
+                margin-bottom: 4px;
+            }
+
+            .header p {
+                font-size: 0.9em;
+            }
+
             .sidebar {
                 position: fixed;
-                left: -280px;
+                left: -260px;
                 z-index: 100;
                 transition: left 0.3s ease;
+                width: 260px;
             }
 
             .sidebar.mobile-open {
@@ -844,12 +872,84 @@
                 margin-left: 0;
             }
 
+            .content-header {
+                padding: 15px 20px;
+            }
+
+            .page-title {
+                font-size: 20px;
+                gap: 8px;
+            }
+
+            .page-subtitle {
+                font-size: 13px;
+            }
+
+            .content-body {
+                padding: 15px;
+            }
+
             .quick-stats {
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: 1fr;
+                gap: 15px;
             }
 
             .documents-grid {
                 grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .auth-container {
+                margin: 30px auto;
+                padding: 30px 20px;
+                max-width: 90%;
+            }
+
+            .filters {
+                flex-direction: column;
+                gap: 15px;
+                padding: 20px;
+            }
+
+            .search-box {
+                min-width: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.3em;
+            }
+
+            .header p {
+                font-size: 0.8em;
+            }
+
+            .content-body {
+                padding: 10px;
+            }
+
+            .stat-card {
+                padding: 20px;
+            }
+
+            .stat-value {
+                font-size: 2.2em;
+            }
+
+            .document-card {
+                padding: 20px;
+            }
+
+            .modal-content {
+                margin: 5% auto;
+                padding: 20px;
+                width: 95%;
+            }
+
+            .quick-login-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
             }
         }
 
@@ -1953,6 +2053,9 @@
                 return;
             }
 
+            // Wait for DOM to be ready
+            setTimeout(() => {
+
             // Sample data for demo (dashboard charts use sample data)
             const trendData = {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
@@ -2040,6 +2143,7 @@
                     console.log('Failed to create department chart:', error.message);
                 }
             }
+            }, 100); // Small delay to ensure DOM is ready
         }
 
         function createStatisticsCharts(data) {
@@ -2060,6 +2164,9 @@
             if (!statsTab || !statsTab.classList.contains('active')) {
                 return;
             }
+
+            // Wait for DOM to be ready
+            setTimeout(() => {
 
             // Create realistic sample data for demo
             const sampleData = {
@@ -2297,6 +2404,7 @@
                     console.log('Failed to create priority chart:', error.message);
                 }
             }
+            }, 100); // Small delay to ensure DOM is ready
         }
 
         async function reviewDocument(docId, action, comments) {
