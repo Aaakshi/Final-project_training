@@ -603,7 +603,7 @@ async def bulk_upload_documents(
         confidentiality_percent = analysis_data.get('confidentiality_percent', 0.0)
         sentiment = analysis_data.get('sentiment', 'neutral')
         summary = analysis_data.get('summary', '')
-        
+
         # Ensure we have a meaningful summary
         if not summary or summary.strip() == '' or len(summary.strip()) < 20:
             # Generate a basic summary from the extracted text
@@ -612,7 +612,7 @@ async def bulk_upload_documents(
                 summary = ' '.join(words) + ("..." if len(extracted_text.strip().split()) > 35 else ".")
             else:
                 summary = f"Document '{file.filename}' processed successfully. Content classified as {doc_type} for {department} department."
-        
+
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
         entities = json.dumps(analysis_data.get('entities', {}))
 
@@ -835,7 +835,7 @@ async def get_review_documents(
     current_user: dict = Depends(get_current_user)
 ):
     try:
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn =sqlite3.connect(DATABASE_FILE)
         cursor = conn.cursor()
 
         query = "SELECT * FROM documents WHERE 1=1"
