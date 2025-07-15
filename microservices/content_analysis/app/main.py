@@ -29,6 +29,7 @@ class AnalysisResponse(BaseModel):
     sentiment: str
     readability_score: float
     risk_score: float
+    confidentiality_percent: float
     metadata: dict
 
 def extract_entities(content: str) -> dict:
@@ -122,189 +123,270 @@ def calculate_risk_score(content: str, entities: dict) -> float:
 
     return min(risk_score, 1.0)
 
-def generate_summary(content: str) -> str:
-    """Generate a comprehensive bullet-point summary that covers the entire document"""
-    if not content or len(content.strip()) == 0:
-        return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
-
-    # Clean and prepare content
-    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
-    content_words = content.split()
-    total_words = len(content_words)
-
-    if total_words < 10:
-        return f"• Short document with {total_words} words\n• Content: {content[:100]}{'...' if len(content) > 100 else ''}\n• Ready for review"
-
-    # Split content into sentences for analysis
-    sentences = [s.strip() for s in re.split(r'[.!?]+', content) if len(s.strip()) > 10]
-
-    if not sentences:
-        return f"• Document processed: {total_words} words analyzed\n• Content type: Text document\n• Ready for review"
-
-    summary_points = []
-    used_sentences = set()
+def calculate_confidentiality_score(content: str) -> float:
+    """Calculate confidentiality percentage based on document content"""
     content_lower = content.lower()
+    
+    # High confidentiality keywords (30-50 points each)
+    high_conf_keywords = [
+        'confidential', 'classified', 'proprietary', 'trade secret', 'nda', 'non-disclosure',
+        'salary', 'compensation', 'payroll', 'employee id', 'ssn', 'social security',
+        'personal information', 'private', 'restricted', 'internal only', 'sensitive',
+        'password', 'credit card', 'bank account', 'financial records', 'tax information',
+        'medical records', 'health information', 'performance review', 'disciplinary action',
+        'legal action', 'lawsuit', 'settlement', 'merger', 'acquisition', 'strategic plan'
+    ]
+    
+    # Medium confidentiality keywords (10-20 points each)
+    medium_conf_keywords = [
+        'employee', 'staff', 'personnel', 'hr', 'human resources', 'department',
+        'manager', 'supervisor', 'team', 'project', 'budget', 'cost', 'expense',
+        'contract', 'agreement', 'vendor', 'client', 'customer', 'business plan',
+        'meeting notes', 'discussion', 'strategy', 'policy', 'procedure'
+    ]
+    
+    # Low confidentiality keywords (5-10 points each)
+    low_conf_keywords = [
+        'public', 'announcement', 'press release', 'newsletter', 'general information',
+        'training', 'workshop', 'seminar', 'event', 'schedule', 'calendar'
+    ]
+    
+    score = 0.0
+    
+    # Check for high confidentiality content
+    for keyword in high_conf_keywords:
+        if keyword in content_lower:
+            score += 35
+    
+    # Check for medium confidentiality content
+    for keyword in medium_conf_keywords:
+        if keyword in content_lower:
+            score += 15
+    
+    # Check for low confidentiality content (reduces score)
+    for keyword in low_conf_keywords:
+        if keyword in content_lower:
+            score -= 5
+    
+    # Check for specific patterns that indicate confidentiality
+    patterns = {
+        r'\b\d{3}-\d{2}-\d{4}\b': 40,  # SSN pattern
+        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 45,  # Credit card pattern
+        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 20,  # Money amounts
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 15,  # Email addresses
+        r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': 10,  # Phone numbers
+        r'\bEMP\d+\b|\bID[-\s]?\d+\b': 25,  # Employee IDs
+    }
+    
+    for pattern, points in patterns.items():
+        if re.search(pattern, content):
+            score += points
+    
+    # Document type indicators
+    if any(indicator in content_lower for indicator in ['request for', 'application', 'leave', 'vacation']):
+        score += 20
+    
+    if any(indicator in content_lower for indicator in ['urgent', 'immediate', 'asap', 'priority']):
+        score += 10
+    
+    # Normalize score to percentage (0-100)
+    normalized_score = min(100, max(0, score))
+    
+    return normalized_score
 
-    # Strategy 1: Document Overview from beginning (25% of content)
-    beginning_section = content[:len(content)//4]
-    if sentences and len(sentences) > 0:
-        first_sentence = sentences[0][:150] + ("..." if len(sentences[0]) > 150 else "")
-        summary_points.append(f"• Document Overview: {first_sentence}")
-        used_sentences.add(sentences[0])
+def generate_summary(content: str) -> str:
+    """Generate intelligent bullet-point summary that analyzes and summarizes document content"""
+    if not content or len(content.strip()) == 0:
+        return "• Empty document uploaded\n• No content available for analysis\n• Please upload a document with text content"
 
-    # Strategy 2: Extract action items and requirements
-    action_keywords = ['must', 'required', 'need', 'should', 'request', 'action', 'submit', 'complete', 'deadline', 'due', 'urgent', 'immediate', 'approve', 'review', 'apply', 'process', 'respond', 'reply', 'contact']
-    action_count = 0
-
-    for sentence in sentences:
-        if sentence not in used_sentences and action_count < 2:
-            if any(keyword in sentence.lower() for keyword in action_keywords):
-                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-                summary_points.append(f"• Action Required: {clean_sentence}")
-                used_sentences.add(sentence)
-                action_count += 1
-
-    # Strategy 3: Financial and numerical information
-    financial_keywords = ['cost', 'price', 'amount', 'budget', 'payment', 'invoice', 'expense', 'revenue', 'salary', 'fee', 'charge', 'dollar', 'money', 'fund', 'bill', 'receipt', 'account']
-    financial_count = 0
-
-    for sentence in sentences:
-        if sentence not in used_sentences and financial_count < 1:
-            has_financial = any(keyword in sentence.lower() for keyword in financial_keywords)
-            has_numbers = re.search(r'\$\d+|\d+\.\d+|\d+%|\d+,\d+|\d+ dollars?', sentence)
-            if has_financial or has_numbers:
-                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-                summary_points.append(f"• Financial Details: {clean_sentence}")
-                used_sentences.add(sentence)
-                financial_count += 1
-
-    # Strategy 4: Personnel and department information
-    people_keywords = ['employee', 'manager', 'director', 'supervisor', 'team', 'department', 'hr', 'finance', 'legal', 'it', 'staff', 'personnel', 'admin', 'coordinator', 'specialist']
-    people_count = 0
-
-    for sentence in sentences:
-        if sentence not in used_sentences and people_count < 1:
-            if any(keyword in sentence.lower() for keyword in people_keywords):
-                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-                summary_points.append(f"• Personnel/Department: {clean_sentence}")
-                used_sentences.add(sentence)
-                people_count += 1
-
-    # Strategy 5: Timeline and dates
-    date_patterns = [r'\d{4}-\d{2}-\d{2}', r'\d{2}/\d{2}/\d{4}', r'\d{2}-\d{2}-\d{4}']
-    timeline_keywords = ['deadline', 'due', 'schedule', 'date', 'time', 'when', 'by', 'until', 'before', 'after', 'start', 'end', 'meeting', 'event']
-    timeline_count = 0
-
-    for sentence in sentences:
-        if sentence not in used_sentences and timeline_count < 1:
-            has_date = any(re.search(pattern, sentence, re.IGNORECASE) for pattern in date_patterns)
-            has_timeline = any(keyword in sentence.lower() for keyword in timeline_keywords)
-            if has_date or has_timeline:
-                clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-                summary_points.append(f"• Timeline/Dates: {clean_sentence}")
-                used_sentences.add(sentence)
-                timeline_count += 1
-
-    # Strategy 6: Process and procedures from middle section (50% of content)
-    middle_start = len(content) // 4
-    middle_end = 3 * len(content) // 4
-    middle_section = content[middle_start:middle_end]
-
-    process_keywords = ['process', 'procedure', 'step', 'method', 'workflow', 'protocol', 'guideline', 'instruction', 'policy', 'rule']
-    process_count = 0
-
-    for sentence in sentences:
-        if sentence not in used_sentences and process_count < 2:
-            sentence_position = content.find(sentence)
-            if middle_start <= sentence_position <= middle_end:
-                if any(keyword in sentence.lower() for keyword in process_keywords) or len(sentence.split()) > 10:
-                    clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-                    summary_points.append(f"• Process/Procedure: {clean_sentence}")
-                    used_sentences.add(sentence)
-                    process_count += 1
-
-    # Strategy 7: Key content from remaining sentences
-    remaining_sentences = [s for s in sentences if s not in used_sentences]
-
-    # Score remaining sentences by importance
-    scored_remaining = []
-    for sentence in remaining_sentences:
-        score = 0
-        words = sentence.split()
-
-        # Prefer medium-length sentences
-        if 8 <= len(words) <= 25:
-            score += 2
-
-        # Important keywords
-        important_keywords = ['important', 'critical', 'key', 'main', 'primary', 'significant', 'essential', 'note', 'attention', 'summary', 'conclusion']
-        if any(keyword in sentence.lower() for keyword in important_keywords):
-            score += 3
-
-        # Contains specifics (names, numbers, etc.)
-        if re.search(r'[A-Z][a-z]+\s+[A-Z][a-z]+|\d+', sentence):
-            score += 1
-
-        # Avoid very generic sentences
-        generic_phrases = ['this document', 'please note', 'thank you', 'sincerely', 'best regards']
-        if any(phrase in sentence.lower() for phrase in generic_phrases):
-            score -= 2
-
-        scored_remaining.append((score, sentence))
-
-    # Sort by score and add top sentences
-    scored_remaining.sort(key=lambda x: x[0], reverse=True)
-
-    content_added = 0
-    for score, sentence in scored_remaining:
-        if len(summary_points) >= 10:
-            break
-        if score >= 1 and content_added < 3:
-            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-            summary_points.append(f"• Key Content: {clean_sentence}")
-            content_added += 1
-
-    # Strategy 8: Ensure minimum coverage - add from final 25% if needed
-    if len(summary_points) < 4:
-        final_section = content[3 * len(content) // 4:]
-        final_sentences = [s for s in sentences if s not in used_sentences and s in final_section]
-
-        for sentence in final_sentences[:2]:
-            if len(summary_points) >= 8:
-                break
-            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-            summary_points.append(f"• Document Conclusion: {clean_sentence}")
-
-    # Ensure we have a minimum number of summary points
+    # Clean content
+    content = content.strip().replace('\r\n', '\n').replace('\r', '\n')
+    content_lower = content.lower()
+    
+    # Extract key information first
+    summary_points = []
+    
+    # 1. Document Type and Purpose Analysis
+    doc_purpose = ""
+    if any(keyword in content_lower for keyword in ['request', 'application', 'asking', 'inquiry']):
+        doc_purpose = "Employee request/inquiry document"
+    elif any(keyword in content_lower for keyword in ['policy', 'procedure', 'guideline', 'rule']):
+        doc_purpose = "Policy or procedural document"
+    elif any(keyword in content_lower for keyword in ['invoice', 'bill', 'payment', 'receipt']):
+        doc_purpose = "Financial/billing document"
+    elif any(keyword in content_lower for keyword in ['contract', 'agreement', 'terms']):
+        doc_purpose = "Legal/contractual document"
+    elif any(keyword in content_lower for keyword in ['report', 'analysis', 'summary', 'findings']):
+        doc_purpose = "Report or analysis document"
+    else:
+        doc_purpose = "General business document"
+    
+    summary_points.append(f"• Document Type: {doc_purpose}")
+    
+    # 2. Key People and Departments
+    people_mentioned = []
+    dept_pattern = r'\b(?:hr|human resources|finance|legal|it|marketing|sales|operations|administration)\b'
+    departments = list(set(re.findall(dept_pattern, content_lower)))
+    
+    name_pattern = r'\b[A-Z][a-z]+ [A-Z][a-z]+\b'
+    names = re.findall(name_pattern, content)
+    
+    if names:
+        people_mentioned = list(set(names))[:3]  # Limit to 3 names
+    
+    people_info = []
+    if people_mentioned:
+        people_info.append(f"People: {', '.join(people_mentioned)}")
+    if departments:
+        people_info.append(f"Departments: {', '.join(departments).upper()}")
+    
+    if people_info:
+        summary_points.append(f"• Key Stakeholders: {' | '.join(people_info)}")
+    
+    # 3. Main Requests or Actions
+    action_items = []
+    
+    # Look for specific request patterns
+    request_patterns = [
+        (r'request(?:ing)?\s+(?:for\s+)?(.{1,50}?)(?:\.|,|\n)', 'Request for'),
+        (r'asking\s+(?:for\s+)?(.{1,50}?)(?:\.|,|\n)', 'Asking for'),
+        (r'need(?:s)?\s+(.{1,50}?)(?:\.|,|\n)', 'Needs'),
+        (r'would like\s+(?:to\s+)?(.{1,50}?)(?:\.|,|\n)', 'Would like'),
+        (r'please\s+(.{1,50}?)(?:\.|,|\n)', 'Please'),
+    ]
+    
+    for pattern, prefix in request_patterns:
+        matches = re.findall(pattern, content_lower, re.IGNORECASE)
+        for match in matches[:2]:  # Limit to 2 matches per pattern
+            clean_match = match.strip()
+            if len(clean_match) > 10 and clean_match not in str(action_items):
+                action_items.append(f"{prefix} {clean_match}")
+    
+    if action_items:
+        for i, item in enumerate(action_items[:3], 1):  # Limit to 3 action items
+            summary_points.append(f"• Request {i}: {item}")
+    
+    # 4. Important Dates and Deadlines
+    date_info = []
+    
+    # Find dates
+    date_patterns = [
+        r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b',
+        r'\b\d{1,2}[/-]\d{1,2}[/-]\d{4}\b',
+        r'\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b'
+    ]
+    
+    for pattern in date_patterns:
+        dates = re.findall(pattern, content)
+        date_info.extend(dates[:3])  # Limit to 3 dates
+    
+    # Look for deadline/timeline context
+    timeline_keywords = ['deadline', 'due', 'by', 'until', 'before', 'starting', 'from', 'schedule']
+    timeline_info = []
+    
+    for keyword in timeline_keywords:
+        pattern = rf'{keyword}\s+(.{{1,40}}?)(?:\.|,|\n)'
+        matches = re.findall(pattern, content_lower, re.IGNORECASE)
+        for match in matches[:1]:  # One match per keyword
+            if any(char.isdigit() for char in match):  # Only if contains numbers/dates
+                timeline_info.append(f"{keyword.title()}: {match.strip()}")
+    
+    if date_info or timeline_info:
+        date_summary = []
+        if date_info:
+            date_summary.append(f"Dates mentioned: {', '.join(set(date_info[:3]))}")
+        if timeline_info:
+            date_summary.append(f"Timeline: {' | '.join(timeline_info[:2])}")
+        summary_points.append(f"• Important Dates: {' | '.join(date_summary)}")
+    
+    # 5. Financial or Numerical Information
+    financial_info = []
+    
+    # Money amounts
+    money_pattern = r'\$\d+(?:,\d{3})*(?:\.\d{2})?'
+    money_amounts = re.findall(money_pattern, content)
+    
+    # Percentages
+    percent_pattern = r'\d+(?:\.\d+)?%'
+    percentages = re.findall(percent_pattern, content)
+    
+    # Numbers with context
+    number_context_pattern = r'(\d+)\s+(days?|months?|years?|hours?|weeks?)'
+    number_contexts = re.findall(number_context_pattern, content_lower)
+    
+    if money_amounts:
+        financial_info.append(f"Amounts: {', '.join(money_amounts[:3])}")
+    if percentages:
+        financial_info.append(f"Percentages: {', '.join(percentages[:3])}")
+    if number_contexts:
+        contexts = [f"{num} {unit}" for num, unit in number_contexts[:3]]
+        financial_info.append(f"Durations: {', '.join(contexts)}")
+    
+    if financial_info:
+        summary_points.append(f"• Numerical Details: {' | '.join(financial_info)}")
+    
+    # 6. Key Topics and Categories
+    topic_keywords = {
+        'Leave/Time Off': ['leave', 'vacation', 'time off', 'holiday', 'absence', 'pto'],
+        'Remote Work': ['remote', 'work from home', 'telecommute', 'flexible work'],
+        'Training/Development': ['training', 'course', 'workshop', 'development', 'skill', 'certification'],
+        'Benefits/Insurance': ['benefits', 'insurance', 'health', 'medical', 'coverage', 'plan'],
+        'Performance': ['performance', 'review', 'evaluation', 'feedback', 'assessment'],
+        'Compensation': ['salary', 'pay', 'compensation', 'bonus', 'raise', 'wages'],
+        'Policies': ['policy', 'procedure', 'rule', 'guideline', 'regulation']
+    }
+    
+    identified_topics = []
+    for topic, keywords in topic_keywords.items():
+        if any(keyword in content_lower for keyword in keywords):
+            identified_topics.append(topic)
+    
+    if identified_topics:
+        summary_points.append(f"• Main Topics: {', '.join(identified_topics[:4])}")
+    
+    # 7. Urgency and Priority Indicators
+    urgency_keywords = ['urgent', 'immediate', 'asap', 'priority', 'critical', 'important', 'time-sensitive']
+    urgent_indicators = [keyword for keyword in urgency_keywords if keyword in content_lower]
+    
+    if urgent_indicators:
+        summary_points.append(f"• Priority Level: High priority document - contains urgency indicators: {', '.join(urgent_indicators[:3])}")
+    
+    # 8. Document Conclusion/Next Steps
+    conclusion_patterns = [
+        r'(?:please|kindly)\s+(.{1,60}?)(?:\.|$)',
+        r'(?:i|we)\s+(?:look forward to|await|expect)\s+(.{1,60}?)(?:\.|$)',
+        r'(?:next steps?|follow[- ]up)\s*:?\s*(.{1,60}?)(?:\.|$)',
+        r'(?:thank you|thanks)\s+(.{1,60}?)(?:\.|$)'
+    ]
+    
+    next_steps = []
+    for pattern in conclusion_patterns:
+        matches = re.findall(pattern, content_lower, re.IGNORECASE)
+        for match in matches[:1]:
+            clean_match = match.strip()
+            if len(clean_match) > 5:
+                next_steps.append(clean_match)
+    
+    if next_steps:
+        summary_points.append(f"• Next Steps: {' | '.join(next_steps[:2])}")
+    
+    # Ensure we have at least 3 summary points
     if len(summary_points) < 3:
-        # Create summary from content chunks to ensure coverage
-        chunk_size = max(30, total_words // 8)
-        for i in range(0, min(len(content_words), chunk_size * 6), chunk_size):
-            if len(summary_points) >= 6:
-                break
-            chunk = ' '.join(content_words[i:i+chunk_size])
-            if len(chunk) > 30:
-                clean_chunk = chunk[:150] + ("..." if len(chunk) > 150 else "")
-                summary_points.append(f"• Content Section: {clean_chunk}")
-
-    # Create final summary
-    final_summary = '\n'.join(summary_points)
-
-    # Ensure we have a proper summary
-    if not summary_points or len(final_summary) < 50:
-        final_summary = f"• Document processed: {total_words} words analyzed\n• Content type: Text document\n• Key content: {content[:200]}{'...' if len(content) > 200 else ''}\n• Analysis complete: Ready for review"
-
-    # Ensure at least 15% coverage as mentioned in requirements
-    coverage_target = max(3, min(10, total_words // 50))
-    while len(summary_points) < coverage_target and len(summary_points) < 10:
-        if remaining_sentences:
-            sentence = remaining_sentences.pop(0)
-            clean_sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-            summary_points.append(f"• Additional Information: {clean_sentence}")
-        else:
-            break
-
-    return '\n'.join(summary_points)
+        # Add content-based summary as fallback
+        sentences = [s.strip() for s in re.split(r'[.!?]+', content) if len(s.strip()) > 20]
+        if sentences:
+            # Add first meaningful sentence
+            summary_points.append(f"• Content Overview: {sentences[0][:100]}...")
+            
+            # Add middle content if available
+            if len(sentences) > 2:
+                mid_sentence = sentences[len(sentences)//2]
+                summary_points.append(f"• Key Information: {mid_sentence[:100]}...")
+    
+    # Join all summary points
+    final_summary = '\n'.join(summary_points[:8])  # Limit to 8 points maximum
+    
+    return final_summary if final_summary else "• Document uploaded and processed\n• Content analysis completed\n• Ready for review"
 
 @app.get("/")
 async def root():
@@ -317,7 +399,7 @@ async def analyze_content(request: AnalysisRequest):
         # Extract entities
         entities = extract_entities(request.content)
 
-        # Generate comprehensive summary
+        # Generate intelligent summary
         summary = generate_summary(request.content)
 
         # Extract key phrases
@@ -329,10 +411,13 @@ async def analyze_content(request: AnalysisRequest):
         # Calculate risk score
         risk_score = calculate_risk_score(request.content, entities)
 
+        # Calculate confidentiality score
+        confidentiality_percent = calculate_confidentiality_score(request.content)
+
         # Basic sentiment analysis (simplified)
         sentiment = "neutral"
-        positive_words = ["good", "excellent", "positive", "success", "approve", "great"]
-        negative_words = ["bad", "terrible", "negative", "fail", "reject", "poor"]
+        positive_words = ["good", "excellent", "positive", "success", "approve", "great", "thank you", "appreciate"]
+        negative_words = ["bad", "terrible", "negative", "fail", "reject", "poor", "urgent", "problem", "issue"]
 
         content_lower = request.content.lower()
         positive_count = sum(1 for word in positive_words if word in content_lower)
@@ -348,10 +433,11 @@ async def analyze_content(request: AnalysisRequest):
             "word_count": len(request.content.split()),
             "sentence_count": len(re.split(r'[.!?]+', request.content)),
             "paragraph_count": len([p for p in request.content.split('\n\n') if p.strip()]),
-            "avg_sentence_length": len(request.content.split()) / max(len(re.split(r'[.!?]+', request.content)), 1)
+            "avg_sentence_length": len(request.content.split()) / max(len(re.split(r'[.!?]+', request.content)), 1),
+            "confidentiality_level": "High" if confidentiality_percent >= 70 else "Medium" if confidentiality_percent >= 30 else "Low"
         }
 
-        logger.info(f"Analyzed content for document {request.doc_id}")
+        logger.info(f"Analyzed content for document {request.doc_id} - Confidentiality: {confidentiality_percent:.1f}%")
 
         return AnalysisResponse(
             entities=entities,
@@ -360,6 +446,7 @@ async def analyze_content(request: AnalysisRequest):
             sentiment=sentiment,
             readability_score=readability_score,
             risk_score=risk_score,
+            confidentiality_percent=confidentiality_percent,
             metadata=metadata
         )
 
@@ -372,7 +459,8 @@ async def analyze_content(request: AnalysisRequest):
             sentiment="neutral",
             readability_score=0.5,
             risk_score=0.1,
-            metadata={"word_count": 0, "sentence_count": 0, "paragraph_count": 0, "avg_sentence_length": 0}
+            confidentiality_percent=0.0,
+            metadata={"word_count": 0, "sentence_count": 0, "paragraph_count": 0, "avg_sentence_length": 0, "confidentiality_level": "Low"}
         )
 
 @app.get("/ping")
