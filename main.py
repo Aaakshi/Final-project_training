@@ -679,24 +679,75 @@ def classify_document(text: str, filename: str) -> tuple:
     text_lower = text.lower()
     filename_lower = filename.lower()
 
-    # Classification logic
-    if any(keyword in text_lower or keyword in filename_lower for keyword in 
-           ['invoice', 'billing', 'payment', 'finance', 'receipt', 'expense', 'budget']):
-        return 'invoice', 'finance', 'high'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['contract', 'agreement', 'legal', 'terms', 'conditions', 'clause']):
-        return 'contract', 'legal', 'high'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['employee', 'hr', 'human resources', 'payroll', 'vacation', 'leave']):
-        return 'hr_document', 'hr', 'medium'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['it', 'technical', 'software', 'hardware', 'system', 'network']):
-        return 'it_document', 'it', 'medium'
-    elif any(keyword in text_lower or keyword in filename_lower for keyword in 
-             ['marketing', 'campaign', 'promotion', 'advertisement', 'brand']):
-        return 'marketing_document', 'marketing', 'low'
-    else:
+    # Enhanced classification logic with more comprehensive keywords
+    
+    # Finance keywords with priority scoring
+    finance_keywords = ['invoice', 'billing', 'payment', 'finance', 'receipt', 'expense', 'budget',
+                       'financial', 'accounting', 'cost', 'revenue', 'profit', 'loss', 'tax',
+                       'audit', 'payroll', 'salary', 'wage', 'reimbursement', 'purchase order',
+                       'vendor payment', 'bank statement', 'credit', 'debit', 'transaction',
+                       'cash flow', 'balance sheet', 'p&l', 'roi', 'margin', 'earnings']
+    
+    # Legal keywords
+    legal_keywords = ['contract', 'agreement', 'legal', 'terms', 'conditions', 'clause',
+                     'litigation', 'compliance', 'regulation', 'policy', 'nda', 'non-disclosure',
+                     'copyright', 'trademark', 'patent', 'liability', 'warranty', 'settlement',
+                     'lawsuit', 'attorney', 'lawyer', 'court', 'arbitration', 'confidentiality']
+    
+    # HR keywords
+    hr_keywords = ['employee', 'hr', 'human resources', 'payroll', 'vacation', 'leave',
+                  'personnel', 'hiring', 'recruitment', 'training', 'performance', 'benefits',
+                  'termination', 'resignation', 'promotion', 'appraisal', 'job description',
+                  'workplace policy', 'harassment', 'diversity', 'staff', 'workforce',
+                  'employment', 'onboarding', 'orientation', 'compensation']
+    
+    # IT keywords
+    it_keywords = ['it', 'technical', 'software', 'hardware', 'system', 'network',
+                  'security', 'cybersecurity', 'database', 'server', 'cloud', 'infrastructure',
+                  'programming', 'development', 'application', 'platform', 'integration',
+                  'api', 'maintenance', 'support', 'troubleshooting', 'bug', 'feature']
+    
+    # Marketing keywords
+    marketing_keywords = ['marketing', 'campaign', 'promotion', 'advertisement', 'brand',
+                         'social media', 'digital marketing', 'content marketing', 'seo',
+                         'analytics', 'engagement', 'conversion', 'lead generation', 'roi']
+
+    # Check for high priority indicators
+    high_priority_indicators = ['urgent', 'immediate', 'asap', 'critical', 'emergency',
+                               'deadline', 'action required', 'confidential', 'sensitive']
+    
+    priority = 'low'
+    if any(indicator in text_lower for indicator in high_priority_indicators):
+        priority = 'high'
+    elif any(word in text_lower for word in ['important', 'priority', 'review', 'approval']):
+        priority = 'medium'
+
+    # Classification with scoring
+    finance_score = sum(1 for keyword in finance_keywords if keyword in text_lower or keyword in filename_lower)
+    legal_score = sum(1 for keyword in legal_keywords if keyword in text_lower or keyword in filename_lower)
+    hr_score = sum(1 for keyword in hr_keywords if keyword in text_lower or keyword in filename_lower)
+    it_score = sum(1 for keyword in it_keywords if keyword in text_lower or keyword in filename_lower)
+    marketing_score = sum(1 for keyword in marketing_keywords if keyword in text_lower or keyword in filename_lower)
+
+    # Determine classification based on highest score
+    scores = {
+        'finance': (finance_score, 'invoice', 'finance', 'high'),
+        'legal': (legal_score, 'contract', 'legal', 'high'), 
+        'hr': (hr_score, 'hr_document', 'hr', 'medium'),
+        'it': (it_score, 'it_document', 'it', 'medium'),
+        'marketing': (marketing_score, 'marketing_document', 'marketing', 'low')
+    }
+
+    best_match = max(scores.items(), key=lambda x: x[1][0])
+    category, (score, doc_type, department, base_priority) = best_match
+
+    if score == 0:
         return 'general', 'administration', 'low'
+    
+    # Override priority if high priority indicators found
+    final_priority = priority if priority == 'high' else base_priority
+    
+    return doc_type, department, final_priority
 
 def get_department_email(department: str) -> str:
     """Get the appropriate email for a department based on existing users"""

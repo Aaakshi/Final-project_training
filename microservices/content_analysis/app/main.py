@@ -127,66 +127,185 @@ def calculate_confidentiality_score(content: str) -> float:
     """Calculate confidentiality percentage based on document content"""
     content_lower = content.lower()
     
-    # High confidentiality keywords (30-50 points each)
+    # Very High confidentiality keywords (40-60 points each)
+    very_high_conf_keywords = [
+        'top secret', 'classified', 'confidential', 'restricted access', 'eyes only',
+        'proprietary', 'trade secret', 'intellectual property', 'patent pending',
+        'salary', 'wages', 'compensation', 'payroll', 'bonus', 'stock options',
+        'ssn', 'social security number', 'tax id', 'ein', 'passport number',
+        'medical records', 'health information', 'diagnosis', 'patient', 'hipaa',
+        'criminal background', 'background check', 'drug test', 'investigation',
+        'lawsuit', 'litigation', 'settlement', 'legal action', 'court case',
+        'merger', 'acquisition', 'buyout', 'takeover', 'strategic acquisition',
+        'board meeting', 'executive decision', 'ceo confidential', 'board resolution',
+        'financial statements', 'audit report', 'tax return', 'insider information',
+        'security clearance', 'access control', 'authentication', 'authorization'
+    ]
+    
+    # High confidentiality keywords (25-40 points each)
     high_conf_keywords = [
-        'confidential', 'classified', 'proprietary', 'trade secret', 'nda', 'non-disclosure',
-        'salary', 'compensation', 'payroll', 'employee id', 'ssn', 'social security',
-        'personal information', 'private', 'restricted', 'internal only', 'sensitive',
-        'password', 'credit card', 'bank account', 'financial records', 'tax information',
-        'medical records', 'health information', 'performance review', 'disciplinary action',
-        'legal action', 'lawsuit', 'settlement', 'merger', 'acquisition', 'strategic plan'
+        'private', 'internal only', 'confidentiality', 'non-disclosure', 'nda',
+        'sensitive', 'privileged', 'restricted', 'proprietary information',
+        'employee id', 'personnel file', 'hr record', 'employment history',
+        'performance review', 'performance evaluation', 'appraisal', 'rating',
+        'disciplinary action', 'warning', 'termination', 'firing', 'layoff',
+        'contract negotiation', 'vendor agreement', 'supplier contract',
+        'budget allocation', 'financial planning', 'cost analysis', 'profit margin',
+        'customer list', 'client database', 'contact information', 'email list',
+        'pricing strategy', 'cost structure', 'revenue model', 'business model',
+        'strategic plan', 'business strategy', 'competitive analysis', 'swot analysis',
+        'research and development', 'r&d', 'product development', 'innovation',
+        'password', 'login credentials', 'access token', 'api key', 'security key',
+        'bank account', 'routing number', 'account number', 'credit card',
+        'personal information', 'pii', 'personally identifiable', 'data protection'
     ]
     
-    # Medium confidentiality keywords (10-20 points each)
+    # Medium confidentiality keywords (15-25 points each)
     medium_conf_keywords = [
-        'employee', 'staff', 'personnel', 'hr', 'human resources', 'department',
-        'manager', 'supervisor', 'team', 'project', 'budget', 'cost', 'expense',
-        'contract', 'agreement', 'vendor', 'client', 'customer', 'business plan',
-        'meeting notes', 'discussion', 'strategy', 'policy', 'procedure'
+        'employee', 'staff', 'personnel', 'workforce', 'team member',
+        'hr', 'human resources', 'talent management', 'recruiting',
+        'department', 'division', 'business unit', 'organizational',
+        'manager', 'supervisor', 'director', 'vice president', 'executive',
+        'project', 'initiative', 'program', 'campaign', 'operation',
+        'budget', 'cost', 'expense', 'expenditure', 'financial',
+        'revenue', 'income', 'profit', 'loss', 'earnings', 'sales',
+        'contract', 'agreement', 'deal', 'partnership', 'collaboration',
+        'vendor', 'supplier', 'contractor', 'third party', 'external',
+        'client', 'customer', 'account', 'relationship', 'service',
+        'meeting notes', 'discussion', 'conversation', 'consultation',
+        'policy', 'procedure', 'guideline', 'protocol', 'standard',
+        'training', 'development', 'education', 'certification', 'skill',
+        'performance', 'productivity', 'efficiency', 'quality', 'metric',
+        'deadline', 'timeline', 'schedule', 'milestone', 'deliverable',
+        'risk', 'compliance', 'audit', 'regulation', 'governance'
     ]
     
-    # Low confidentiality keywords (5-10 points each)
+    # Low confidentiality keywords (5-15 points each)
     low_conf_keywords = [
-        'public', 'announcement', 'press release', 'newsletter', 'general information',
-        'training', 'workshop', 'seminar', 'event', 'schedule', 'calendar'
+        'office', 'facility', 'building', 'location', 'address',
+        'general', 'public', 'external', 'community', 'stakeholder',
+        'calendar', 'schedule', 'appointment', 'meeting', 'event',
+        'announcement', 'notification', 'update', 'news', 'information',
+        'handbook', 'manual', 'guide', 'instruction', 'documentation',
+        'process', 'workflow', 'procedure', 'step', 'task'
+    ]
+    
+    # Public/Low sensitivity keywords (reduce score)
+    public_keywords = [
+        'public', 'open', 'transparent', 'published', 'announced',
+        'press release', 'newsletter', 'blog post', 'social media',
+        'marketing', 'advertisement', 'promotion', 'publicity',
+        'general information', 'faq', 'help', 'support', 'tutorial'
     ]
     
     score = 0.0
+    matched_keywords = []
+    
+    # Check for very high confidentiality content
+    for keyword in very_high_conf_keywords:
+        if keyword in content_lower:
+            score += 50
+            matched_keywords.append(keyword)
     
     # Check for high confidentiality content
     for keyword in high_conf_keywords:
         if keyword in content_lower:
-            score += 35
+            score += 32
+            matched_keywords.append(keyword)
     
     # Check for medium confidentiality content
     for keyword in medium_conf_keywords:
         if keyword in content_lower:
-            score += 15
+            score += 20
+            matched_keywords.append(keyword)
     
-    # Check for low confidentiality content (reduces score)
+    # Check for low confidentiality content
     for keyword in low_conf_keywords:
         if keyword in content_lower:
-            score -= 5
+            score += 10
+            matched_keywords.append(keyword)
     
-    # Check for specific patterns that indicate confidentiality
+    # Check for public content (reduces score)
+    for keyword in public_keywords:
+        if keyword in content_lower:
+            score -= 8
+    
+    # Enhanced pattern matching for sensitive data
     patterns = {
-        r'\b\d{3}-\d{2}-\d{4}\b': 40,  # SSN pattern
-        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 45,  # Credit card pattern
-        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 20,  # Money amounts
-        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 15,  # Email addresses
-        r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': 10,  # Phone numbers
-        r'\bEMP\d+\b|\bID[-\s]?\d+\b': 25,  # Employee IDs
+        r'\b\d{3}-\d{2}-\d{4}\b': 60,  # SSN pattern
+        r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b': 55,  # Credit card pattern
+        r'\$\d+(?:,\d{3})*(?:\.\d{2})?': 25,  # Money amounts
+        r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b': 20,  # Email addresses
+        r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b': 15,  # Phone numbers
+        r'\bEMP\d+\b|\bID[-\s]?\d+\b': 30,  # Employee IDs
+        r'\b\d{2}-\d{7}\b': 35,  # Account numbers
+        r'\b[A-Z]{2}\d{6,8}\b': 40,  # License/ID patterns
+        r'\b\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\b': 55,  # Credit card with spaces
+        r'\b[0-9]{9}\b': 25,  # 9-digit numbers (could be SSN without dashes)
     }
     
     for pattern, points in patterns.items():
-        if re.search(pattern, content):
+        matches = re.findall(pattern, content)
+        if matches:
+            score += points * min(len(matches), 3)  # Cap at 3 matches per pattern
+    
+    # Document type and context indicators
+    doc_type_indicators = {
+        'salary review': 45,
+        'compensation analysis': 45,
+        'performance evaluation': 40,
+        'disciplinary action': 50,
+        'termination notice': 55,
+        'background check': 50,
+        'medical leave': 35,
+        'family leave': 30,
+        'personal time off': 25,
+        'employee complaint': 40,
+        'harassment report': 55,
+        'security incident': 50,
+        'data breach': 60,
+        'financial audit': 45,
+        'tax document': 50,
+        'legal counsel': 45,
+        'board minutes': 50,
+        'executive summary': 35,
+        'strategic planning': 40,
+        'merger discussion': 55,
+        'acquisition plan': 55,
+        'layoff plan': 60,
+        'restructuring': 45
+    }
+    
+    for indicator, points in doc_type_indicators.items():
+        if indicator in content_lower:
             score += points
     
-    # Document type indicators
-    if any(indicator in content_lower for indicator in ['request for', 'application', 'leave', 'vacation']):
-        score += 20
+    # Request/action type analysis
+    if any(indicator in content_lower for indicator in ['request for', 'application for', 'asking for']):
+        if any(sensitive in content_lower for sensitive in ['salary', 'raise', 'promotion', 'transfer', 'leave']):
+            score += 25
+        else:
+            score += 15
     
-    if any(indicator in content_lower for indicator in ['urgent', 'immediate', 'asap', 'priority']):
+    # Urgency and priority context
+    if any(indicator in content_lower for indicator in ['urgent', 'immediate', 'asap', 'critical', 'emergency']):
+        score += 15
+    
+    # Department-specific sensitivity
+    if 'hr' in content_lower or 'human resources' in content_lower:
+        score += 20
+    if 'legal' in content_lower:
+        score += 25
+    if 'finance' in content_lower or 'accounting' in content_lower:
+        score += 22
+    if 'executive' in content_lower or 'board' in content_lower:
+        score += 30
+    
+    # Document length consideration (longer docs might contain more sensitive info)
+    word_count = len(content.split())
+    if word_count > 500:
+        score += 5
+    elif word_count > 1000:
         score += 10
     
     # Normalize score to percentage (0-100)
