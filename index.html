@@ -1947,7 +1947,13 @@
                 return;
             }
 
-            // Sample data for demo
+            // Check if we're on dashboard tab and elements exist
+            const dashboardTab = document.getElementById('dashboard');
+            if (!dashboardTab || !dashboardTab.classList.contains('active')) {
+                return;
+            }
+
+            // Sample data for demo (dashboard charts use sample data)
             const trendData = {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
                 datasets: [{
@@ -1960,32 +1966,40 @@
                 }]
             };
 
-            charts.trend = new Chart(document.getElementById('trendChart'), {
-                type: 'line',
-                data: trendData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: '#e2e8f0'
+            // Only create charts if canvas elements exist
+            const trendCanvas = document.getElementById('trendChart');
+            if (trendCanvas) {
+                try {
+                    charts.trend = new Chart(trendCanvas, {
+                        type: 'line',
+                        data: trendData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: '#e2e8f0'
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        color: '#e2e8f0'
+                                    }
+                                }
                             }
-                        },
-                        x: {
-                            grid: {
-                                color: '#e2e8f0'
-                            }
                         }
-                    }
+                    });
+                } catch (error) {
+                    console.log('Failed to create trend chart:', error.message);
                 }
-            });
+            }
 
             const deptData = {
                 labels: ['HR', 'Finance', 'Legal', 'IT', 'Admin'],
@@ -2002,23 +2016,30 @@
                 }]
             };
 
-            charts.department = new Chart(document.getElementById('departmentChart'), {
-                type: 'doughnut',
-                data: deptData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true
+            const deptCanvas = document.getElementById('departmentChart');
+            if (deptCanvas) {
+                try {
+                    charts.department = new Chart(deptCanvas, {
+                        type: 'doughnut',
+                        data: deptData,
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        padding: 20,
+                                        usePointStyle: true
+                                    }
+                                }
                             }
                         }
-                    }
+                    });
+                } catch (error) {
+                    console.log('Failed to create department chart:', error.message);
                 }
-            });
+            }
         }
 
         function createStatisticsCharts(data) {
@@ -2033,6 +2054,12 @@
                     chart.destroy();
                 }
             });
+
+            // Check if we're on stats tab
+            const statsTab = document.getElementById('stats');
+            if (!statsTab || !statsTab.classList.contains('active')) {
+                return;
+            }
 
             // Create realistic sample data for demo
             const sampleData = {
@@ -2077,7 +2104,8 @@
             // Create document processing trends chart
             const statsLineCtx = document.getElementById('statsLineChart');
             if (statsLineCtx) {
-                charts.statsLine = new Chart(statsLineCtx, {
+                try {
+                    charts.statsLine = new Chart(statsLineCtx, {
                     type: 'line',
                     data: {
                         labels: chartData.upload_trends.map(t => new Date(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
@@ -2123,15 +2151,19 @@
                         }
                     }
                 });
+            } catch (error) {
+                    console.log('Failed to create stats line chart:', error.message);
+                }
             }
 
             // Department workload chart
             const statsDeptCtx = document.getElementById('statsDeptChart');
             if (statsDeptCtx) {
-                const deptLabels = Object.keys(chartData.departments);
-                const deptValues = Object.values(chartData.departments);
+                try {
+                    const deptLabels = Object.keys(chartData.departments);
+                    const deptValues = Object.values(chartData.departments);
 
-                charts.statsDept = new Chart(statsDeptCtx, {
+                    charts.statsDept = new Chart(statsDeptCtx, {
                     type: 'doughnut',
                     data: {
                         labels: deptLabels,
@@ -2164,15 +2196,19 @@
                         }
                     }
                 });
+                } catch (error) {
+                    console.log('Failed to create department chart:', error.message);
+                }
             }
 
             // Document types chart
             const statsTypeCtx = document.getElementById('statsTypeChart');
             if (statsTypeCtx) {
-                const typeLabels = Object.keys(chartData.document_types);
-                const typeValues = Object.values(chartData.document_types);
+                try {
+                    const typeLabels = Object.keys(chartData.document_types);
+                    const typeValues = Object.values(chartData.document_types);
 
-                charts.statsType = new Chart(statsTypeCtx, {
+                    charts.statsType = new Chart(statsTypeCtx, {
                     type: 'bar',
                     data: {
                         labels: typeLabels,
@@ -2214,15 +2250,19 @@
                         }
                     }
                 });
+                } catch (error) {
+                    console.log('Failed to create type chart:', error.message);
+                }
             }
 
             // Priority distribution chart
             const statsPriorityCtx = document.getElementById('statsPriorityChart');
             if (statsPriorityCtx) {
-                const priorityLabels = Object.keys(chartData.priorities);
-                const priorityValues = Object.values(chartData.priorities);
+                try {
+                    const priorityLabels = Object.keys(chartData.priorities);
+                    const priorityValues = Object.values(chartData.priorities);
 
-                charts.statsPriority = new Chart(statsPriorityCtx, {
+                    charts.statsPriority = new Chart(statsPriorityCtx, {
                     type: 'pie',
                     data: {
                         labels: priorityLabels,
@@ -2252,7 +2292,10 @@
                             }
                         }
                     }
-                });
+                    });
+                } catch (error) {
+                    console.log('Failed to create priority chart:', error.message);
+                }
             }
         }
 

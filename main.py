@@ -71,7 +71,7 @@ def init_database():
     conn = sqlite3.connect(DATABASE_FILE)
     cursor = conn.cursor()
 
-    # Drop all tables to ensure clean state
+    # Create tables only if they don't exist (don't drop existing data)
     cursor.execute('DROP TABLE IF EXISTS email_notifications')
     cursor.execute('DROP TABLE IF EXISTS documents')
     cursor.execute('DROP TABLE IF EXISTS users')
@@ -179,8 +179,261 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
+# Initialize database only if it doesn't exist
+def init_database_if_needed():
+    if not os.path.exists(DATABASE_FILE):
+        print("Database doesn't exist, creating new one...")
+        init_database()
+        add_dummy_data()
+    else:
+        print("Database already exists, keeping existing data...")
+        migrate_database()
+
+# Add dummy documents for demo purposes
+def add_dummy_data():
+    print("Adding dummy data for demo users...")
+    conn = sqlite3.connect(DATABASE_FILE)
+    cursor = conn.cursor()
+    
+    # Check if dummy data already exists
+    cursor.execute("SELECT COUNT(*) FROM documents")
+    existing_count = cursor.fetchone()[0]
+    
+    if existing_count > 0:
+        print("Dummy data already exists, skipping...")
+        conn.close()
+        return
+    
+    dummy_documents = [
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'Employee_Handbook_2024.pdf',
+            'file_path': 'dummy/Employee_Handbook_2024.pdf',
+            'file_size': 2048576,
+            'file_type': 'pdf',
+            'uploaded_by': 'hr.manager@company.com',
+            'batch_name': 'HR Policy Updates',
+            'extracted_text': 'Employee Handbook 2024\n\nWelcome to our company! This handbook contains important policies and procedures that every employee should know. Remote Work Policy: Employees may request flexible work arrangements subject to manager approval. Leave Balance: All employees are entitled to 20 days of annual leave per year. Training Programs: We offer various professional development opportunities including digital marketing courses and leadership training.',
+            'document_type': 'hr_document',
+            'department': 'hr',
+            'priority': 'medium',
+            'processing_status': 'classified',
+            'review_status': 'approved',
+            'reviewed_by': 'admin@company.com',
+            'risk_score': 0.2,
+            'confidentiality_percent': 45.0,
+            'sentiment': 'positive',
+            'summary': '• Document Type: HR policy and procedural document\n• Key Stakeholders: All employees | Departments: HR\n• Main Topics: Remote Work, Leave Management, Training, HR Policies\n• Content Overview: Employee handbook covering company policies, remote work guidelines, and professional development opportunities\n• Priority Level: Standard company documentation',
+            'key_phrases': '["Remote Work", "Leave Management", "Training", "HR Policies", "Employee"]',
+            'entities': '{"names": ["Employee Handbook"], "dates": ["2024"], "amounts": ["20 days"], "organizations": [], "locations": []}',
+            'routed_to': 'hr.manager@company.com',
+            'routing_reason': 'HR document automatically routed to HR department'
+        },
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'Q4_Financial_Report.pdf',
+            'file_path': 'dummy/Q4_Financial_Report.pdf',
+            'file_size': 1536000,
+            'file_type': 'pdf',
+            'uploaded_by': 'finance.manager@company.com',
+            'batch_name': 'Q4 Financial Reports',
+            'extracted_text': 'Q4 Financial Report 2024\n\nRevenue: $2,500,000\nExpenses: $1,800,000\nNet Profit: $700,000\n\nThis quarter showed significant growth compared to Q3. Our marketing campaigns generated 15% more leads. Budget allocation for 2025 includes increased investment in technology infrastructure and employee training programs. Accounts payable decreased by 8% while accounts receivable improved.',
+            'document_type': 'financial_report',
+            'department': 'finance',
+            'priority': 'high',
+            'processing_status': 'classified',
+            'review_status': 'approved',
+            'reviewed_by': 'admin@company.com',
+            'risk_score': 0.1,
+            'confidentiality_percent': 85.0,
+            'sentiment': 'positive',
+            'summary': '• Document Type: Financial/billing document\n• Financial Details: Revenue: $2,500,000, Expenses: $1,800,000, Net Profit: $700,000\n• Key Information: 15% growth in marketing leads, 8% decrease in accounts payable\n• Main Topics: Budget allocation for 2025 including technology and training investments\n• Priority Level: High - contains financial performance data',
+            'key_phrases': '["Revenue", "Profit", "Budget", "Financial", "Investment", "Growth"]',
+            'entities': '{"names": [], "dates": ["Q4", "2024", "2025"], "amounts": ["$2,500,000", "$1,800,000", "$700,000", "15%", "8%"], "organizations": [], "locations": []}',
+            'routed_to': 'finance.manager@company.com',
+            'routing_reason': 'Financial document with high confidentiality routed to Finance department'
+        },
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'Software_License_Agreement.docx',
+            'file_path': 'dummy/Software_License_Agreement.docx',
+            'file_size': 892400,
+            'file_type': 'docx',
+            'uploaded_by': 'legal.manager@company.com',
+            'batch_name': 'Legal Contracts Q4',
+            'extracted_text': 'Software License Agreement\n\nThis agreement is between TechCorp Inc. and our company for the licensing of enterprise software solutions. License Duration: 3 years starting January 1, 2025. Payment Terms: Annual payment of $50,000 due within 30 days of invoice. Termination clause allows either party to terminate with 90 days written notice. Compliance requirements include data security audits.',
+            'document_type': 'contract',
+            'department': 'legal',
+            'priority': 'high',
+            'processing_status': 'classified',
+            'review_status': 'pending',
+            'risk_score': 0.7,
+            'confidentiality_percent': 90.0,
+            'sentiment': 'neutral',
+            'summary': '• Document Type: Legal/contractual document\n• Key Stakeholders: TechCorp Inc. | Departments: LEGAL\n• Request 1: Software licensing agreement for enterprise solutions\n• Important Dates: January 1, 2025 start date, 90 days termination notice\n• Financial Details: Annual payment of $50,000\n• Main Topics: Compliance requirements including data security audits',
+            'key_phrases': '["Contract", "Agreement", "Legal", "Compliance", "License", "Payment"]',
+            'entities': '{"names": ["TechCorp Inc"], "dates": ["January 1, 2025", "30 days", "90 days"], "amounts": ["$50,000"], "organizations": ["TechCorp Inc"], "locations": []}',
+            'routed_to': 'legal.manager@company.com',
+            'routing_reason': 'High-risk legal contract requiring immediate attention'
+        },
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'Remote_Work_Request_Johnson.txt',
+            'file_path': 'dummy/Remote_Work_Request_Johnson.txt',
+            'file_size': 15840,
+            'file_type': 'txt',
+            'uploaded_by': 'general.employee@company.com',
+            'batch_name': 'Employee Requests Jan 2025',
+            'extracted_text': 'Subject: Request for Remote Work Flexibility\n\nDear HR Team,\n\nI am writing to request remote work flexibility for the next 3 months starting February 1, 2025. Due to family circumstances, I need to work from home 3 days per week. I will ensure all deliverables are met and will be available for team meetings via video conference. Please let me know if additional documentation is required.\n\nThank you,\nSarah Johnson',
+            'document_type': 'hr_document',
+            'department': 'hr',
+            'priority': 'medium',
+            'processing_status': 'classified',
+            'review_status': 'pending',
+            'risk_score': 0.0,
+            'confidentiality_percent': 35.0,
+            'sentiment': 'positive',
+            'summary': '• Document Type: Employee request/inquiry document\n• Key Stakeholders: People: Sarah Johnson | Departments: HR\n• Request 1: Request for remote work flexibility for 3 months\n• Important Dates: February 1, 2025 start date\n• Main Topics: Remote Work, HR Policies\n• Priority Level: Standard request',
+            'key_phrases': '["Remote Work", "Employee", "Request", "HR", "Flexibility"]',
+            'entities': '{"names": ["Sarah Johnson"], "dates": ["February 1, 2025"], "amounts": ["3 months", "3 days"], "organizations": [], "locations": []}',
+            'routed_to': 'hr.manager@company.com',
+            'routing_reason': 'Employee request routed to HR for review and approval'
+        },
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'IT_Security_Audit_2024.pdf',
+            'file_path': 'dummy/IT_Security_Audit_2024.pdf',
+            'file_size': 3247680,
+            'file_type': 'pdf',
+            'uploaded_by': 'it@company.com',
+            'batch_name': 'IT Security Documents',
+            'extracted_text': 'IT Security Audit Report 2024\n\nExecutive Summary: Our annual security audit revealed several areas for improvement. Network security protocols are functioning well, but we need to update firewall configurations. Employee training on cybersecurity should be mandatory. Budget requirement: $75,000 for security infrastructure upgrades. Immediate action required on password policy enforcement.',
+            'document_type': 'it_document',
+            'department': 'it',
+            'priority': 'high',
+            'processing_status': 'classified',
+            'review_status': 'approved',
+            'reviewed_by': 'admin@company.com',
+            'risk_score': 0.6,
+            'confidentiality_percent': 70.0,
+            'sentiment': 'neutral',
+            'summary': '• Document Type: Report or analysis document\n• Key Stakeholders: Departments: IT\n• Action Required: Security infrastructure upgrades and password policy enforcement\n• Financial Details: Budget requirement of $75,000 for upgrades\n• Main Topics: Network security, employee training, cybersecurity improvements\n• Priority Level: High - contains urgent and immediate action items',
+            'key_phrases': '["Security", "Audit", "Network", "Cybersecurity", "Infrastructure"]',
+            'entities': '{"names": [], "dates": ["2024"], "amounts": ["$75,000"], "organizations": [], "locations": []}',
+            'routed_to': 'it@company.com',
+            'routing_reason': 'High-priority IT security document requiring immediate attention'
+        },
+        {
+            'doc_id': str(uuid.uuid4()),
+            'original_name': 'Marketing_Campaign_Results.xlsx',
+            'file_path': 'dummy/Marketing_Campaign_Results.xlsx',
+            'file_size': 567280,
+            'file_type': 'xlsx',
+            'uploaded_by': 'manager@company.com',
+            'batch_name': 'Marketing Analytics Q4',
+            'extracted_text': 'Q4 Marketing Campaign Results\n\nDigital Marketing Performance:\n- Email campaigns: 25% open rate, 5% click-through rate\n- Social media engagement increased by 40%\n- Lead generation: 1,250 qualified leads\n- Customer acquisition cost: $45 per customer\n- ROI: 315%\n\nRecommendations: Increase budget for social media advertising by 20% next quarter.',
+            'document_type': 'marketing_document',
+            'department': 'marketing',
+            'priority': 'low',
+            'processing_status': 'classified',
+            'review_status': 'approved',
+            'reviewed_by': 'manager@company.com',
+            'risk_score': 0.1,
+            'confidentiality_percent': 25.0,
+            'sentiment': 'positive',
+            'summary': '• Document Type: Report or analysis document\n• Financial Details: Customer acquisition cost: $45, ROI: 315%\n• Key Information: 1,250 qualified leads generated, 40% increase in social media engagement\n• Action Required: Increase social media advertising budget by 20%\n• Main Topics: Digital marketing performance, lead generation, customer acquisition',
+            'key_phrases': '["Marketing", "Campaign", "Digital", "Social Media", "ROI", "Lead Generation"]',
+            'entities': '{"names": [], "dates": ["Q4"], "amounts": ["25%", "5%", "40%", "1,250", "$45", "315%", "20%"], "organizations": [], "locations": []}',
+            'routed_to': 'manager@company.com',
+            'routing_reason': 'Marketing performance document routed to management for review'
+        }
+    ]
+    
+    # Add email notifications for these documents
+    email_notifications = [
+        {
+            'doc_id': dummy_documents[0]['doc_id'],
+            'sent_by': 'hr.manager@company.com',
+            'received_by': 'admin@company.com',
+            'subject': 'New Document Routed: Employee_Handbook_2024.pdf',
+            'body_preview': 'A new HR document has been automatically routed to your department. The employee handbook has been updated with new remote work policies...',
+            'email_type': 'notification',
+            'status': 'sent',
+            'document_name': 'Employee_Handbook_2024.pdf',
+            'department': 'hr',
+            'priority': 'medium'
+        },
+        {
+            'doc_id': dummy_documents[3]['doc_id'],
+            'sent_by': 'hr.manager@company.com',
+            'received_by': 'general.employee@company.com',
+            'subject': 'Document Review: Remote_Work_Request_Johnson.txt - APPROVED',
+            'body_preview': 'Your document "Remote_Work_Request_Johnson.txt" has been approved by HR Manager. Your remote work request has been processed...',
+            'email_type': 'document_review',
+            'status': 'sent',
+            'document_name': 'Remote_Work_Request_Johnson.txt',
+            'department': 'hr',
+            'priority': 'medium'
+        },
+        {
+            'doc_id': dummy_documents[1]['doc_id'],
+            'sent_by': 'finance.manager@company.com',
+            'received_by': 'admin@company.com',
+            'subject': 'New Document Routed: Q4_Financial_Report.pdf',
+            'body_preview': 'A new financial document has been automatically routed to your department. Q4 results show significant growth with $700,000 net profit...',
+            'email_type': 'notification',
+            'status': 'sent',
+            'document_name': 'Q4_Financial_Report.pdf',
+            'department': 'finance',
+            'priority': 'high'
+        }
+    ]
+    
+    # Insert dummy documents
+    for doc in dummy_documents:
+        # Set upload time to various times in the past
+        days_ago = dummy_documents.index(doc) + 1
+        upload_time = (datetime.now() - timedelta(days=days_ago)).isoformat()
+        
+        cursor.execute('''
+            INSERT INTO documents 
+            (doc_id, original_name, file_path, file_size, file_type, uploaded_by, uploaded_at,
+             batch_name, extracted_text, document_type, department, priority, processing_status, 
+             review_status, reviewed_by, reviewed_at, review_comments, risk_score, confidentiality_percent, 
+             sentiment, summary, key_phrases, entities, routed_to, routing_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            doc['doc_id'], doc['original_name'], doc['file_path'], doc['file_size'], 
+            doc['file_type'], doc['uploaded_by'], upload_time, doc['batch_name'],
+            doc['extracted_text'], doc['document_type'], doc['department'], doc['priority'],
+            doc['processing_status'], doc['review_status'], doc.get('reviewed_by'),
+            upload_time if doc.get('reviewed_by') else None, 
+            doc.get('review_comments', ''), doc['risk_score'], doc['confidentiality_percent'],
+            doc['sentiment'], doc['summary'], doc['key_phrases'], doc['entities'],
+            doc['routed_to'], doc['routing_reason']
+        ))
+    
+    # Insert email notifications
+    for notif in email_notifications:
+        days_ago = email_notifications.index(notif) + 1
+        sent_time = (datetime.now() - timedelta(days=days_ago)).isoformat()
+        
+        cursor.execute('''
+            INSERT INTO email_notifications 
+            (doc_id, sent_by, received_by, subject, body_preview, email_type, status, sent_at, document_name, department, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            notif['doc_id'], notif['sent_by'], notif['received_by'], notif['subject'],
+            notif['body_preview'], notif['email_type'], notif['status'], sent_time,
+            notif['document_name'], notif['department'], notif['priority']
+        ))
+    
+    conn.commit()
+    conn.close()
+    print(f"Added {len(dummy_documents)} dummy documents and {len(email_notifications)} email notifications")
+
 # Initialize database on startup
-init_database()
+init_database_if_needed()
 
 # Migrate database to add new columns if they don't exist
 def migrate_database():
@@ -212,8 +465,6 @@ def migrate_database():
 
     conn.commit()
     conn.close()
-
-migrate_database()
 
 # Pydantic models
 class UserRegister(BaseModel):
