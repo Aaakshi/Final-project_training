@@ -432,9 +432,6 @@ def add_dummy_data():
     conn.close()
     print(f"Added {len(dummy_documents)} dummy documents and {len(email_notifications)} email notifications")
 
-# Initialize database on startup
-init_database_if_needed()
-
 # Migrate database to add new columns if they don't exist
 def migrate_database():
     conn = sqlite3.connect(DATABASE_FILE)
@@ -458,13 +455,17 @@ def migrate_database():
     for column_name, column_def in new_columns:
         if column_name not in columns:
             try:
-                cursor.execute(f'ALTER TABLE documents ADD COLUMN {column_name} {column_def}')
+                cursor.execute(f'ALTER TABLE {column_name} ADD COLUMN {column_name} {column_def}')
                 print(f"Added column: {column_name}")
             except Exception as e:
                 print(f"Column {column_name} might already exist: {str(e)}")
 
     conn.commit()
     conn.close()
+
+# Initialize database on startup
+init_database_if_needed()
+    
 
 # Pydantic models
 class UserRegister(BaseModel):

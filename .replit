@@ -16,7 +16,7 @@ run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]
-runButton = "Run Complete IDCR Demo"
+runButton = "Start Frontend Only"
 
 [[workflows.workflow]]
 name = "Run Demo"
