@@ -226,180 +226,214 @@ def extract_key_phrases(content: str) -> List[str]:
     return [phrase[0] for phrase in key_phrases]
 
 def generate_summary(content: str) -> str:
-    """Generate a brief summary of the document using ML-like approach"""
+    """Generate a comprehensive bullet-point summary of the document"""
     if not content or len(content.strip()) == 0:
-        return "Document uploaded successfully - content analysis completed."
+        return "• Document uploaded successfully\n• Content analysis completed\n• Ready for review"
 
     # Clean and prepare content
     content = content.strip()
-    
-    # Try multiple sentence splitting methods
-    sentences = []
-    
-    # Method 1: Split by periods
-    period_sentences = [s.strip() for s in content.split('.') if s.strip() and len(s.strip()) > 15]
-    sentences.extend(period_sentences)
-    
-    # Method 2: Split by newlines for structured documents
-    if not sentences:
-        line_sentences = [s.strip() for s in content.split('\n') if s.strip() and len(s.strip()) > 20]
-        sentences.extend(line_sentences)
-    
-    # Method 3: Try exclamation and question marks
-    if not sentences:
-        other_sentences = []
-        for delimiter in ['!', '?']:
-            other_sentences.extend([s.strip() for s in content.split(delimiter) if s.strip() and len(s.strip()) > 15])
-        sentences.extend(other_sentences)
-
-    if not sentences:
-        # Enhanced fallback - extract meaningful phrases
-        words = content.split()
-        if len(words) <= 10:
-            return content + " - Document processed and analyzed."
-        
-        # Take first meaningful chunk
-        meaningful_content = ' '.join(words[:40])
-        return meaningful_content + "..." if len(words) > 40 else meaningful_content + " - Analysis complete."
-
-    if len(sentences) <= 2:
-        summary = '. '.join(sentences)
-        if not summary.endswith('.'):
-            summary += '.'
-        return summary
-
-    # Enhanced key terms for better classification and importance scoring
-    key_terms = {
-        'action': ['request', 'submit', 'approve', 'review', 'process', 'complete', 'urgent', 'immediate', 'action', 'required'],
-        'business': ['invoice', 'payment', 'contract', 'agreement', 'budget', 'financial', 'cost', 'revenue', 'profit'],
-        'people': ['employee', 'manager', 'team', 'department', 'staff', 'personnel', 'director', 'supervisor'],
-        'process': ['policy', 'procedure', 'workflow', 'system', 'analysis', 'report', 'documentation', 'guidelines'],
-        'time': ['deadline', 'schedule', 'meeting', 'date', 'time', 'duration', 'by', 'before', 'after'],
-        'location': ['office', 'department', 'location', 'address', 'facility', 'building', 'site'],
-        'document_types': ['memo', 'notice', 'announcement', 'summary', 'overview', 'introduction']
-    }
-
-    # Score sentences based on multiple factors
-    scored_sentences = []
-    content_words = content.lower().split()
+    content_words = content.split()
     total_words = len(content_words)
     
-    for i, sentence in enumerate(sentences[:20]):  # Increased limit for better selection
+    # Extract different types of information for comprehensive summary
+    summary_points = []
+    
+    # 1. Document Overview/Purpose
+    overview_keywords = ['overview', 'introduction', 'purpose', 'summary', 'document', 'report', 'memo', 'notice', 'policy']
+    first_sentences = content.split('.')[:3]
+    for sentence in first_sentences:
+        sentence = sentence.strip()
+        if len(sentence) > 20 and any(keyword in sentence.lower() for keyword in overview_keywords):
+            summary_points.append(f"• Document Purpose: {sentence}")
+            break
+    
+    if not summary_points:
+        # Get first meaningful sentence as overview
+        for sentence in content.split('.')[:5]:
+            sentence = sentence.strip()
+            if len(sentence) > 15 and len(sentence.split()) >= 5:
+                summary_points.append(f"• Document Overview: {sentence}")
+                break
+    
+    # 2. Key Actions/Requirements
+    action_keywords = ['request', 'require', 'must', 'need', 'action', 'submit', 'approve', 'review', 'complete', 'deadline', 'urgent', 'immediate']
+    action_sentences = []
+    for sentence in content.split('.'):
+        sentence = sentence.strip()
+        if len(sentence) > 15 and any(keyword in sentence.lower() for keyword in action_keywords):
+            action_sentences.append(sentence)
+    
+    if action_sentences:
+        summary_points.append(f"• Key Actions Required: {action_sentences[0]}")
+        if len(action_sentences) > 1:
+            summary_points.append(f"• Additional Requirements: {action_sentences[1]}")
+    
+    # 3. Financial/Business Information
+    financial_keywords = ['payment', 'invoice', 'cost', 'amount', 'budget', 'financial', 'money', 'price', 'revenue', 'expense']
+    financial_info = []
+    for sentence in content.split('.'):
+        sentence = sentence.strip()
+        if len(sentence) > 10 and any(keyword in sentence.lower() for keyword in financial_keywords):
+            financial_info.append(sentence)
+    
+    if financial_info:
+        summary_points.append(f"• Financial Details: {financial_info[0]}")
+    
+    # 4. People/Departments mentioned
+    people_keywords = ['employee', 'manager', 'department', 'team', 'staff', 'director', 'supervisor', 'hr', 'finance', 'legal', 'it']
+    people_info = []
+    for sentence in content.split('.'):
+        sentence = sentence.strip()
+        if len(sentence) > 10 and any(keyword in sentence.lower() for keyword in people_keywords):
+            people_info.append(sentence)
+    
+    if people_info:
+        summary_points.append(f"• Departments/People Involved: {people_info[0]}")
+    
+    # 5. Dates/Timeline Information
+    import re
+    date_patterns = [
+        r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
+        r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
+        r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
+        r'\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}',  # DD Month YYYY
+        r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}'  # Month DD, YYYY
+    ]
+    
+    dates_found = []
+    for pattern in date_patterns:
+        dates_found.extend(re.findall(pattern, content, re.IGNORECASE))
+    
+    if dates_found:
+        summary_points.append(f"• Important Dates: {', '.join(dates_found[:3])}")
+    
+    # 6. Process/Procedure Information
+    process_keywords = ['process', 'procedure', 'workflow', 'step', 'guideline', 'instruction', 'method', 'approach']
+    process_info = []
+    for sentence in content.split('.'):
+        sentence = sentence.strip()
+        if len(sentence) > 15 and any(keyword in sentence.lower() for keyword in process_keywords):
+            process_info.append(sentence)
+    
+    if process_info:
+        summary_points.append(f"• Process Details: {process_info[0]}")
+    
+    # 7. Key Content Areas (extract most informative sentences)
+    all_sentences = [s.strip() for s in content.split('.') if len(s.strip()) > 20]
+    
+    # Score sentences for informativeness
+    scored_sentences = []
+    for i, sentence in enumerate(all_sentences[:15]):
         score = 0
-        sentence_lower = sentence.lower()
-        sentence_words = sentence.split()
-        word_count = len(sentence_words)
+        words = sentence.split()
         
-        # Position scoring (earlier sentences get higher scores, but not too much weight)
-        if i == 0:
-            score += 4  # First sentence bonus
-        elif i <= 2:
-            score += 2  # Early sentences bonus
-        elif i <= 5:
-            score += 1
-            
-        # Length scoring (prefer informative but not too long sentences)
-        if 10 <= word_count <= 30:
-            score += 4
-        elif 6 <= word_count <= 40:
+        # Length scoring
+        if 8 <= len(words) <= 25:
+            score += 3
+        elif 6 <= len(words) <= 35:
             score += 2
-        elif 5 <= word_count <= 50:
+        
+        # Position scoring (earlier is better)
+        if i < 3:
+            score += 2
+        elif i < 6:
             score += 1
-            
-        # Key term scoring with different weights
-        for category, terms in key_terms.items():
-            category_matches = sum(1 for term in terms if term in sentence_lower)
-            if category in ['action', 'business']:
-                score += category_matches * 3  # Higher weight for action and business terms
-            else:
-                score += category_matches * 2
-                
-        # Sentence structure scoring
-        if sentence.strip().endswith((':', '.')):
-            score += 1  # Complete sentences
-        if any(word in sentence_lower for word in ['this', 'document', 'report', 'summary', 'overview']):
-            score += 2  # Document description indicators
-        if any(word in sentence_lower for word in ['regarding', 'concerning', 'about', 'for', 'to']):
-            score += 1  # Purpose indicators
-            
-        # Penalty for very short or very long sentences
-        if word_count < 5:
-            score -= 3
-        elif word_count > 50:
-            score -= 2
-            
-        # Bonus for sentences with numbers, dates, or specific details
+        
+        # Information density scoring
         if any(char.isdigit() for char in sentence):
             score += 1
+        if sentence.count(',') > 1:  # Contains multiple clauses
+            score += 1
+        if any(word in sentence.lower() for word in ['important', 'key', 'critical', 'essential', 'main']):
+            score += 2
             
-        scored_sentences.append((score, sentence.strip(), i))
-
-    # Sort by score (descending) and position (ascending as tiebreaker)
-    scored_sentences.sort(key=lambda x: (-x[0], x[2]))
-
-    # Select best sentences for summary
-    selected_sentences = []
+        scored_sentences.append((score, sentence))
     
-    if scored_sentences:
-        # Always include the highest scoring sentence
-        selected_sentences.append(scored_sentences[0][1])
-        
-        # Add more sentences based on score threshold and diversity
-        max_score = scored_sentences[0][0]
-        threshold = max(2, max_score * 0.6)  # Adaptive threshold
-        
-        for score, sentence, pos in scored_sentences[1:4]:  # Check next 3 sentences
-            if score >= threshold and len(selected_sentences) < 3:
-                # Check for diversity (avoid very similar sentences)
-                similar = False
-                for existing in selected_sentences:
-                    common_words = set(sentence.lower().split()) & set(existing.lower().split())
-                    if len(common_words) > len(sentence.split()) * 0.6:
-                        similar = True
-                        break
-                if not similar:
-                    selected_sentences.append(sentence)
+    # Sort by score and add top sentences not already covered
+    scored_sentences.sort(key=lambda x: -x[0])
     
-    # Fallback if no sentences scored well
-    if not selected_sentences and sentences:
-        # Take first sentence that's reasonably informative
-        for sentence in sentences[:5]:
-            if len(sentence.split()) >= 6:
-                selected_sentences.append(sentence)
+    # Add additional content points
+    added_content = 0
+    for score, sentence in scored_sentences:
+        if added_content >= 3:  # Limit additional content points
+            break
+        # Check if this content is not already covered
+        sentence_lower = sentence.lower()
+        already_covered = False
+        for existing_point in summary_points:
+            existing_lower = existing_point.lower()
+            common_words = set(sentence_lower.split()) & set(existing_lower.split())
+            if len(common_words) > len(sentence_lower.split()) * 0.4:
+                already_covered = True
                 break
         
-        # If still empty, take first sentence regardless
-        if not selected_sentences:
-            selected_sentences.append(sentences[0])
-
-    # Create summary
-    if selected_sentences:
-        summary = '. '.join(selected_sentences)
-        if not summary.endswith('.'):
-            summary += '.'
-    else:
-        summary = "Document contains structured content ready for review."
-
-    # Ensure reasonable length without adding extra text
-    if len(summary) > 400:
-        words = summary[:400].split()
-        summary = ' '.join(words[:-1]) + "..."
-    elif len(summary) < 50 and total_words > 20:
-        # If summary is too short but document has content, add more context from actual content
-        words = content.split()[:30]
-        summary = ' '.join(words) + ("..." if len(content.split()) > 30 else ".")
+        if not already_covered and score > 2:
+            summary_points.append(f"• Key Content: {sentence}")
+            added_content += 1
     
-    # Clean up any formatting issues and ensure it's a proper summary
-    summary = summary.strip()
-    if not summary or len(summary) < 20:
-        # Last resort - create summary from first meaningful sentences
-        words = content.split()[:40]
-        if words:
-            summary = ' '.join(words) + ("..." if len(content.split()) > 40 else ".")
+    # 8. Document Status/Conclusion
+    conclusion_keywords = ['conclusion', 'summary', 'result', 'outcome', 'decision', 'recommendation', 'next steps']
+    last_sentences = content.split('.')[-3:]
+    for sentence in reversed(last_sentences):
+        sentence = sentence.strip()
+        if len(sentence) > 15 and any(keyword in sentence.lower() for keyword in conclusion_keywords):
+            summary_points.append(f"• Conclusion: {sentence}")
+            break
+    
+    # Ensure we have a minimum number of points for comprehensive coverage
+    if len(summary_points) < 3:
+        # Add more general content points
+        remaining_sentences = [s.strip() for s in content.split('.') if len(s.strip()) > 25]
+        for sentence in remaining_sentences[:5]:
+            if len(summary_points) >= 6:
+                break
+            # Check if not already covered
+            sentence_lower = sentence.lower()
+            already_covered = False
+            for existing_point in summary_points:
+                if any(word in existing_point.lower() for word in sentence_lower.split()[:3]):
+                    already_covered = True
+                    break
+            
+            if not already_covered:
+                summary_points.append(f"• Content Detail: {sentence}")
+    
+    # Ensure we don't have too many points (limit to 8 for readability)
+    if len(summary_points) > 8:
+        summary_points = summary_points[:8]
+    
+    # If no points were generated, create basic summary from content
+    if not summary_points:
+        if total_words > 30:
+            words_chunk1 = ' '.join(content_words[:20])
+            words_chunk2 = ' '.join(content_words[20:40]) if len(content_words) > 20 else ""
+            summary_points = [
+                f"• Document Content: {words_chunk1}",
+                f"• Additional Details: {words_chunk2}" if words_chunk2 else "• Document processing completed"
+            ]
         else:
-            summary = "Document successfully processed and ready for review."
+            summary_points = [
+                f"• Document Content: {content}",
+                "• Ready for review"
+            ]
     
-    return summary
+    # Join all points with newlines
+    final_summary = '\n'.join(summary_points)
+    
+    # Ensure summary isn't too long
+    if len(final_summary) > 800:
+        # Truncate points to fit within limit
+        truncated_points = []
+        current_length = 0
+        for point in summary_points:
+            if current_length + len(point) + 1 <= 800:
+                truncated_points.append(point)
+                current_length += len(point) + 1
+            else:
+                break
+        final_summary = '\n'.join(truncated_points)
+    
+    return final_summary if final_summary else "• Document processed and ready for review"
 
 def detect_language(content: str) -> str:
     """Simple language detection"""
