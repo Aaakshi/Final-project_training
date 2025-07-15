@@ -1678,7 +1678,7 @@
                                 AI-Generated Document Summary
                             </h3>
                             <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #bfdbfe; font-size: 14px; line-height: 1.6; color: #374151;">
-                                ${doc.summary || 'AI summary is being generated. Please check back in a moment.'}
+                                ${doc.summary ? doc.summary.replace(/\n/g, '<br>') : 'AI summary is being generated. Please check back in a moment.'}
                             </div>
                             ${doc.key_phrases && doc.key_phrases !== '[]' ? `
                                 <div style="margin-top: 15px;">
