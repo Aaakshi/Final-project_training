@@ -603,6 +603,17 @@ async def bulk_upload_documents(
         confidentiality_percent = analysis_data.get('confidentiality_percent', 0.0)
         sentiment = analysis_data.get('sentiment', 'neutral')
         summary = analysis_data.get('summary', '')
+        
+        # Ensure we have a meaningful summary
+        if not summary or summary.strip() == '' or len(summary.strip()) < 20:
+            # Generate a basic summary from the extracted text
+            if extracted_text and len(extracted_text.strip()) > 50:
+                words = extracted_text.strip().split()[:30]
+                summary = ' '.join(words) + "..." if len(words) == 30 else ' '.join(words)
+                summary += " - Document processed and ready for review."
+            else:
+                summary = f"Document '{file.filename}' processed successfully. Content classified as {doc_type} for {department} department."
+        
         key_phrases = json.dumps(analysis_data.get('key_phrases', []))
         entities = json.dumps(analysis_data.get('entities', {}))
 
